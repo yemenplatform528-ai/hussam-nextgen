@@ -1,0 +1,19 @@
+{
+  "gate": "postgresql",
+  "environment": "staging",
+  "source": "real PostgreSQL operator / environment identifier",
+  "performed_at": "2026-09-15T00:00:00Z",
+  "result": "PASS",
+  "reviewed_by": "named reviewer",
+  "checks": [
+    "Alembic upgrade to deployed head succeeded",
+    "alembic check returned no pending operations",
+    "backup artifact created and archive listing verified",
+    "restore completed into isolated target",
+    "SELECT 1 and application smoke checks passed"
+  ],
+  "artifact": {
+    "path": "artifacts/postgresql/real-drill-report.txt",
+    "sha256": "PUT_REAL_64_HEX_SHA256_HERE"
+  }
+}

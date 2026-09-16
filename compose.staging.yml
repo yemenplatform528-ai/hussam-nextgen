@@ -1,0 +1,42 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: hussam
+      POSTGRES_USER: hussam
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in the staging environment}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hussam -d hussam"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - hussam_pgdata:/var/lib/postgresql/data
+
+  api:
+    build: .
+    environment:
+      DATABASE_URL: postgresql+psycopg://hussam:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in the staging environment}@db:5432/hussam
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in the staging environment}
+      ENVIRONMENT: staging
+      REQUIRE_HTTPS: "true"
+      RATE_LIMIT_EDGE_ENFORCED: "true"
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:?set OIDC_CLIENT_ID in the staging environment}
+      OIDC_ISSUER: ${OIDC_ISSUER:?set OIDC_ISSUER in the staging environment}
+      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:?set OIDC_CLIENT_SECRET in the staging environment}
+      OIDC_REDIRECT_URI: ${OIDC_REDIRECT_URI:?set OIDC_REDIRECT_URI in the staging environment}
+      OIDC_STATE_SECRET: ${OIDC_STATE_SECRET:?set OIDC_STATE_SECRET in the staging environment}
+      SQL_ECHO: "false"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/ready')"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    ports:
+      - "8000:8000"
+
+volumes:
+  hussam_pgdata:

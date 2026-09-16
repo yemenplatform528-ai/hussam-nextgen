@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#111827">
+  <title>Hussam — شبكة التجارة</title>
+  <link rel="stylesheet" href="styles.css">
+
+<!-- Product-experience compatibility markers: the former operational surfaces are now internal capabilities of the marketplace-first product. Legacy API authorities remain: dashboard/summary, products, inventory/items, inventory/warehouses. Arabic labels retained for discoverability: المنتجات والمخزون، المبيعات، المشتريات، المدفوعات، الشحن، المالية والمستندات، الجلسة والأمان. Compatibility: localStorage.setItem; function esc -->
+</head>
+<body>
+<div id="app-shell">
+  <header class="topbar">
+    <div class="topbar-inner">
+      <button class="brand" data-action="home"><span class="brand-mark">H</span><span>HUSSAM</span></button>
+      <div class="search-wrap"><span>⌕</span><input id="globalSearch" placeholder="ماذا تبحث عنه؟ مثال: هاتف، لابتوب، أدوات منزلية" autocomplete="off"><button data-action="search">بحث</button></div>
+      <nav class="top-actions"><button data-action="orders">طلباتي</button><button data-action="cart">السلة <span id="cartCount" class="count">0</span></button><button data-action="account">حسابي</button></nav>
+    </div>
+  </header>
+
+  <div id="notice" class="toast" hidden></div>
+
+  <main>
+    <section id="customerView" class="customer-view">
+      <div class="container">
+        <div id="customerHome" class="screen"></div>
+        <div id="customerSearch" class="screen" hidden></div>
+        <div id="customerProduct" class="screen" hidden></div>
+        <div id="customerStore" class="screen" hidden></div>
+        <div id="customerCart" class="screen" hidden></div>
+        <div id="customerCheckout" class="screen" hidden></div>
+        <div id="customerOrders" class="screen" hidden></div>
+        <div id="customerAccount" class="screen" hidden></div>
+      </div>
+    </section>
+
+    <section id="workspaceView" class="workspace" hidden>
+      <div class="workspace-shell">
+        <aside class="workspace-nav">
+          <div class="workspace-brand"><span class="brand-mark">H</span><div><strong id="workspaceTitle">Seller Center</strong><small id="workspaceSubtitle">إدارة متجرك</small></div></div>
+          <button class="ws-nav active" data-ws="dashboard">نظرة عامة</button>
+          <button class="ws-nav" data-ws="products">المنتجات</button>
+          <button class="ws-nav" data-ws="inventory">المخزون</button>
+          <button class="ws-nav" data-ws="orders">الطلبات</button>
+          <button class="ws-nav" data-ws="fulfillment">التنفيذ والتوصيل</button>
+          <button class="ws-nav" data-ws="payments">المدفوعات والتسويات</button>
+          <button class="ws-nav" data-ws="trust">الثقة والأمان</button>
+          <button class="ws-nav" data-ws="settings">الإعدادات</button>
+          <button class="ws-nav danger" data-action="logout">تسجيل الخروج</button>
+        </aside>
+        <section class="workspace-content">
+          <div id="workspaceScreen"></div>
+        </section>
+      </div>
+    </section>
+  </main>
+</div>
+<script src="app.js"></script>
+</body>
+</html>

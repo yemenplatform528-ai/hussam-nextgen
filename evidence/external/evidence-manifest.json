@@ -1,0 +1,78 @@
+{
+  "closed": 0,
+  "gates": [
+    {
+      "artifact": null,
+      "gate": "Identity/OIDC",
+      "reason": "evidence envelope missing",
+      "sha256": null,
+      "state": "PENDING_EXTERNAL"
+    },
+    {
+      "artifact": null,
+      "gate": "PostgreSQL",
+      "reason": "evidence envelope missing",
+      "sha256": null,
+      "state": "PENDING_EXTERNAL"
+    },
+    {
+      "artifact": null,
+      "gate": "Payments",
+      "reason": "evidence envelope missing",
+      "sha256": null,
+      "state": "PENDING_EXTERNAL"
+    },
+    {
+      "artifact": null,
+      "gate": "Accounting",
+      "reason": "evidence envelope missing",
+      "sha256": null,
+      "state": "PENDING_EXTERNAL"
+    },
+    {
+      "artifact": null,
+      "gate": "Logistics",
+      "reason": "evidence envelope missing",
+      "sha256": null,
+      "state": "PENDING_EXTERNAL"
+    },
+    {
+      "artifact": null,
+      "gate": "Browser/mobile E2E",
+      "reason": "evidence envelope missing",
+      "sha256": null,
+      "state": "PENDING_EXTERNAL"
+    },
+    {
+      "artifact": null,
+      "gate": "Security",
+      "reason": "evidence envelope missing",
+      "sha256": null,
+      "state": "PENDING_EXTERNAL"
+    },
+    {
+      "artifact": null,
+      "gate": "Backup/DR/Observability",
+      "reason": "evidence envelope missing",
+      "sha256": null,
+      "state": "PENDING_EXTERNAL"
+    },
+    {
+      "artifact": null,
+      "gate": "Operations",
+      "reason": "evidence envelope missing",
+      "sha256": null,
+      "state": "PENDING_EXTERNAL"
+    },
+    {
+      "artifact": null,
+      "gate": "Legal/Compliance",
+      "reason": "evidence envelope missing",
+      "sha256": null,
+      "state": "PENDING_EXTERNAL"
+    }
+  ],
+  "generated_at": "2026-09-14T21:23:19.508314+00:00",
+  "pending_external": 10,
+  "principle": "artifact-backed, reviewed evidence only; configuration is not evidence"
+}

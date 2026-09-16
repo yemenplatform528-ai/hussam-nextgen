@@ -1,0 +1,35 @@
+groups:
+  - name: hussam-nextgen-production
+    rules:
+      - alert: HussamApiDown
+        expr: up{job="hussam-api"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: Hussam NextGen API is down
+          description: The production API target has been unreachable for more than two minutes.
+      - alert: HussamReadinessFailed
+        expr: hussam_readiness_ok == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: Hussam NextGen readiness is failing
+          description: The last deep database readiness probe is failing.
+      - alert: HussamHigh5xxRate
+        expr: rate(hussam_http_requests_failed_total[5m]) / clamp_min(rate(hussam_http_requests_total[5m]), 1) > 0.05
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: Hussam NextGen 5xx rate is elevated
+          description: More than five percent of requests have returned 5xx responses over ten minutes.
+      - alert: HussamNoTraffic
+        expr: increase(hussam_http_requests_total[15m]) == 0
+        for: 15m
+        labels:
+          severity: info
+        annotations:
+          summary: Hussam NextGen has received no HTTP traffic
+          description: Verify routing, load balancer health checks, and monitoring before treating this as an outage.

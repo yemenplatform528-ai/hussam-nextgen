@@ -1,0 +1,31 @@
+services:
+  - type: web
+    name: hussam-nextgen-api
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /ready
+    autoDeploy: true
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: ENVIRONMENT
+        value: staging
+      - key: REQUIRE_HTTPS
+        value: "true"
+      - key: RATE_LIMIT_EDGE_ENFORCED
+        value: "true"
+      - key: OIDC_CLIENT_ID
+        sync: false
+      - key: OIDC_ISSUER
+        sync: false
+      - key: OIDC_CLIENT_SECRET
+        sync: false
+      - key: OIDC_REDIRECT_URI
+        sync: false
+      - key: OIDC_STATE_SECRET
+        sync: false
+      - key: SQL_ECHO
+        value: "false"

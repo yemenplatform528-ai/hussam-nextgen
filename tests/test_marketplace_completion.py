@@ -1,0 +1,91 @@
+from datetime import datetime, timezone
+from decimal import Decimal
+import pytest
+from sqlalchemy import create_engine, select
+from sqlalchemy.orm import sessionmaker
+from app.core.persistence import Base
+from app.core.models import Tenant, User, TenantMembership
+from app.core.models.marketplace import MarketplaceSellerVerification, MarketplaceShippingQuote, MarketplaceFavorite, MarketplaceReturnRequest
+from app.engines.identity import IdentityService
+from app.engines.inventory.production import InventoryProductionService
+from app.core.contracts import StockMovement
+from app.engines.marketplace import MarketplaceService, ListingInput, MarketplaceError
+from app.engines.marketplace_completion import MarketplaceCompletionService
+
+def setup():
+    e=create_engine('sqlite+pysqlite:///:memory:',future=True); Base.metadata.create_all(e); db=sessionmaker(e,expire_on_commit=False)()
+    ids=IdentityService(db); seller=ids.create_tenant('Seller'); buyer_t=ids.create_tenant('Buyer'); buyer=ids.create_user('buyer','buyer@example.com'); su=ids.create_user('seller','seller@example.com'); ids.add_membership(buyer.id,buyer_t.id,'owner'); ids.add_membership(su.id,seller.id,'owner')
+    inv=InventoryProductionService(db); inv.create_item(seller.id,'rice','Rice','bag'); inv.create_warehouse(seller.id,'wh','Main'); inv.record(seller.id,StockMovement('rice','wh',Decimal('20'),'in','opening'))
+    m=MarketplaceService(db); m.register_seller(seller.id,'seller','Seller'); m.review_seller_verification(seller.id,su.id,'approved')
+    l=m.create_listing(seller.id,ListingInput('rice','Rice','product','product','YER',Decimal('1000'),'rice','wh'))
+    m.moderate_listing(l.id,su.id,'approved')
+    m.publish_listing(seller.id,l.id); m.ensure_buyer(buyer.id); a=m.add_address(buyer.id,'home','Buyer','777','Aden','Aden','Street')
+    return db,seller,buyer,su,l,a,m
+
+def test_verification_is_required_for_activation_and_public_visibility():
+    db,seller,buyer,su,l,a,m=setup()
+    assert db.scalar(select(MarketplaceSellerVerification).where(MarketplaceSellerVerification.seller_tenant_id==seller.id)).status=='approved'
+    assert m.public_listings()[0]['seller']['tenant_id']==seller.id
+
+def test_shipping_quote_is_server_owned_and_consumed():
+    db,seller,buyer,su,l,a,m=setup(); m.add_shipping_rate(seller.id,'Aden','Aden','YER',Decimal('250'))
+    m.add_to_cart(buyer.id,l.id,1); q=m.quote_shipping(buyer.id,a.id,seller.id,'YER'); assert q.fee==Decimal('250.0000')
+    orders=m.checkout(buyer.id,a.id,Decimal('0'),500,q.id); assert orders[0].shipping_fee==Decimal('250.0000'); assert q.consumed_at is not None
+    m.add_to_cart(buyer.id,l.id,1)
+    with pytest.raises(MarketplaceError): m.checkout(buyer.id,a.id,Decimal('250'),500,q.id)
+
+def test_client_cannot_supply_arbitrary_shipping_fee():
+    db,seller,buyer,su,l,a,m=setup(); m.add_to_cart(buyer.id,l.id,1)
+    with pytest.raises(MarketplaceError): m.checkout(buyer.id,a.id,Decimal('10'),500)
+
+def test_payment_intent_is_attached_to_marketplace_order():
+    db,seller,buyer,su,l,a,m=setup(); m.add_to_cart(buyer.id,l.id,1); o=m.checkout(buyer.id,a.id)[0]
+    p=m.attach_payment_intent(buyer.id,o.id,'provider-x'); assert o.payment_reference==p.reference
+    assert p.reference.startswith('MKT-PAY:')
+
+def test_paid_order_cannot_be_directly_cancelled():
+    db,seller,buyer,su,l,a,m=setup(); m.add_to_cart(buyer.id,l.id,1); o=m.checkout(buyer.id,a.id)[0]; o.status='paid'; db.commit()
+    with pytest.raises(MarketplaceError): m.cancel(buyer.id,o.id)
+
+def test_favorite_and_return_request_are_buyer_scoped():
+    db,seller,buyer,su,l,a,m=setup(); f=m.add_favorite(buyer.id,l.id); assert f.listing_id==l.id; m.remove_favorite(buyer.id,l.id); assert db.scalar(select(MarketplaceFavorite).where(MarketplaceFavorite.buyer_user_id==buyer.id)) is None
+    m.add_to_cart(buyer.id,l.id,1); o=m.checkout(buyer.id,a.id)[0]; o.status='completed'; db.commit(); r=m.request_return(buyer.id,o.id,'damaged','damaged item'); assert r.status=='requested'
+
+def test_multi_seller_checkout_accepts_one_shipping_quote_per_seller():
+    db,seller,buyer,su,l,a,m=setup()
+    seller2_t=IdentityService(db).create_tenant('Seller Two')
+    su2=IdentityService(db).create_user('seller2','seller2@example.com')
+    IdentityService(db).add_membership(su2.id,seller2_t.id,'owner')
+    m.register_seller(seller2_t.id,'seller-two','Seller Two'); m.review_seller_verification(seller2_t.id,su2.id,'approved')
+    inv=InventoryProductionService(db); inv.create_item(seller2_t.id,'tea','Tea','bag'); inv.create_warehouse(seller2_t.id,'wh2','Main'); inv.record(seller2_t.id,StockMovement('tea','wh2',Decimal('20'),'in','opening'))
+    l2=m.create_listing(seller2_t.id,ListingInput('tea','Tea','product','product','YER',Decimal('500'),'tea','wh2')); m.moderate_listing(l2.id,su2.id,'approved'); m.publish_listing(seller2_t.id,l2.id)
+    m.add_shipping_rate(seller.id,'Aden','Aden','YER',Decimal('250')); m.add_shipping_rate(seller2_t.id,'Aden','Aden','YER',Decimal('150'))
+    m.add_to_cart(buyer.id,l.id,1); m.add_to_cart(buyer.id,l2.id,1)
+    q1=m.quote_shipping(buyer.id,a.id,seller.id,'YER'); q2=m.quote_shipping(buyer.id,a.id,seller2_t.id,'YER')
+    orders=m.checkout(buyer.id,a.id,Decimal('0'),500,None,[q1.id,q2.id])
+    assert len(orders)==2 and all(o.shipping_fee in {Decimal('250.0000'),Decimal('150.0000')} for o in orders)
+    assert q1.consumed_at is not None and q2.consumed_at is not None
+
+
+def test_checkout_discount_allocates_atomically_across_seller_orders():
+    db,seller,buyer,su,l,a,m=setup(); svc=MarketplaceCompletionService(db)
+    from app.core.models.marketplace import MarketplaceCustomerOrder, MarketplaceSellerOrder, MarketplaceOrder
+    customer=MarketplaceCustomerOrder(reference='co-alloc',buyer_user_id=buyer.id,currency='YER',subtotal=Decimal('3000'),shipping_fee=Decimal('0'),total=Decimal('3000'))
+    db.add(customer); db.flush()
+    seller2=IdentityService(db).create_tenant('Seller Three')
+    mo1=MarketplaceOrder(reference='mo-alloc-1',buyer_user_id=buyer.id,seller_tenant_id=seller.id,customer_order_id=customer.id,currency='YER',subtotal=Decimal('1000'),shipping_fee=0,platform_fee=0,total=Decimal('1000'))
+    mo2=MarketplaceOrder(reference='mo-alloc-2',buyer_user_id=buyer.id,seller_tenant_id=seller2.id,customer_order_id=customer.id,currency='YER',subtotal=Decimal('2000'),shipping_fee=0,platform_fee=0,total=Decimal('2000'))
+    db.add_all([mo1,mo2]); db.flush()
+    so1=MarketplaceSellerOrder(customer_order_id=customer.id,marketplace_order_id=mo1.id,seller_tenant_id=seller.id,subtotal=Decimal('1000'),shipping_fee=0,total=1000)
+    so2=MarketplaceSellerOrder(customer_order_id=customer.id,marketplace_order_id=mo2.id,seller_tenant_id=seller2.id,subtotal=Decimal('2000'),shipping_fee=0,total=2000)
+    db.add_all([so1,so2]); db.commit(); db.refresh(so1); db.refresh(so2)
+    out=svc.allocate_order_discount(customer.id,[{'seller_order_id':so1.id,'amount':100},{'seller_order_id':so2.id,'amount':200}],funding_source='platform')
+    assert out['discount']=='300.0000' and len(out['allocations'])==2
+
+
+def test_repricing_job_lifecycle():
+    db,seller,buyer,su,l,a,m=setup(); svc=MarketplaceCompletionService(db); now=datetime.now(timezone.utc)
+    job=svc.schedule_repricing(seller.id,l.id,now)
+    assert job.status=='queued'
+    out=svc.execute_repricing_job(seller.id,job.id)
+    assert out['status']=='completed'

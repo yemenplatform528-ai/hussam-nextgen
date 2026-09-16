@@ -1,0 +1,45 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Local configuration / secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+
+# Databases / local runtime
+*.db
+*.sqlite
+*.sqlite3
+*.log
+runtime/
+
+# Build / distribution
+build/
+dist/
+*.egg-info/
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+
+# Node artifacts if a client is added
+node_modules/
+
+# Local audit outputs
+reports/
