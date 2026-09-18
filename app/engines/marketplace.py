@@ -23,6 +23,7 @@ from app.core.models.inventory import InventoryItem, Warehouse
 from app.core.models.catalog import MarketplaceProduct, MarketplaceSKU, MarketplaceOffer
 from app.core.models.governance import OutboxEvent
 from app.engines.commerce import CommerceProductionService, OrderLineInput
+from app.core.models.marketplace_operational import MarketplaceOrderFinancialAllocation
 
 class MarketplaceError(ValueError): pass
 
@@ -836,6 +837,19 @@ class MarketplaceService:
                 self.db.add(MarketplaceOrderLine(marketplace_order_id=order.id,listing_id=l.id,sales_order_line_id=sales_lines[j].id if j<len(sales_lines) else None,title_snapshot=l.title,quantity=_money(ci.quantity),unit_price=_money(l.unit_price),line_total=line_total)); j+=1
             self.db.add(MarketplaceOrderFee(marketplace_order_id=order.id,seller_tenant_id=seller_id,rule_id=fee_rule.id,fee_type='commission',basis_amount=subtotal,commission_bps=fee_rule.commission_bps,fixed_fee=_money(fee_rule.fixed_fee),amount=fee,currency=currency))
             self.db.add(MarketplacePayout(market_id=market_id,seller_tenant_id=seller_id,marketplace_order_id=order.id,reference=f'PAYOUT:{ref}',gross_amount=total,platform_fee=fee,net_amount=total-fee,currency=currency,status='held'))
+            line_rows=self.db.scalars(select(MarketplaceOrderLine).where(MarketplaceOrderLine.marketplace_order_id==order.id).order_by(MarketplaceOrderLine.id)).all()
+            remaining_fee=fee; remaining_shipping=seller_shipping_fee
+            for idx,line in enumerate(line_rows):
+                is_last=idx==len(line_rows)-1
+                share=line_total=line.line_total
+                if is_last:
+                    line_fee=remaining_fee; line_shipping=remaining_shipping
+                else:
+                    ratio=(Decimal(str(line.line_total))/subtotal) if subtotal else Decimal('0')
+                    line_fee=_money(fee*ratio); line_shipping=_money(seller_shipping_fee*ratio)
+                    remaining_fee-=line_fee; remaining_shipping-=line_shipping
+                line_net=_money(line.line_total+line_shipping-line_fee)
+                self.db.add(MarketplaceOrderFinancialAllocation(marketplace_order_id=order.id,order_line_id=line.id,seller_order_id=seller_order.id,seller_tenant_id=seller_id,market_id=market_id,currency=currency,gross_amount=_money(line.line_total),shipping_amount=_money(line_shipping),discount_amount=Decimal('0'),platform_fee=_money(line_fee),net_amount=line_net,allocation_reference=f'ALLOC:{ref}:{line.id}'))
             self._event(seller_id,'marketplace.order.created','marketplace_order',order.id,{'reference':ref,'buyer_user_id':user_id,'total':str(total),'currency':currency})
             self.db.flush(); created.append(order)
             for quote in quotes:
@@ -845,6 +859,11 @@ class MarketplaceService:
             self.db.delete(ci)
         cart.status='active'; cart.updated_at=datetime.now(timezone.utc); self.db.commit()
         return created
+
+    def financial_allocation(self, marketplace_order_id:int):
+        """Return immutable line-level financial allocation for one seller order."""
+        rows=self.db.scalars(select(MarketplaceOrderFinancialAllocation).where(MarketplaceOrderFinancialAllocation.marketplace_order_id==marketplace_order_id).order_by(MarketplaceOrderFinancialAllocation.order_line_id)).all()
+        return [{"order_line_id":x.order_line_id,"seller_order_id":x.seller_order_id,"seller_tenant_id":x.seller_tenant_id,"market_id":x.market_id,"currency":x.currency,"gross":str(x.gross_amount),"shipping":str(x.shipping_amount),"discount":str(x.discount_amount),"platform_fee":str(x.platform_fee),"net":str(x.net_amount),"reference":x.allocation_reference} for x in rows]
 
     def customer_order_view(self, buyer_user_id:str, customer_order_id:int):
         co=self.db.scalar(select(MarketplaceCustomerOrder).where(MarketplaceCustomerOrder.id==customer_order_id,MarketplaceCustomerOrder.buyer_user_id==buyer_user_id))

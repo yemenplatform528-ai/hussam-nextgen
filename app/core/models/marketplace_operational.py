@@ -28,6 +28,31 @@ class MarketplaceDiscountAllocation(Base):
     )
 
 
+class MarketplaceOrderFinancialAllocation(Base):
+    __tablename__ = 'marketplace_order_financial_allocations'
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    marketplace_order_id: Mapped[int] = mapped_column(ForeignKey('marketplace_orders.id', ondelete='CASCADE'), nullable=False, index=True)
+    order_line_id: Mapped[int] = mapped_column(ForeignKey('marketplace_order_lines.id', ondelete='CASCADE'), nullable=False, unique=True, index=True)
+    seller_order_id: Mapped[int] = mapped_column(ForeignKey('marketplace_seller_orders.id', ondelete='CASCADE'), nullable=False, index=True)
+    seller_tenant_id: Mapped[int] = mapped_column(ForeignKey('tenants.id', ondelete='RESTRICT'), nullable=False, index=True)
+    market_id: Mapped[int | None] = mapped_column(ForeignKey('market_contexts.id', ondelete='RESTRICT'), nullable=True, index=True)
+    currency: Mapped[str] = mapped_column(String(10), nullable=False)
+    gross_amount: Mapped[Decimal] = mapped_column(Numeric(20, 4), nullable=False)
+    shipping_amount: Mapped[Decimal] = mapped_column(Numeric(20, 4), nullable=False, default=0)
+    discount_amount: Mapped[Decimal] = mapped_column(Numeric(20, 4), nullable=False, default=0)
+    platform_fee: Mapped[Decimal] = mapped_column(Numeric(20, 4), nullable=False, default=0)
+    net_amount: Mapped[Decimal] = mapped_column(Numeric(20, 4), nullable=False)
+    allocation_reference: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, nullable=False)
+    __table_args__ = (
+        CheckConstraint('gross_amount >= 0 AND shipping_amount >= 0 AND discount_amount >= 0 AND platform_fee >= 0 AND net_amount >= 0', name='ck_market_fin_alloc_nonnegative'),
+        CheckConstraint('discount_amount <= gross_amount + shipping_amount', name='ck_market_fin_alloc_discount_bound'),
+        CheckConstraint('net_amount = gross_amount + shipping_amount - discount_amount - platform_fee', name='ck_market_fin_alloc_math'),
+        UniqueConstraint('marketplace_order_id', 'order_line_id', name='uq_market_fin_alloc_order_line'),
+        Index('ix_market_fin_alloc_seller_market_currency', 'seller_tenant_id', 'market_id', 'currency'),
+    )
+
+
 class MarketplaceRepricingJob(Base):
     __tablename__ = 'marketplace_repricing_jobs'
     id: Mapped[int] = mapped_column(Integer, primary_key=True)

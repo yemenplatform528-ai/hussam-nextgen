@@ -4,6 +4,7 @@ from sqlalchemy.orm import sessionmaker
 from app.core.persistence import Base
 from app.core.models import Tenant, User
 from app.core.models.marketplace import MarketplaceCustomerOrder, MarketplaceSellerOrder, MarketplaceFulfillment
+from app.core.models.marketplace_operational import MarketplaceOrderFinancialAllocation
 from app.engines.identity import IdentityService
 from app.engines.inventory.production import InventoryProductionService
 from app.core.contracts import StockMovement
@@ -37,6 +38,11 @@ def test_multiseller_checkout_creates_one_customer_order_and_seller_orders():
     assert co.total == Decimal('3500.0000')
     assert len(children)==2 and {x.seller_tenant_id for x in children}=={listings[0].seller_tenant_id,listings[1].seller_tenant_id}
     assert len(fulfillments)==2 and all(x.status=='pending' for x in fulfillments)
+    allocations=db.scalars(select(MarketplaceOrderFinancialAllocation).where(MarketplaceOrderFinancialAllocation.marketplace_order_id.in_([x.id for x in orders]))).all()
+    assert len(allocations)==2
+    assert sum((x.gross_amount for x in allocations), Decimal('0')) == Decimal('3500.0000')
+    assert sum((x.net_amount for x in allocations), Decimal('0')) == sum((x.net_amount for x in [db.scalar(select(__import__('app.core.models.marketplace', fromlist=['MarketplacePayout']).MarketplacePayout).where(__import__('app.core.models.marketplace', fromlist=['MarketplacePayout']).MarketplacePayout.marketplace_order_id==o.id)) for o in orders]), Decimal('0'))
+    assert {x.seller_tenant_id for x in allocations} == {listings[0].seller_tenant_id,listings[1].seller_tenant_id}
     view=m.customer_order_view(buyer.id,co.id)
     assert view['reference']==co.reference and len(view['seller_orders'])==2
 
