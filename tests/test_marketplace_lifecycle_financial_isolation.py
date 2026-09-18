@@ -180,3 +180,33 @@ def test_settlement_from_another_market_cannot_link_to_order():
     o.status='paid'; o.payment_reference=p.reference; db.commit()
     with pytest.raises(MarketplaceError, match='settlement market'):
         m.settle_order_payment(seller.id, o.id, settlement.settlement_reference)
+
+
+def test_paid_payout_refund_completion_is_idempotent_for_same_provider_reference():
+    db, m, ids, seller, admin, buyer, o = setup()
+    payout = db.scalar(select(MarketplacePayout).where(MarketplacePayout.marketplace_order_id == o.id))
+    payout.status = 'eligible'
+    payout.eligible_at = __import__('datetime').datetime.now(__import__('datetime').timezone.utc)
+    m._balance_entry(payout, 'credit', payout.net_amount, 'settlement:SET-IDEMP-RECOVERY')
+    db.commit()
+    m.set_payout_destination(seller.id, 'test-provider', 'DEST-IDEMP-RECOVERY')
+    m.verify_payout_destination(seller.id, admin.id)
+    payout.payment_reference = 'PAY-IDEMP-RECOVERY'
+    payout.settlement_reference = 'SET-IDEMP-RECOVERY'
+    db.commit()
+    m.request_payout(seller.id, o.id)
+    m.mark_payout_paid(seller.id, o.id, 'EXT-IDEMP-RECOVERY')
+    rr = m.request_return(buyer.id, o.id, 'damaged', 'idempotent completion')
+    m.review_return(seller.id, rr.id, 'approved')
+    m.advance_return(seller.id, rr.id, 'pickup')
+    m.advance_return(seller.id, rr.id, 'received')
+    m.advance_return(seller.id, rr.id, 'inspected')
+    m.approve_refund(seller.id, rr.id)
+    m.complete_return_refund(seller.id, rr.id, 'PR-IDEMP-RECOVERY')
+    x, r = m.complete_return_refund(seller.id, rr.id, 'PR-IDEMP-RECOVERY')
+    assert x.status == 'refunded'
+    assert r.status == 'succeeded'
+    rows = db.scalars(select(__import__('app.core.models.marketplace', fromlist=['MarketplaceSellerBalanceEntry']).MarketplaceSellerBalanceEntry).where(
+        __import__('app.core.models.marketplace', fromlist=['MarketplaceSellerBalanceEntry']).MarketplaceSellerBalanceEntry.marketplace_payout_id == payout.id,
+        __import__('app.core.models.marketplace', fromlist=['MarketplaceSellerBalanceEntry']).MarketplaceSellerBalanceEntry.entry_type == 'refund_recovery')).all()
+    assert len(rows) == 1

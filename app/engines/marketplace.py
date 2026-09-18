@@ -432,8 +432,14 @@ class MarketplaceService:
 
     def complete_return_refund(self, actor_tenant_id:int, return_id:int, provider_refund_id:str):
         x=self.db.scalar(select(MarketplaceReturnRequest).join(MarketplaceOrder, MarketplaceOrder.id==MarketplaceReturnRequest.marketplace_order_id).where(MarketplaceReturnRequest.id==return_id, MarketplaceOrder.seller_tenant_id==actor_tenant_id).with_for_update())
-        if not x or x.status!='refund_approved' or not x.refund_reference: raise MarketplaceError('return is not awaiting refund completion')
+        if not x or not x.refund_reference: raise MarketplaceError('return is not awaiting refund completion')
         from app.engines.payments import PaymentProductionService
+        if x.status == 'refunded':
+            r=self.db.scalar(select(PaymentRefund).where(PaymentRefund.tenant_id==actor_tenant_id, PaymentRefund.refund_reference==x.refund_reference).with_for_update())
+            if not r or r.status!='succeeded': raise MarketplaceError('completed return refund is missing its succeeded refund record')
+            if r.provider_refund_id != provider_refund_id: raise MarketplaceError('return refund already completed with a different provider reference')
+            return x,r
+        if x.status!='refund_approved': raise MarketplaceError('return is not awaiting refund completion')
         r=PaymentProductionService(self.db).complete_refund(actor_tenant_id,x.refund_reference,provider_refund_id=provider_refund_id)
         x.status='refunded'; x.resolved_at=datetime.now(timezone.utc)
         lines=self.db.scalars(select(MarketplaceReturnLine).where(MarketplaceReturnLine.return_request_id==x.id)).all()
