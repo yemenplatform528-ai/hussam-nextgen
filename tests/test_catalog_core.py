@@ -15,6 +15,9 @@ def setup():
     e=create_engine('sqlite+pysqlite:///:memory:',future=True); Base.metadata.create_all(e); db=sessionmaker(e,expire_on_commit=False)()
     ids=IdentityService(db); seller=ids.create_tenant('Seller'); user=ids.create_user('seller','seller@example.com'); ids.add_membership(user.id,seller.id,'owner')
     inv=InventoryProductionService(db); inv.create_item(seller.id,'rice','Rice','bag'); inv.create_warehouse(seller.id,'wh','Main')
+    from app.core.models.market import MarketContext, MarketCurrency
+    market=MarketContext(code='YE',country_code='YE',name='Yemen',locale='ar-YE',timezone='Asia/Aden',default_currency='YER',status='active')
+    db.add(market); db.flush(); db.add(MarketCurrency(market_id=market.id,currency='YER',is_default=True)); db.flush()
     m=__import__('app.engines.marketplace',fromlist=['MarketplaceService']).MarketplaceService(db)
     m.register_seller(seller.id,'seller-catalog','Seller Catalog'); m.review_seller_verification(seller.id,user.id,'approved')
     return db,seller

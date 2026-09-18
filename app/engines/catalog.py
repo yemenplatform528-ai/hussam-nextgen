@@ -7,7 +7,6 @@ from sqlalchemy.orm import Session
 
 from app.core.models.core import Tenant
 from app.core.models.market import MarketContext, MarketCurrency
-import os
 from app.core.models.inventory import InventoryItem, Warehouse
 from app.core.models.marketplace import MarketplaceCategory, MarketplaceListing, MarketplaceSellerProfile, MarketplaceSellerVerification
 from app.core.models.catalog import MarketplaceProduct, MarketplaceSKU, MarketplaceOffer, MarketplaceCatalogGroup
@@ -76,12 +75,6 @@ class CatalogService:
         active = self.db.scalars(select(MarketContext).where(MarketContext.status == 'active').order_by(MarketContext.id)).all()
         if len(active) == 1:
             return active[0].id
-        if not active and os.getenv('ENVIRONMENT','dev') != 'production':
-            market = MarketContext(code='YE', country_code='YE', name='Yemen', locale='ar-YE', timezone='Asia/Aden', default_currency='YER', status='active')
-            self.db.add(market); self.db.flush()
-            for currency in ('YER','USD','SAR','AED'):
-                self.db.add(MarketCurrency(market_id=market.id, currency=currency, is_default=(currency=='YER')))
-            self.db.flush(); return market.id
         raise CatalogError('market context is required when multiple or no active markets exist')
 
     def _seller(self, tenant_id):
