@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+import json
 from datetime import datetime, timezone, timedelta
 from decimal import Decimal, ROUND_HALF_UP
 from uuid import uuid4
@@ -335,6 +336,12 @@ class MarketplaceService:
         p=self.db.scalar(select(PaymentIntent).where(PaymentIntent.tenant_id==o.seller_tenant_id,PaymentIntent.reference==o.payment_reference,PaymentIntent.status=='captured')) if o.payment_reference else None
         if not p: raise MarketplaceError('captured marketplace payment not found')
         if p.currency!=o.currency or _money(p.amount)!=_money(o.total): raise MarketplaceError('payment does not match order')
+        try:
+            payment_metadata=json.loads(p.metadata_json or '{}')
+        except (TypeError, ValueError):
+            payment_metadata={}
+        if payment_metadata.get('market_id') is None or int(payment_metadata['market_id']) != o.market_id:
+            raise MarketplaceError('payment market does not match marketplace order')
         o.status='paid'; o.updated_at=datetime.now(timezone.utc); self._event(o.seller_tenant_id,'marketplace.order.paid','marketplace_order',o.id,{'payment_reference':p.reference,'source':'payment_sync'}); self.db.commit(); return o
 
     def request_return(self,buyer_user_id:str,order_id:int,reason:str,description:str):
@@ -1090,6 +1097,12 @@ class MarketplaceService:
         p=self.db.scalar(select(PaymentIntent).where(PaymentIntent.tenant_id==seller_tenant_id,PaymentIntent.reference==payment_reference))
         if not p or p.status!='captured': raise MarketplaceError('payment must be captured before marketplace order is paid')
         if p.currency!=o.currency or _money(p.amount)!=_money(o.total): raise MarketplaceError('captured payment does not match marketplace order')
+        try:
+            payment_metadata=json.loads(p.metadata_json or '{}')
+        except (TypeError, ValueError):
+            payment_metadata={}
+        if payment_metadata.get('market_id') is None or int(payment_metadata['market_id']) != o.market_id:
+            raise MarketplaceError('payment market does not match marketplace order')
         o.status='paid'; o.payment_reference=payment_reference; o.updated_at=datetime.now(timezone.utc)
         payout=self.db.scalar(select(MarketplacePayout).where(MarketplacePayout.marketplace_order_id==o.id).with_for_update())
         if payout: payout.payment_reference=payment_reference
@@ -1155,6 +1168,12 @@ class MarketplaceService:
             raise MarketplaceError('verified settled payment not found for order')
         if settlement.currency != o.currency or _money(settlement.amount) != _money(o.total):
             raise MarketplaceError('settlement does not match marketplace order')
+        if settlement.market_id is None or settlement.market_id != o.market_id:
+            raise MarketplaceError('settlement market does not match marketplace order')
+        if settlement.provider != self.db.scalar(select(PaymentIntent.provider).where(
+                PaymentIntent.tenant_id == seller_tenant_id,
+                PaymentIntent.reference == o.payment_reference)):
+            raise MarketplaceError('settlement provider does not match marketplace payment')
         payout=self.db.scalar(select(MarketplacePayout).where(MarketplacePayout.marketplace_order_id==o.id, MarketplacePayout.seller_tenant_id==seller_tenant_id).with_for_update())
         if not payout:
             raise MarketplaceError('payout not found')
@@ -1234,7 +1253,8 @@ class MarketplaceService:
         if not p: raise MarketplaceError('payout not found')
         o=self.db.scalar(select(MarketplaceOrder).where(MarketplaceOrder.id==order_id,MarketplaceOrder.seller_tenant_id==seller_tenant_id).with_for_update())
         if not o: raise MarketplaceError('marketplace order not found')
-        if p.market_id is not None and o.market_id != p.market_id: raise MarketplaceError('payout market mismatch')
+        if p.market_id is None or o.market_id is None or o.market_id != p.market_id: raise MarketplaceError('payout market mismatch')
+        if p.currency != o.currency: raise MarketplaceError('payout currency mismatch')
         if o.status in {'refunded','partially_refunded','disputed'}: raise MarketplaceError('payout is blocked by order financial state')
         if p.status!='eligible': raise MarketplaceError('payout is not eligible')
         return p
@@ -1266,7 +1286,8 @@ class MarketplaceService:
         if not p: raise MarketplaceError('payout not found')
         o=self.db.scalar(select(MarketplaceOrder).where(MarketplaceOrder.id==order_id,MarketplaceOrder.seller_tenant_id==seller_tenant_id).with_for_update())
         if not o: raise MarketplaceError('marketplace order not found')
-        if p.market_id is not None and o.market_id != p.market_id: raise MarketplaceError('payout market mismatch')
+        if p.market_id is None or o.market_id is None or o.market_id != p.market_id: raise MarketplaceError('payout market mismatch')
+        if p.currency != o.currency: raise MarketplaceError('payout currency mismatch')
         if o.status in {'refunded','partially_refunded','disputed'}: raise MarketplaceError('payout is blocked by order financial state')
         if p.status=='paid': return p
         if p.status!='processing': raise MarketplaceError('payout request must be created before payment completion')

@@ -123,3 +123,37 @@ def test_paid_payout_refund_creates_recoverable_balance_debit_once():
         __import__('app.core.models.marketplace', fromlist=['MarketplaceSellerBalanceEntry']).MarketplaceSellerBalanceEntry.marketplace_payout_id == payout.id,
         __import__('app.core.models.marketplace', fromlist=['MarketplaceSellerBalanceEntry']).MarketplaceSellerBalanceEntry.entry_type == 'refund_recovery')).all()
     assert len(rows) == 1
+
+
+def test_captured_payment_from_another_market_cannot_pay_order():
+    from app.core.models.market import MarketContext
+    from app.core.models.payments import PaymentIntent
+    from app.engines.marketplace import MarketplaceError
+    db, m, ids, seller, admin, buyer, o = setup()
+    o.status='pending_payment'; db.commit()
+    other = MarketContext(code='ALT', country_code='AA', name='Alt Market', locale='en-AA', timezone='UTC', default_currency='YER', status='active')
+    db.add(other); db.flush(); db.commit()
+    p = PaymentIntent(tenant_id=seller.id, reference='PAY-CROSS-MARKET', provider='test-provider', amount=o.total, currency=o.currency,
+                      status='captured', provider_payment_id='PP-CROSS', metadata_json='{"market_id": %d}' % other.id)
+    db.add(p); db.commit()
+    with pytest.raises(MarketplaceError, match='payment market'):
+        m.mark_paid(seller.id, o.id, p.reference)
+
+
+def test_settlement_from_another_market_cannot_link_to_order():
+    from app.core.models.market import MarketContext
+    from app.core.models.payments import PaymentIntent, PaymentSettlement
+    from app.engines.marketplace import MarketplaceError
+    db, m, ids, seller, admin, buyer, o = setup()
+    p = PaymentIntent(tenant_id=seller.id, reference='PAY-SET-CROSS', provider='test-provider', amount=o.total, currency=o.currency,
+                      status='captured', provider_payment_id='PP-SET-CROSS', metadata_json='{"market_id": %d}' % o.market_id)
+    db.add(p); db.flush()
+    other = MarketContext(code='ALT2', country_code='BB', name='Alt Market 2', locale='en-BB', timezone='UTC', default_currency='YER', status='active')
+    db.add(other); db.flush()
+    settlement = PaymentSettlement(tenant_id=seller.id, provider='test-provider', market_id=other.id,
+                                   settlement_reference='SET-CROSS', payment_reference=p.reference,
+                                   amount=o.total, currency=o.currency, status='settled')
+    db.add(settlement); db.commit()
+    o.status='paid'; o.payment_reference=p.reference; db.commit()
+    with pytest.raises(MarketplaceError, match='settlement market'):
+        m.settle_order_payment(seller.id, o.id, settlement.settlement_reference)
