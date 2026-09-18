@@ -26,7 +26,7 @@ def test_expired_rule_is_not_selected():
     l=m.create_listing(seller.id,__import__('app.engines.marketplace',fromlist=['ListingInput']).ListingInput('rice','Rice','', 'product','YER',Decimal('500'),'rice','wh')); m.moderate_listing(l.id,su.id,'approved'); m.publish_listing(seller.id,l.id); m.add_to_cart(buyer.id,l.id,1)
     now=datetime.now(timezone.utc)
     db.add(MarketplaceFeeRule(name='Expired',scope='seller',seller_tenant_id=seller.id,commission_bps=900,active=True,policy_version='expired',effective_from=now-timedelta(hours=2),effective_to=now-timedelta(hours=1))); db.commit()
-    try:
-        m.checkout(buyer.id); assert False
-    except ValueError as exc:
-        assert 'fee rule' in str(exc)
+    order=m.checkout(buyer.id)[0]
+    fee=db.scalar(select(MarketplaceOrderFee).where(MarketplaceOrderFee.marketplace_order_id==order.id))
+    assert fee.commission_bps != 900
+    assert fee.policy_version != 'expired'

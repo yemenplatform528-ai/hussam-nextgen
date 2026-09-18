@@ -1,4 +1,4 @@
-from test_api import setup_client, teardown
+from tests.test_api import setup_client, teardown
 
 def test_product_read_surfaces_are_authenticated_and_tenant_scoped():
     client, _, token = setup_client()
