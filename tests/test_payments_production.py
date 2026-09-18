@@ -8,7 +8,7 @@ from app.core.models.payments import PaymentIntent, PaymentWebhook, PaymentSettl
 from app.core.models.finance import FiscalPeriod
 from app.core.models.core import Journal, JournalLineRecord
 from app.core.models.governance import OutboxEvent
-from app.core.models.market import MarketContext, MarketCurrency, ProviderRegistryEntry, ProviderMarketCapability
+from app.core.models.market import MarketContext, MarketCurrency, ProviderRegistryEntry, ProviderMarketCapability, PaymentRailRegistryEntry, PaymentAdapterRegistryEntry
 import json
 
 
@@ -26,7 +26,9 @@ def governed_market(s, t, provider='wallet', currency='YER'):
     s.add(market); s.flush(); s.add(MarketCurrency(market_id=market.id, currency=currency, is_default=True)); s.flush()
     evidence = json.dumps({k: True for k in __import__('app.engines.payment_adapters', fromlist=['REQUIRED_PRODUCTION_EVIDENCE']).REQUIRED_PRODUCTION_EVIDENCE})
     entry = ProviderRegistryEntry(code=provider, organization_name='Test Provider', provider_type='payment', product_name='Test Pay', status='production', integration_mode='api', metadata_json=evidence)
-    s.add(entry); s.flush(); s.add_all([ProviderMarketCapability(provider_id=entry.id, market_id=market.id, capability='payment', currency=currency, active=True), ProviderMarketCapability(provider_id=entry.id, market_id=market.id, capability='settlement', currency=currency, active=True)]); s.commit()
+    s.add(entry); s.flush(); s.add_all([ProviderMarketCapability(provider_id=entry.id, market_id=market.id, capability='payment', currency=currency, active=True), ProviderMarketCapability(provider_id=entry.id, market_id=market.id, capability='settlement', currency=currency, active=True), ProviderMarketCapability(provider_id=entry.id, market_id=market.id, capability='refund', currency=currency, active=True)]); s.flush()
+    rail = PaymentRailRegistryEntry(market_id=market.id, code='wallet', capability='payment', currency=currency, status='production')
+    s.add(rail); s.flush(); s.add(PaymentAdapterRegistryEntry(provider_id=entry.id, rail_id=rail.id, adapter_code='test.wallet', adapter_version='1.0.0', status='production', active=True)); s.commit()
     return market
 
 def test_create_and_webhook_are_tenant_scoped_and_idempotent():

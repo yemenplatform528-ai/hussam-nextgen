@@ -28,16 +28,22 @@ def resolve_payment_adapter(db, provider_code: str, market_id: int, capability: 
     if not gate.allowed:
         reasons.extend(gate.blocked_reasons)
 
-    rail_entry = db.scalar(select(PaymentRailRegistryEntry).where(
+    rail_query = select(PaymentRailRegistryEntry).where(
         PaymentRailRegistryEntry.market_id == market_id,
-        PaymentRailRegistryEntry.code == rail,
-        PaymentRailRegistryEntry.capability == capability,
         or_(PaymentRailRegistryEntry.currency == currency, PaymentRailRegistryEntry.currency == ""),
         PaymentRailRegistryEntry.status.in_(("certified", "production")),
-    ))
-    if rail_entry is None:
+    )
+    if rail:
+        rail_query = rail_query.where(PaymentRailRegistryEntry.code == rail)
+    rail_entries = db.scalars(rail_query).all()
+    if not rail_entries:
         reasons.append("rail_not_certified_for_market")
         return PaymentAdapterResolution(False, provider_code, rail, currency, blocked_reasons=tuple(dict.fromkeys(reasons)))
+    if len(rail_entries) > 1:
+        reasons.append("multiple_certified_rails_match")
+        return PaymentAdapterResolution(False, provider_code, rail, currency, blocked_reasons=tuple(dict.fromkeys(reasons)))
+    rail_entry = rail_entries[0]
+    resolved_rail = rail_entry.code
 
     adapters = db.scalars(select(PaymentAdapterRegistryEntry).where(
         PaymentAdapterRegistryEntry.provider_id == provider.id,
@@ -51,6 +57,6 @@ def resolve_payment_adapter(db, provider_code: str, market_id: int, capability: 
         reasons.append("multiple_production_adapters_active")
 
     if reasons:
-        return PaymentAdapterResolution(False, provider_code, rail, currency, blocked_reasons=tuple(dict.fromkeys(reasons)))
+        return PaymentAdapterResolution(False, provider_code, resolved_rail, currency, blocked_reasons=tuple(dict.fromkeys(reasons)))
     adapter = adapters[0]
-    return PaymentAdapterResolution(True, provider_code, rail, currency, adapter.adapter_code, adapter.adapter_version)
+    return PaymentAdapterResolution(True, provider_code, resolved_rail, currency, adapter.adapter_code, adapter.adapter_version)

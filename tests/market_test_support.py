@@ -1,6 +1,6 @@
 from decimal import Decimal
 import json
-from app.core.models.market import MarketContext, MarketCurrency, ProviderRegistryEntry, ProviderMarketCapability
+from app.core.models.market import MarketContext, MarketCurrency, ProviderRegistryEntry, ProviderMarketCapability, PaymentRailRegistryEntry, PaymentAdapterRegistryEntry
 from app.core.models.marketplace import MarketplaceFeeRule
 
 
@@ -17,7 +17,11 @@ def ensure_market(db, code='YE', currency='YER'):
     }, sort_keys=True)
     provider = ProviderRegistryEntry(code='test-provider', organization_name='Test Provider', provider_type='payment', product_name='Test Pay', status='production', integration_mode='api', metadata_json=evidence)
     db.add(provider); db.flush()
-    for capability in ('payment', 'refund', 'payout'):
+    for capability in ('payment', 'refund', 'payout', 'settlement'):
         db.add(ProviderMarketCapability(provider_id=provider.id, market_id=market.id, capability=capability, rail='', currency=currency, active=True))
+    db.flush()
+    rail = PaymentRailRegistryEntry(market_id=market.id, code='wallet', capability='payment', currency=currency, status='production')
+    db.add(rail); db.flush()
+    db.add(PaymentAdapterRegistryEntry(provider_id=provider.id, rail_id=rail.id, adapter_code='test.wallet', adapter_version='1.0.0', status='production', active=True))
     db.commit()
     return market

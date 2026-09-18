@@ -12,6 +12,7 @@ from app.core.models.governance import OutboxEvent
 from app.core.models.core import Journal
 from app.engines.finance.production import PostingLine, post_journal
 from app.engines.payment_adapters import evaluate_provider_production_gate
+from app.engines.payment_registry import resolve_payment_adapter
 
 
 class PaymentError(ValueError):
@@ -39,6 +40,25 @@ class PaymentProductionService:
         self.db.add(OutboxEvent(event_id=str(uuid4()), tenant_id=tenant_id, event_type=event_type,
                                 aggregate_type='payment', aggregate_id=str(aggregate_id), payload=payload, published=False))
 
+    def _registry(self, provider: str, market_id: int, capability: str, rail: str, currency: str):
+        resolution = resolve_payment_adapter(self.db, provider, int(market_id), capability, rail or "", currency)
+        if not resolution.allowed:
+            gate_prefixes = ('provider_', 'market_capability_not_active', 'integration_mode:', 'missing_evidence:', 'invalid_evidence_metadata')
+            if any(reason.startswith(gate_prefixes) for reason in resolution.blocked_reasons):
+                raise PaymentError('provider production gate blocked: ' + ';'.join(resolution.blocked_reasons))
+            raise PaymentError('payment registry blocked: ' + ';'.join(resolution.blocked_reasons))
+        return resolution
+
+    def _payment_registry_for_intent(self, p: PaymentIntent, capability: str):
+        try:
+            metadata = json.loads(p.metadata_json or '{}')
+        except (TypeError, ValueError):
+            metadata = {}
+        market_id = metadata.get('market_id')
+        if market_id is None:
+            return None
+        return self._registry(p.provider, int(market_id), capability, metadata.get('rail', ''), p.currency)
+
     def create_intent(self, tenant_id: int, reference: str, provider: str, amount: Decimal, currency: str, *, market_id: int | None = None, rail: str = "", commit: bool = True) -> PaymentIntent:
         amount = Decimal(str(amount))
         if tenant_id <= 0 or not reference or not provider or not currency or amount <= 0:
@@ -47,11 +67,11 @@ class PaymentProductionService:
             raise PaymentError('duplicate payment reference')
         metadata = {}
         if market_id is not None:
-            gate = evaluate_provider_production_gate(self.db, provider, market_id, 'payment', rail=rail, currency=currency)
-            if not gate.allowed:
-                raise PaymentError('provider production gate blocked: ' + ';'.join(gate.blocked_reasons))
+            resolution = self._registry(provider, market_id, 'payment', rail, currency)
             metadata['market_id'] = market_id
-            metadata['rail'] = rail
+            metadata['rail'] = resolution.rail
+            metadata['adapter_code'] = resolution.adapter_code
+            metadata['adapter_version'] = resolution.adapter_version
         p = PaymentIntent(tenant_id=tenant_id, reference=reference, provider=provider, amount=amount,
                           currency=currency, status='pending', metadata_json=json.dumps(metadata, sort_keys=True))
         self.db.add(p); self.db.flush()
@@ -80,9 +100,7 @@ class PaymentProductionService:
             metadata = {}
         market_id = metadata.get('market_id')
         if market_id is not None:
-            gate = evaluate_provider_production_gate(self.db, p.provider, int(market_id), 'payment', rail=metadata.get('rail', ''), currency=p.currency)
-            if not gate.allowed:
-                raise PaymentError('provider production gate blocked: ' + ';'.join(gate.blocked_reasons))
+            self._registry(p.provider, int(market_id), 'payment', metadata.get('rail', ''), p.currency)
         if p.provider_payment_id and p.provider_payment_id != provider_payment_id:
             raise PaymentError('provider payment id cannot be changed')
         conflict = self.db.scalar(select(PaymentIntent).where(
@@ -113,6 +131,7 @@ class PaymentProductionService:
         p = self._get(tenant_id, payment_reference, lock=True)
         if p.provider != provider:
             raise PaymentError('provider mismatch')
+        self._payment_registry_for_intent(p, 'payment')
         if provider_payment_id:
             if p.provider_payment_id and p.provider_payment_id != provider_payment_id:
                 raise PaymentError('provider payment id cannot be changed')
@@ -169,6 +188,7 @@ class PaymentProductionService:
         p = self._get(tenant_id, payment_reference, lock=True)
         if p.status not in {'authorized', 'processing'}:
             raise PaymentError('only authorized or processing payments can be captured')
+        self._payment_registry_for_intent(p, 'payment')
         if not p.provider_payment_id:
             raise PaymentError('provider payment must be verified before capture')
         post_journal(self.db, tenant_id=tenant_id, reference=f'PAY:{p.reference}:capture', currency=p.currency,
@@ -201,12 +221,7 @@ class PaymentProductionService:
         market_id = metadata.get('market_id')
         if market_id is None:
             raise PaymentError('market context is required before settlement')
-        gate = evaluate_provider_production_gate(
-            self.db, p.provider, int(market_id), 'settlement',
-            rail=metadata.get('rail', ''), currency=p.currency
-        )
-        if not gate.allowed:
-            raise PaymentError('provider production gate blocked: ' + ';'.join(gate.blocked_reasons))
+        self._registry(p.provider, int(market_id), 'settlement', metadata.get('rail', ''), p.currency)
         existing = self.db.scalar(select(PaymentSettlement).where(
             PaymentSettlement.tenant_id == tenant_id,
             PaymentSettlement.settlement_reference == settlement_reference))
@@ -252,12 +267,7 @@ class PaymentProductionService:
         market_id = metadata.get('market_id')
         if market_id is None:
             raise PaymentError('market context is required before refund')
-        gate = evaluate_provider_production_gate(
-            self.db, p.provider, int(market_id), 'refund',
-            rail=metadata.get('rail', ''), currency=p.currency
-        )
-        if not gate.allowed:
-            raise PaymentError('provider production gate blocked: ' + ';'.join(gate.blocked_reasons))
+        self._registry(p.provider, int(market_id), 'refund', metadata.get('rail', ''), p.currency)
         if p.status != 'captured':
             raise PaymentError('only captured payments can be refunded')
         amount = Decimal(str(amount))
@@ -290,12 +300,7 @@ class PaymentProductionService:
         market_id = metadata.get('market_id')
         if market_id is None:
             raise PaymentError('market context is required before refund completion')
-        gate = evaluate_provider_production_gate(
-            self.db, p.provider, int(market_id), 'refund',
-            rail=metadata.get('rail', ''), currency=p.currency
-        )
-        if not gate.allowed:
-            raise PaymentError('provider production gate blocked: ' + ';'.join(gate.blocked_reasons))
+        self._registry(p.provider, int(market_id), 'refund', metadata.get('rail', ''), p.currency)
         conflict = self.db.scalar(select(PaymentRefund).where(PaymentRefund.tenant_id == tenant_id, PaymentRefund.provider_refund_id == provider_refund_id, PaymentRefund.id != r.id))
         if conflict: raise PaymentError('provider refund id already belongs to another refund')
         r.provider_refund_id = provider_refund_id; r.status='succeeded'; r.processed_at=datetime.now(timezone.utc)
@@ -318,9 +323,7 @@ class PaymentProductionService:
             if existing.provider == provider and existing.source_reference == source_reference and existing.source_sha256 == source_sha256:
                 return existing
             raise PaymentError('reconciliation run reference already belongs to another source')
-        gate = evaluate_provider_production_gate(self.db, provider, market_id, 'settlement', currency=currency)
-        if not gate.allowed:
-            raise PaymentError('provider production gate blocked: ' + ';'.join(gate.blocked_reasons))
+        self._registry(provider, market_id, 'settlement', '', currency)
         if not rows:
             raise PaymentError('reconciliation statement must contain at least one row')
         refs = [str(r.get('provider_reference') or '') for r in rows]
