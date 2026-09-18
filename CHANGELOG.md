@@ -54,3 +54,10 @@ The `1.0` label is reserved for the first real launch after all release gates pa
 - Added `docs/YEMEN_GEOGRAPHY_SOURCE_REVIEW.md`.
 - Reviewed OCHA COD-AB as the primary candidate and Open Admin Data as an independent cross-check.
 - Kept national geography import blocked until the exact source artifact, license/provenance, structural validation, and SHA-256 review gate are satisfied.
+
+## 2026-09-18 — Yemen geography source gate update
+
+- Revalidated OCHA COD-AB as the standards reference for administrative-boundary quality and P-code structure.
+- Confirmed from OCHA's current COD-AB status dashboard that Yemen's 2026 work order is still `Initialized`; therefore no current OCHA Yemen artifact is treated as a newly verified production import source.
+- Kept the exact-artifact promotion gate fail-closed: source artifact, license, provenance, structural validation, independent cross-check, and SHA-256 must all pass before apply.
+- Kept national geography data out of production pending exact-artifact review.
