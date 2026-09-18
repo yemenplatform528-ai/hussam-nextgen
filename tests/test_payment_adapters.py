@@ -3,7 +3,8 @@ import pytest
 from app.engines.payment_adapters import (
     PaymentAdapterError, PaymentCreateRequest, PaymentCreateResult,
     PaymentRefundRequest, PaymentRefundResult, PaymentStatusResult,
-    StatementRow, UnconfiguredPaymentAdapter,
+    StatementRow, UnconfiguredPaymentAdapter, validate_adapter_result_status,
+    validate_adapter_amount_currency,
 )
 
 
@@ -107,3 +108,14 @@ def test_provider_production_gate_accepts_unrestricted_rail_and_currency():
         gate = evaluate_provider_production_gate(db, "wildcard-provider", 1, "payment", rail="wallet", currency="YER")
         assert gate.allowed
     engine.dispose()
+
+
+def test_adapter_contract_rejects_provider_specific_statuses_and_bad_money():
+    assert validate_adapter_result_status(" CAPTURED ") == "captured"
+    assert validate_adapter_amount_currency(Decimal("10.00"), "yer") == (Decimal("10.00"), "YER")
+    with pytest.raises(PaymentAdapterError, match="unsupported normalized payment status"):
+        validate_adapter_result_status("provider_completed")
+    with pytest.raises(PaymentAdapterError, match="positive"):
+        validate_adapter_amount_currency(Decimal("0"), "YER")
+    with pytest.raises(PaymentAdapterError, match="currency"):
+        validate_adapter_amount_currency(Decimal("1"), "")

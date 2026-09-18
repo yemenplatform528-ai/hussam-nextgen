@@ -63,7 +63,7 @@ class StatementRow:
 
 
 class PaymentAdapter(Protocol):
-    """Minimal provider boundary; implementations remain outside the core."""
+    """Provider contract; implementations remain outside the authoritative core."""
 
     name: str
 
@@ -74,6 +74,38 @@ class PaymentAdapter(Protocol):
     def refund(self, request: PaymentRefundRequest) -> PaymentRefundResult: ...
 
     def import_statement(self, source: bytes, *, source_reference: str) -> Sequence[StatementRow]: ...
+
+
+
+
+ADAPTER_STATUSES = frozenset({
+    "pending",
+    "processing",
+    "authorized",
+    "captured",
+    "failed",
+    "cancelled",
+    "refunded",
+})
+
+
+def validate_adapter_result_status(status: str) -> str:
+    """Normalize the adapter boundary without accepting provider-specific states."""
+    normalized = str(status or "").strip().lower()
+    if normalized not in ADAPTER_STATUSES:
+        raise PaymentAdapterError(f"unsupported normalized payment status: {status!r}")
+    return normalized
+
+
+def validate_adapter_amount_currency(amount: Decimal, currency: str) -> tuple[Decimal, str]:
+    """Enforce the neutral monetary contract before provider-specific calls."""
+    value = Decimal(str(amount))
+    code = str(currency or "").strip().upper()
+    if value <= 0:
+        raise PaymentAdapterError("adapter amount must be positive")
+    if not code or len(code) > 10:
+        raise PaymentAdapterError("adapter currency is required and must be at most 10 characters")
+    return value, code
 
 
 class UnconfiguredPaymentAdapter:
