@@ -64,6 +64,8 @@ class FulfillmentService:
                 return f
             raise FulfillmentError(f'invalid fulfillment transition: {f.status} -> {status}')
         so = self._seller_order(seller_tenant_id, f.seller_order_id, True)
+        if so.status not in {'processing','ready_for_fulfillment'}:
+            raise FulfillmentError('seller order must be processing or ready_for_fulfillment for fulfillment transition')
         if status in {'picked_up','in_transit','out_for_delivery','delivered'} and f.method != 'pickup' and not f.shipment_id:
             raise FulfillmentError('shipment is required before physical delivery transition')
         if status == 'delivered' and f.method == 'pickup' and not note:
