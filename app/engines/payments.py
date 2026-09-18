@@ -211,6 +211,14 @@ class PaymentProductionService:
                     {'payment_reference': p.reference, 'settlement_reference': settlement_reference, 'amount': str(amount), 'currency': currency})
         try:
             self.db.commit()
+        except IntegrityError:
+            self.db.rollback()
+            existing = self.db.scalar(select(PaymentSettlement).where(
+                PaymentSettlement.tenant_id == tenant_id,
+                PaymentSettlement.settlement_reference == settlement_reference))
+            if existing and existing.payment_reference == p.reference and Decimal(str(existing.amount)) == amount and existing.currency == currency and existing.provider == p.provider:
+                return existing
+            raise PaymentError('settlement reference conflict')
         except Exception:
             self.db.rollback()
             raise
