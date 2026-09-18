@@ -24,7 +24,7 @@ from app.core.models.inventory import InventoryItem, Warehouse
 from app.core.models.catalog import MarketplaceProduct, MarketplaceSKU, MarketplaceOffer
 from app.core.models.governance import OutboxEvent
 from app.engines.commerce import CommerceProductionService, OrderLineInput
-from app.core.models.marketplace_operational import MarketplaceOrderFinancialAllocation
+from app.core.models.marketplace_operational import MarketplaceOrderFinancialAllocation, MarketplaceDiscountAllocation
 
 class MarketplaceError(ValueError): pass
 
@@ -910,6 +910,15 @@ class MarketplaceService:
         alloc_discount = sum((money(x.discount_amount) for x in allocations), Decimal("0"))
         alloc_fee = sum((money(x.platform_fee) for x in allocations), Decimal("0"))
         alloc_net = sum((money(x.net_amount) for x in allocations), Decimal("0"))
+        discount_rows = self.db.scalars(
+            select(MarketplaceDiscountAllocation).where(
+                MarketplaceDiscountAllocation.customer_order_id == order.customer_order_id,
+                MarketplaceDiscountAllocation.seller_order_id.in_(
+                    select(MarketplaceSellerOrder.id).where(MarketplaceSellerOrder.marketplace_order_id == order.id)
+                ),
+            )
+        ).all() if order.customer_order_id else []
+        authoritative_discount = sum((money(x.amount) for x in discount_rows), Decimal("0"))
 
         checks = {
             "order_total": money(order.total) == money(order.subtotal) + money(order.shipping_fee),
@@ -917,6 +926,7 @@ class MarketplaceService:
             "allocation_gross_matches_lines": alloc_gross == line_gross,
             "allocation_shipping_matches_order": alloc_shipping == money(order.shipping_fee),
             "allocation_fee_matches_order": alloc_fee == money(order.platform_fee),
+            "allocation_discount_matches_authority": alloc_discount == authoritative_discount,
             "allocation_math": alloc_net == money(order.subtotal) + money(order.shipping_fee) - alloc_discount - alloc_fee,
             "allocation_count_matches_lines": len(allocations) == len(qlines),
             "allocation_currency_matches_order": all(x.currency == order.currency for x in allocations),
