@@ -21,6 +21,8 @@ def resolve_payment_adapter(db, provider_code: str, market_id: int, capability: 
     provider = db.scalar(select(ProviderRegistryEntry).where(ProviderRegistryEntry.code == provider_code))
     if provider is None:
         return PaymentAdapterResolution(False, provider_code, rail, currency, blocked_reasons=("provider_not_registered",))
+    if provider.provider_type != "payment":
+        reasons.append(f"provider_type:{provider.provider_type}")
 
     gate = evaluate_provider_production_gate(db, provider_code, market_id, capability, rail=rail, currency=currency)
     if not gate.allowed:
@@ -37,15 +39,18 @@ def resolve_payment_adapter(db, provider_code: str, market_id: int, capability: 
         reasons.append("rail_not_certified_for_market")
         return PaymentAdapterResolution(False, provider_code, rail, currency, blocked_reasons=tuple(dict.fromkeys(reasons)))
 
-    adapter = db.scalar(select(PaymentAdapterRegistryEntry).where(
+    adapters = db.scalars(select(PaymentAdapterRegistryEntry).where(
         PaymentAdapterRegistryEntry.provider_id == provider.id,
         PaymentAdapterRegistryEntry.rail_id == rail_entry.id,
         PaymentAdapterRegistryEntry.active.is_(True),
         PaymentAdapterRegistryEntry.status == "production",
-    ))
-    if adapter is None:
+    )).all()
+    if not adapters:
         reasons.append("production_adapter_not_active")
+    elif len(adapters) > 1:
+        reasons.append("multiple_production_adapters_active")
 
     if reasons:
         return PaymentAdapterResolution(False, provider_code, rail, currency, blocked_reasons=tuple(dict.fromkeys(reasons)))
+    adapter = adapters[0]
     return PaymentAdapterResolution(True, provider_code, rail, currency, adapter.adapter_code, adapter.adapter_version)

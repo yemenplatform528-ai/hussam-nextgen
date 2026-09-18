@@ -44,3 +44,31 @@ def test_resolver_fails_closed_without_active_adapter():
         r = resolve_payment_adapter(db, p.code, market.id, 'payment', 'wallet', 'YER')
         assert not r.allowed and 'production_adapter_not_active' in r.blocked_reasons
     engine.dispose()
+
+
+def test_resolver_rejects_non_payment_provider():
+    engine, factory = _db()
+    with factory() as db:
+        market = MarketContext(code='REG3', country_code='YE', name='Registry Market 3', locale='ar-YE', timezone='Asia/Aden', default_currency='YER', status='active')
+        db.add(market); db.flush(); p = _provider(db, market); p.provider_type = 'logistics'; db.commit()
+        rail = PaymentRailRegistryEntry(market_id=market.id, code='wallet', capability='payment', currency='YER', status='certified')
+        db.add(rail); db.flush(); db.add(PaymentAdapterRegistryEntry(provider_id=p.id, rail_id=rail.id, adapter_code='demo.wallet', adapter_version='1.0.0', status='production', active=True)); db.commit()
+        r = resolve_payment_adapter(db, p.code, market.id, 'payment', 'wallet', 'YER')
+        assert not r.allowed and 'provider_type:logistics' in r.blocked_reasons
+    engine.dispose()
+
+
+def test_resolver_rejects_multiple_active_production_adapters():
+    engine, factory = _db()
+    with factory() as db:
+        market = MarketContext(code='REG4', country_code='YE', name='Registry Market 4', locale='ar-YE', timezone='Asia/Aden', default_currency='YER', status='active')
+        db.add(market); db.flush(); p = _provider(db, market)
+        rail = PaymentRailRegistryEntry(market_id=market.id, code='wallet', capability='payment', currency='YER', status='production')
+        db.add(rail); db.flush()
+        db.add_all([
+            PaymentAdapterRegistryEntry(provider_id=p.id, rail_id=rail.id, adapter_code='demo.wallet.a', adapter_version='1.0.0', status='production', active=True),
+            PaymentAdapterRegistryEntry(provider_id=p.id, rail_id=rail.id, adapter_code='demo.wallet.b', adapter_version='1.0.0', status='production', active=True),
+        ]); db.commit()
+        r = resolve_payment_adapter(db, p.code, market.id, 'payment', 'wallet', 'YER')
+        assert not r.allowed and 'multiple_production_adapters_active' in r.blocked_reasons
+    engine.dispose()
