@@ -147,6 +147,22 @@ def test_captured_payment_from_another_market_cannot_pay_order():
         m.mark_paid(seller.id, o.id, p.reference)
 
 
+def test_unreconciled_settlement_cannot_release_marketplace_payout():
+    from app.core.models.payments import PaymentIntent, PaymentSettlement
+    from app.engines.marketplace import MarketplaceError
+    db, m, ids, seller, admin, buyer, o = setup()
+    p = PaymentIntent(tenant_id=seller.id, reference='PAY-SET-PENDING', provider='test-provider', amount=o.total, currency=o.currency,
+                      status='captured', provider_payment_id='PP-SET-PENDING', metadata_json='{\"market_id\": %d}' % o.market_id)
+    db.add(p); db.flush()
+    settlement = PaymentSettlement(tenant_id=seller.id, provider='test-provider', market_id=o.market_id,
+                                   settlement_reference='SET-PENDING', payment_reference=p.reference,
+                                   amount=o.total, currency=o.currency, status='settled', reconciliation_status='pending')
+    db.add(settlement); db.commit()
+    o.status='paid'; o.payment_reference=p.reference; db.commit()
+    with pytest.raises(MarketplaceError, match='reconciliation is not closed'):
+        m.settle_order_payment(seller.id, o.id, settlement.settlement_reference)
+
+
 def test_settlement_from_another_market_cannot_link_to_order():
     from app.core.models.market import MarketContext
     from app.core.models.payments import PaymentIntent, PaymentSettlement

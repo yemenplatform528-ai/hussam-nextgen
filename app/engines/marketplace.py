@@ -1197,6 +1197,8 @@ class MarketplaceService:
             raise MarketplaceError('settlement does not match marketplace order')
         if settlement.market_id is None or settlement.market_id != o.market_id:
             raise MarketplaceError('settlement market does not match marketplace order')
+        if settlement.reconciliation_status != 'reconciled':
+            raise MarketplaceError('settlement reconciliation is not closed')
         if settlement.provider != self.db.scalar(select(PaymentIntent.provider).where(
                 PaymentIntent.tenant_id == seller_tenant_id,
                 PaymentIntent.reference == o.payment_reference)):
