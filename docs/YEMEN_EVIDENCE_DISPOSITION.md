@@ -56,7 +56,9 @@ No national geography import, provider production certification, API credential,
 
 ## Independent cross-check checkpoint
 
-The current candidate dataset claims 22 governorates and 335 districts, while independent reference sources report 22 governorates and 333 districts. This discrepancy is unresolved and is a blocking evidence issue. No candidate district dataset may be accepted or imported until the 335-vs-333 difference is explained at record level and provenance is established.
+The earlier 335-vs-333 note has been refined. The current candidate publishes 22 governorates and 335 districts, and the OCHA/HDX `cod-ab-yem` metadata independently identifies the reviewed COD-AB v01 dataset as 22 governorates and 335 districts. Its XLSX metadata reports 336 `yem_admin2` rows (335 districts plus header) and 23 `yem_admin1` rows (22 governorates plus header), with P-codes. Older references that report 333 are therefore treated as historical/version-variant references rather than a sufficient basis to reject the 335-district candidate.
+
+The evidence gate remains open for a different reason: Hussam has not yet preserved the exact OCHA resource bytes locally, computed their SHA-256, and performed a record-level P-code/parent comparison against the candidate. Until that exact artifact-level reconciliation is complete, no national geography is accepted or imported.
 
 Reviewed: 2026-09-19
-Disposition: PENDING_RECONCILIATION
+Disposition: PENDING_ARTIFACT_RECONCILIATION

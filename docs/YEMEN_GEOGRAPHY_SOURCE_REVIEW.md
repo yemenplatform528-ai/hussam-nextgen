@@ -19,9 +19,11 @@ The current OCHA COD-AB status dashboard, updated 12 September 2026, lists Yemen
 
 #### Artifact-level finding (2026-09-19)
 
-The repository's `data/all-flat.csv` at commit `3eeb32f7811db7f4a91d1a86f64e01ccc60d22b6` was inspected directly. Despite the filename, the retrieved CSV contains the 22 governorate records only; district records are published separately in `data/all-district.json`. The CSV schema also does not match Hussam's ingestion contract directly (`code,level,name,name_ar,parent_code,status,metadata_json`).
+The candidate repository was inspected directly at commit `3eeb32f7811db7f4a91d1a86f64e01ccc60d22b6`. Its published structure reports 22 governorates and 335 districts; district records are supplied separately in `data/all-district.json`. The candidate therefore has a plausible current 335-district structure, but it is still not treated as the canonical source.
 
-Therefore this specific CSV is **not accepted as the direct import artifact**. It may remain a cross-check/reference input, but any use in the canonical importer would require a documented, deterministic transformation and a newly hashed transformed artifact, followed by the normal hierarchy and independent-cross-check gates.
+A stronger independent checkpoint is now available from the OCHA/HDX Yemen COD-AB metadata mirror. The current `cod-ab-yem` metadata identifies the source as the Central Statistical Organization (CSO), says OCHA Yemen contributed it, states that the dataset was reviewed for accuracy and completeness on 23 December 2024, and explicitly defines the dataset as 22 governorates and 335 districts. The metadata also identifies the XLSX resource as P-coded and reports 336 rows in the `yem_admin2` sheet (335 district records plus the header) and 23 rows in `yem_admin1` (22 governorate records plus the header).
+
+This materially changes the interpretation of the earlier `335-vs-333` note: 333 is present in older/historical references, but 335 is directly corroborated by the reviewed OCHA/HDX COD-AB v01 metadata and by the current independent candidate. The discrepancy should therefore no longer be described as evidence that the candidate count is wrong. It remains a **provenance/artifact-acquisition gate**, because the exact OCHA resource bytes have not yet been preserved locally and SHA-256ed by Hussam, and a record-level P-code comparison against the candidate has not yet been executed.
 
 ## Promotion gate
 
