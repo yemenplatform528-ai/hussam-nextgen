@@ -28,3 +28,23 @@ The platform remains one unified system. The current work deepens Amazon-class c
 The first consolidated Yemen-market implementation unit is implemented on the Amazon Public Scope baseline. It establishes reusable market configuration, currency context, hierarchical geography, coverage, provider registry metadata, payment-method catalog, and structured marketplace address context. It does not implement live payment/logistics rails or a Yemen marketplace fork.
 
 Validation: 221 tests passed; Y2 targeted suite 12 passed; Python compileall passed; baseline audit passed with 0 failures/0 warnings; Alembic upgrade/check/downgrade/re-upgrade passed on SQLite; PostgreSQL DDL compilation passed for all Y2 tables/indexes/constraints. `pip check` in the current execution environment reports the unrelated pre-existing `moviepy`/`pillow` dependency conflict; `pip-audit` was not rerun because the current execution environment does not have the `pip_audit` module installed.
+
+## 2026-09-18 continuation — Yemen production layer
+
+The canonical recovery baseline was revalidated locally from the verified Git
+bundle. The next engineering unit is now the **Yemen Production Layer —
+Geography Ingestion Lock**. It adds a fail-closed ingestion boundary for a
+reviewed national geography dataset without inventing governorate, district,
+or locality data.
+
+Validation contract: dry-run by default, explicit `--apply` for mutation,
+market-scoped `(market_id, code)` identity, strict hierarchy validation, JSON
+metadata validation, and transactional upsert semantics.
+
+Fresh verification after this continuation: **276 non-browser tests passed + 1
+browser E2E passed separately**; compileall passed; baseline audit passed with
+0 failures/0 warnings; Amazon public-scope audit passed 30/30.
+
+The national geography dataset itself remains intentionally **not imported**
+until an externally sourced, reviewed dataset and its licensing/provenance are
+approved. This is a deliberate no-fabrication boundary.

@@ -40,3 +40,11 @@ The `1.0` label is reserved for the first real launch after all release gates pa
 - Added revocable/expirable memory records and context assembly rules.
 - Added AI-01 migration `0010_ai_foundation_lock` with downgrade/re-upgrade convergence checks.
 - Added AI-01 engineering lock documentation and regression tests.
+
+## 2026-09-18 — Yemen production-layer continuation
+
+- Added reviewed Yemen geography ingestion boundary.
+- Added strict hierarchy, provenance metadata, status, and duplicate-code validation.
+- Defaulted the importer to dry-run; database mutation requires explicit `--apply`.
+- Added regression tests for valid hierarchy, cross-level parents, and duplicate codes.
+- Kept national geography data out of the repository until an externally sourced and reviewed dataset is approved.
