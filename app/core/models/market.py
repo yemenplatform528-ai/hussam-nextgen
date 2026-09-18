@@ -88,6 +88,50 @@ class MarketCoverage(Base):
     )
 
 
+class MarketMoneyUnit(Base):
+    """Market-scoped monetary unit variant; keeps denomination/issuance distinctions separate from ISO currency code."""
+    __tablename__ = "market_money_units"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    market_id: Mapped[int] = mapped_column(ForeignKey("market_contexts.id", ondelete="CASCADE"), nullable=False)
+    code: Mapped[str] = mapped_column(String(40), nullable=False)
+    currency: Mapped[str] = mapped_column(String(10), nullable=False)
+    variant: Mapped[str] = mapped_column(String(30), nullable=False, default="standard")
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    name_ar: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="active")
+    metadata_json: Mapped[str] = mapped_column(Text, nullable=False, default="{}")
+    __table_args__ = (
+        UniqueConstraint("market_id", "code", name="uq_market_money_unit_code"),
+        CheckConstraint("variant IN ('standard','current','legacy','denomination')", name="ck_market_money_unit_variant"),
+        CheckConstraint("status IN ('active','inactive','deprecated')", name="ck_market_money_unit_status"),
+    )
+
+
+class MarketExchangeRate(Base):
+    """Market/geography-scoped FX observation with explicit provenance and effective time."""
+    __tablename__ = "market_exchange_rates"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    market_id: Mapped[int] = mapped_column(ForeignKey("market_contexts.id", ondelete="CASCADE"), nullable=False)
+    geography_id: Mapped[int | None] = mapped_column(ForeignKey("market_geographies.id", ondelete="RESTRICT"), nullable=True)
+    base_currency: Mapped[str] = mapped_column(String(10), nullable=False)
+    quote_currency: Mapped[str] = mapped_column(String(10), nullable=False)
+    rate: Mapped[object] = mapped_column(Numeric(24, 10), nullable=False)
+    source_type: Mapped[str] = mapped_column(String(30), nullable=False)
+    source_reference: Mapped[str] = mapped_column(String(500), nullable=False)
+    effective_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    captured_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="active")
+    metadata_json: Mapped[str] = mapped_column(Text, nullable=False, default="{}")
+    __table_args__ = (
+        CheckConstraint("rate > 0", name="ck_market_fx_positive_rate"),
+        CheckConstraint("base_currency <> quote_currency", name="ck_market_fx_distinct_currencies"),
+        CheckConstraint("source_type IN ('official','provider','market_observed','manual')", name="ck_market_fx_source_type"),
+        CheckConstraint("status IN ('active','superseded','void')", name="ck_market_fx_status"),
+        ForeignKeyConstraint(["market_id", "geography_id"], ["market_geographies.market_id", "market_geographies.id"], name="fk_market_fx_market_geography", ondelete="RESTRICT"),
+        Index("ix_market_fx_lookup", "market_id", "geography_id", "base_currency", "quote_currency", "effective_at"),
+    )
+
+
 class ProviderRegistryEntry(Base):
     """Provider catalog entry. Credentials and execution are intentionally out of this registry."""
     __tablename__ = "provider_registry_entries"

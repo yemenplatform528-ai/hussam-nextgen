@@ -61,3 +61,9 @@ The `1.0` label is reserved for the first real launch after all release gates pa
 - Confirmed from OCHA's current COD-AB status dashboard that Yemen's 2026 work order is still `Initialized`; therefore no current OCHA Yemen artifact is treated as a newly verified production import source.
 - Kept the exact-artifact promotion gate fail-closed: source artifact, license, provenance, structural validation, independent cross-check, and SHA-256 must all pass before apply.
 - Kept national geography data out of production pending exact-artifact review.
+
+## 2026-09-18 — Yemen financial layer boundary
+- Added market-scoped monetary-unit variants so Yemen-specific denomination/issuance distinctions do not overload ISO currency codes.
+- Added market/geography-scoped FX observations with explicit source provenance and effective time.
+- Kept provider execution and certification separate from the financial data model.
+- Added financial-layer integrity tests.

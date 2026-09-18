@@ -68,3 +68,18 @@ explicit production mutation step.
 This lock does not claim that a national Yemen geography dataset has already
 been imported. It establishes the safe path for doing so without fabricating
 Yemen data.
+
+## Financial Layer — 2026-09-18
+
+The Yemen production layer now includes a market-scoped financial data boundary.
+
+- `MarketMoneyUnit` separates monetary-unit variants (for example current/legacy) from the ISO currency code, without asserting a legal-tender interpretation in application code.
+- `MarketExchangeRate` stores effective-time FX observations at either market scope or a specific market geography.
+- Every FX observation requires an explicit source type and source reference.
+- Positive-rate and distinct-currency invariants are database-enforced.
+- Geography-scoped FX is constrained to the same market as the observation.
+- No live provider credentials or payment execution integrations are claimed by this layer.
+
+Current financial-provider evidence remains external. The Central Bank of Yemen publishes payment-system materials, licensing/regulatory material, and current banking/payment-system notices; these are treated as authoritative regulatory sources for later provider certification, not as proof that a named provider has an integration contract with Hussam. citeturn0search10turn0search9
+
+The financial layer therefore separates **catalog/capability**, **FX observations**, and **real provider execution**. A provider remains `discovered`/`contract_required`/`api_pending` until its actual contract, API, credentials, test environment, and certification evidence exist.
