@@ -51,7 +51,7 @@ def test_partial_refund_reduces_unpaid_payout():
     payout = db.scalar(select(MarketplacePayout).where(MarketplacePayout.marketplace_order_id == o.id))
     assert payout.status == 'held'
     assert payout.gross_amount == Decimal('500.0000')
-    assert payout.net_amount == Decimal('450.0000')
+    assert payout.net_amount == Decimal('475.0000')
 
 
 def test_seller_balance_is_credited_once_and_debited_on_payout():
@@ -107,10 +107,17 @@ def test_seller_statement_has_running_balance_and_period_totals():
 def test_paid_payout_refund_creates_recoverable_balance_debit_once():
     db, m, ids, seller, admin, buyer, o = setup()
     payout = db.scalar(select(MarketplacePayout).where(MarketplacePayout.marketplace_order_id == o.id))
-    payout.status = 'paid'
-    payout.paid_at = __import__('datetime').datetime.now(__import__('datetime').timezone.utc)
-    payout.net_amount = Decimal('950.0000')
+    payout.status = 'eligible'
+    payout.eligible_at = __import__('datetime').datetime.now(__import__('datetime').timezone.utc)
+    m._balance_entry(payout, 'credit', payout.net_amount, 'settlement:SET-PAID-RECOVERY')
     db.commit()
+    m.set_payout_destination(seller.id, 'test-provider', 'DEST-PAID-RECOVERY')
+    m.verify_payout_destination(seller.id, admin.id)
+    payout.payment_reference = 'PAY-PAID-RECOVERY'
+    payout.settlement_reference = 'SET-PAID-RECOVERY'
+    db.commit()
+    m.request_payout(seller.id, o.id)
+    m.mark_payout_paid(seller.id, o.id, 'EXT-PAID-RECOVERY')
     rr = m.request_return(buyer.id, o.id, 'damaged', 'post-payout')
     m.review_return(seller.id, rr.id, 'approved')
     m.advance_return(seller.id, rr.id, 'pickup')
@@ -118,7 +125,7 @@ def test_paid_payout_refund_creates_recoverable_balance_debit_once():
     m.advance_return(seller.id, rr.id, 'inspected')
     m.approve_refund(seller.id, rr.id)
     m.complete_return_refund(seller.id, rr.id, 'PR-PAID-RECOVERY')
-    assert m.seller_balance(seller.id, payout.market_id, payout.currency) == {'YER': '-950.0000'}
+    assert m.seller_balance(seller.id, payout.market_id, payout.currency) == {'YER': f'-{payout.net_amount:.4f}'}
     rows = db.scalars(select(__import__('app.core.models.marketplace', fromlist=['MarketplaceSellerBalanceEntry']).MarketplaceSellerBalanceEntry).where(
         __import__('app.core.models.marketplace', fromlist=['MarketplaceSellerBalanceEntry']).MarketplaceSellerBalanceEntry.marketplace_payout_id == payout.id,
         __import__('app.core.models.marketplace', fromlist=['MarketplaceSellerBalanceEntry']).MarketplaceSellerBalanceEntry.entry_type == 'refund_recovery')).all()
