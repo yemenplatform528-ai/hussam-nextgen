@@ -167,6 +167,40 @@ class ProviderMarketCapability(Base):
     )
 
 
+class PaymentRailRegistryEntry(Base):
+    """Governed payment rail catalog; execution remains behind certified adapters."""
+    __tablename__ = "payment_rail_registry"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    market_id: Mapped[int] = mapped_column(ForeignKey("market_contexts.id", ondelete="CASCADE"), nullable=False)
+    code: Mapped[str] = mapped_column(String(80), nullable=False)
+    capability: Mapped[str] = mapped_column(String(80), nullable=False)
+    currency: Mapped[str] = mapped_column(String(10), nullable=False, default="")
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="draft")
+    metadata_json: Mapped[str] = mapped_column(Text, nullable=False, default="{}")
+    __table_args__ = (
+        UniqueConstraint("market_id", "code", name="uq_payment_rail_market_code"),
+        CheckConstraint("status IN ('draft','certified','production','suspended','retired')", name="ck_payment_rail_status"),
+    )
+
+
+class PaymentAdapterRegistryEntry(Base):
+    """Maps a provider-scoped rail to one adapter implementation/version."""
+    __tablename__ = "payment_adapter_registry"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    provider_id: Mapped[int] = mapped_column(ForeignKey("provider_registry_entries.id", ondelete="CASCADE"), nullable=False)
+    rail_id: Mapped[int] = mapped_column(ForeignKey("payment_rail_registry.id", ondelete="CASCADE"), nullable=False)
+    adapter_code: Mapped[str] = mapped_column(String(120), nullable=False)
+    adapter_version: Mapped[str] = mapped_column(String(40), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending")
+    active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    metadata_json: Mapped[str] = mapped_column(Text, nullable=False, default="{}")
+    __table_args__ = (
+        UniqueConstraint("provider_id", "rail_id", "adapter_code", "adapter_version", name="uq_payment_adapter_registry_identity"),
+        CheckConstraint("status IN ('pending','testing','certified','production','suspended','retired')", name="ck_payment_adapter_registry_status"),
+        Index("ix_payment_adapter_registry_provider_rail", "provider_id", "rail_id"),
+    )
+
+
 class PaymentMethodCatalogEntry(Base):
     __tablename__ = "payment_method_catalog"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
