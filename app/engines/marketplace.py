@@ -919,7 +919,11 @@ class MarketplaceService:
             )
         ).all() if order.customer_order_id else []
         authoritative_discount = sum((money(x.amount) for x in discount_rows), Decimal("0"))
-
+        seller_order_ids = {x.id for x in self.db.scalars(
+            select(MarketplaceSellerOrder).where(
+                MarketplaceSellerOrder.marketplace_order_id == order.id
+            )
+        ).all()}
         checks = {
             "order_total": money(order.total) == money(order.subtotal) + money(order.shipping_fee),
             "line_gross_matches_subtotal": line_gross == money(order.subtotal),
@@ -932,6 +936,13 @@ class MarketplaceService:
             "allocation_currency_matches_order": all(x.currency == order.currency for x in allocations),
             "allocation_seller_matches_order": all(x.seller_tenant_id == order.seller_tenant_id for x in allocations),
             "allocation_market_matches_order": all(x.market_id == order.market_id for x in allocations),
+            "discount_seller_order_matches_scope": all(x.seller_order_id in seller_order_ids for x in discount_rows),
+            "discount_seller_matches_scope": all(
+                x.seller_tenant_id == order.seller_tenant_id for x in discount_rows
+            ),
+            "discount_currency_matches_order": all(
+                x.currency == order.currency for x in discount_rows
+            ),
         }
         if payout:
             checks.update({

@@ -67,3 +67,24 @@ def test_multiseller_financial_invariants_cover_every_child_order_without_cross_
         (Decimal(str(r['allocation_net'])) for r in reports), Decimal('0')
     )
     assert len({(a.seller_tenant_id, a.market_id, a.currency) for a in allocations}) == 2
+
+
+def test_financial_invariants_reject_discount_scope_leakage():
+    db, m, buyer, address, listings = setup()
+    m.add_to_cart(buyer.id, listings[0].id, 1)
+    order = m.checkout(buyer.id, address.id)[0]
+    from app.core.models.marketplace import MarketplaceSellerOrder
+    from app.core.models.marketplace_operational import MarketplaceDiscountAllocation
+    seller_order = db.scalar(select(MarketplaceSellerOrder).where(
+        MarketplaceSellerOrder.marketplace_order_id == order.id
+    ))
+    db.add(MarketplaceDiscountAllocation(
+        customer_order_id=order.customer_order_id,
+        seller_order_id=seller_order.id,
+        seller_tenant_id=999999,
+        amount=Decimal('10.0000'),
+        currency='USD',
+    ))
+    db.flush()
+    with pytest.raises(MarketplaceError, match='financial invariant violation'):
+        m.assert_financial_invariants(order.id)
