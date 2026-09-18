@@ -181,15 +181,18 @@ class MarketplaceCompletionService:
             x=MarketplaceAnalyticsSnapshot(tenant_id=tenant_id,period_start=period_start,period_end=period_end,metric_code=code,value=value,dimensions_json={}); self.db.add(x); created.append(x)
         self.db.commit(); return created
     def allocate_order_discount(self, customer_order_id, allocations, *, promotion_id=None, coupon_id=None, funding_source='seller', currency=None):
-        """Persist a checkout-authoritative discount split across seller orders.
+        """Persist checkout-authoritative discount funding and propagate its financial effect.
 
-        allocations is a list of {seller_order_id, amount}. The method locks the
-        order-side rows, validates seller ownership and total discount, and makes
-        the allocation idempotent for the same order/seller/promotion/coupon scope.
+        Discounts are only mutable while the customer order is still awaiting payment.
+        The customer charge is reduced by the full discount, while seller proceeds are
+        reduced only by the seller-funded portion; platform-funded amounts remain a
+        separate payout subsidy snapshot.
         """
-        from app.core.models.marketplace import MarketplaceCustomerOrder, MarketplaceSellerOrder
+        from app.core.models.marketplace import MarketplaceCustomerOrder, MarketplaceSellerOrder, MarketplaceOrder, MarketplaceOrderLine, MarketplacePayout
+        from app.core.models.marketplace_operational import MarketplaceOrderFinancialAllocation
         order = self.db.scalar(select(MarketplaceCustomerOrder).where(MarketplaceCustomerOrder.id == customer_order_id).with_for_update())
         if not order: raise MarketplaceCompletionError('customer order not found')
+        if order.status != 'pending_payment': raise MarketplaceCompletionError('discount allocation is locked after payment begins')
         if currency and order.currency.upper() != currency.upper(): raise MarketplaceCompletionError('discount currency mismatch')
         if funding_source not in {'seller','platform','shared'}: raise MarketplaceCompletionError('invalid discount funding source')
         total = Decimal('0'); seen = set(); created = []
@@ -211,14 +214,40 @@ class MarketplaceCompletionService:
             so = self.db.scalar(select(MarketplaceSellerOrder).where(MarketplaceSellerOrder.id == seller_order_id, MarketplaceSellerOrder.customer_order_id == customer_order_id).with_for_update())
             if not so: raise MarketplaceCompletionError('seller order does not belong to customer order')
             if amount > money(so.subtotal): raise MarketplaceCompletionError('discount exceeds seller subtotal')
+            mo = self.db.scalar(select(MarketplaceOrder).where(MarketplaceOrder.id == so.marketplace_order_id).with_for_update())
+            if not mo or mo.customer_order_id != customer_order_id: raise MarketplaceCompletionError('marketplace order does not belong to customer order')
             total += amount
             existing = self.db.scalar(select(MarketplaceDiscountAllocation).where(MarketplaceDiscountAllocation.customer_order_id == customer_order_id, MarketplaceDiscountAllocation.seller_order_id == seller_order_id, MarketplaceDiscountAllocation.promotion_id == promotion_id, MarketplaceDiscountAllocation.coupon_id == coupon_id))
             if existing:
-                if money(existing.amount) != amount: raise MarketplaceCompletionError('discount allocation already exists with a different amount')
+                if money(existing.amount) != amount or money(existing.seller_funded_amount or 0) != seller_funded or money(existing.platform_funded_amount or 0) != platform_funded:
+                    raise MarketplaceCompletionError('discount allocation already exists with different funding')
                 created.append(existing); continue
             x=MarketplaceDiscountAllocation(customer_order_id=customer_order_id,seller_order_id=seller_order_id,seller_tenant_id=so.seller_tenant_id,promotion_id=promotion_id,coupon_id=coupon_id,funding_source=funding_source,amount=amount,seller_funded_amount=seller_funded,platform_funded_amount=platform_funded,currency=order.currency)
-            self.db.add(x); created.append(x)
+            self.db.add(x); self.db.flush(); created.append(x)
+            # Customer-facing totals decrease by the full discount. Seller-facing payout
+            # proceeds decrease only by the seller-funded component.
+            mo.total = money(mo.subtotal) + money(mo.shipping_fee) - amount
+            so.total = money(so.subtotal) + money(so.shipping_fee) - amount
+            payout = self.db.scalar(select(MarketplacePayout).where(MarketplacePayout.marketplace_order_id == mo.id).with_for_update())
+            if payout:
+                payout.seller_funded_discount = money(payout.seller_funded_discount) + seller_funded
+                payout.platform_funded_discount = money(payout.platform_funded_discount) + platform_funded
+                payout.net_amount = money(payout.gross_amount) - money(payout.seller_funded_discount) - money(payout.platform_fee)
+            lines = self.db.scalars(select(MarketplaceOrderLine).where(MarketplaceOrderLine.marketplace_order_id == mo.id).order_by(MarketplaceOrderLine.id)).all()
+            if lines:
+                remaining = seller_funded
+                for idx, line in enumerate(lines):
+                    alloc = self.db.scalar(select(MarketplaceOrderFinancialAllocation).where(MarketplaceOrderFinancialAllocation.order_line_id == line.id).with_for_update())
+                    if not alloc: continue
+                    is_last = idx == len(lines) - 1
+                    share = remaining if is_last else money(seller_funded * money(line.line_total) / money(mo.subtotal)) if money(mo.subtotal) else Decimal('0')
+                    share = money(share); remaining -= share
+                    alloc.discount_amount = money(alloc.discount_amount) + share
+                    alloc.net_amount = money(alloc.gross_amount) + money(alloc.shipping_amount) - money(alloc.discount_amount) - money(alloc.platform_fee)
         if total > money(order.subtotal): raise MarketplaceCompletionError('discount exceeds customer subtotal')
+        # Rebuild customer total from all seller-order totals, preventing partial propagation.
+        children=self.db.scalars(select(MarketplaceSellerOrder).where(MarketplaceSellerOrder.customer_order_id==order.id)).all()
+        order.total=sum((money(x.total) for x in children), Decimal('0'))
         self.db.commit()
         return {'customer_order_id': customer_order_id, 'discount': str(total.quantize(Decimal('0.0001'))), 'currency': order.currency, 'allocations': [{'seller_order_id': x.seller_order_id, 'seller_tenant_id': x.seller_tenant_id, 'amount': str(x.amount)} for x in created]}
 

@@ -447,12 +447,12 @@ class MarketplaceService:
                 refund_amount=_money(r.amount)
                 old_net=_money(payout.net_amount)
                 if refund_amount >= _money(payout.gross_amount):
-                    payout.gross_amount=_money(payout.platform_fee)
+                    payout.gross_amount=_money(payout.seller_funded_discount) + _money(payout.platform_fee)
                     payout.net_amount=Decimal('0')
                     payout.status='reversed'
                 else:
                     payout.gross_amount=_money(payout.gross_amount)-refund_amount
-                    payout.net_amount=max(Decimal('0'),_money(payout.gross_amount)-_money(payout.platform_fee))
+                    payout.net_amount=max(Decimal('0'),_money(payout.gross_amount)-_money(payout.seller_funded_discount)-_money(payout.platform_fee))
                 if payout.status=='reversed' and old_net>0 and payout.eligible_at:
                     self._balance_entry(payout,'refund_reversal',old_net,r.refund_reference)
                 elif payout.eligible_at and old_net > _money(payout.net_amount):
@@ -861,7 +861,7 @@ class MarketplaceService:
                 line_total=_money(ci.quantity)*_money(l.unit_price)
                 self.db.add(MarketplaceOrderLine(marketplace_order_id=order.id,listing_id=l.id,sales_order_line_id=sales_lines[j].id if j<len(sales_lines) else None,title_snapshot=l.title,quantity=_money(ci.quantity),unit_price=_money(l.unit_price),line_total=line_total)); j+=1
             self.db.add(MarketplaceOrderFee(marketplace_order_id=order.id,seller_tenant_id=seller_id,rule_id=fee_rule.id if fee_rule.id else None,fee_type='commission',basis_amount=subtotal,commission_bps=fee_rule.commission_bps,fixed_fee=_money(fee_rule.fixed_fee),amount=fee,currency=currency,policy_version=fee_rule.policy_version,policy_snapshot={'name':fee_rule.name,'scope':fee_rule.scope,'market_id':fee_rule.market_id,'seller_tenant_id':fee_rule.seller_tenant_id,'category_id':fee_rule.category_id,'commission_bps':fee_rule.commission_bps,'fixed_fee':str(_money(fee_rule.fixed_fee)),'currency':fee_rule.currency,'priority':fee_rule.priority}))
-            self.db.add(MarketplacePayout(market_id=market_id,seller_tenant_id=seller_id,marketplace_order_id=order.id,reference=f'PAYOUT:{ref}',gross_amount=total,platform_fee=fee,net_amount=total-fee,currency=currency,status='held'))
+            self.db.add(MarketplacePayout(market_id=market_id,seller_tenant_id=seller_id,marketplace_order_id=order.id,reference=f'PAYOUT:{ref}',gross_amount=total,seller_funded_discount=Decimal('0'),platform_funded_discount=Decimal('0'),platform_fee=fee,net_amount=total-fee,currency=currency,status='held'))
             line_rows=self.db.scalars(select(MarketplaceOrderLine).where(MarketplaceOrderLine.marketplace_order_id==order.id).order_by(MarketplaceOrderLine.id)).all()
             remaining_fee=fee; remaining_shipping=seller_shipping_fee
             for idx,line in enumerate(line_rows):
@@ -927,7 +927,7 @@ class MarketplaceService:
             )
         ).all()}
         checks = {
-            "order_total": money(order.total) == money(order.subtotal) + money(order.shipping_fee),
+            "order_total": money(order.total) == money(order.subtotal) + money(order.shipping_fee) - authoritative_discount,
             "line_gross_matches_subtotal": line_gross == money(order.subtotal),
             "allocation_gross_matches_lines": alloc_gross == line_gross,
             "allocation_shipping_matches_order": alloc_shipping == money(order.shipping_fee),
@@ -951,9 +951,10 @@ class MarketplaceService:
         }
         if payout:
             checks.update({
-                "payout_gross_matches_order": money(payout.gross_amount) == money(order.total),
+                "payout_gross_matches_order": money(payout.gross_amount) == money(order.subtotal) + money(order.shipping_fee),
+                "payout_discount_snapshot_matches_authority": money(payout.seller_funded_discount) == seller_funded_discount and money(payout.platform_funded_discount) == platform_funded_discount,
                 "payout_fee_matches_order": money(payout.platform_fee) == money(order.platform_fee),
-                "payout_net_math": money(payout.net_amount) == money(payout.gross_amount) - money(payout.platform_fee),
+                "payout_net_math": money(payout.net_amount) == money(payout.gross_amount) - money(payout.seller_funded_discount) - money(payout.platform_fee),
                 "payout_currency_matches_order": payout.currency == order.currency,
             })
         else:
@@ -991,7 +992,7 @@ class MarketplaceService:
             raise MarketplaceError('refund invariant violation: refund not completed')
         payout = self.db.scalar(select(MarketplacePayout).where(MarketplacePayout.marketplace_order_id == order.id))
         if payout:
-            if payout.currency != order.currency or _money(payout.net_amount) != max(Decimal('0'), _money(payout.gross_amount) - _money(payout.platform_fee)):
+            if payout.currency != order.currency or _money(payout.net_amount) != max(Decimal('0'), _money(payout.gross_amount) - _money(payout.seller_funded_discount) - _money(payout.platform_fee)):
                 raise MarketplaceError('refund invariant violation: payout math')
             if payout.status == 'reversed' and _money(payout.net_amount) != 0:
                 raise MarketplaceError('refund invariant violation: reversed payout retains balance')

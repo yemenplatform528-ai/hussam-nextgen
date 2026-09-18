@@ -115,3 +115,43 @@ def test_shared_discount_requires_explicit_funding_split():
         svc.allocate_order_discount(customer.id,[{'seller_order_id':so.id,'amount':100}],funding_source='shared')
     out=svc.allocate_order_discount(customer.id,[{'seller_order_id':so.id,'amount':100,'seller_amount':40,'platform_amount':60}],funding_source='shared')
     assert out['discount']=='100.0000'
+
+
+def test_platform_funded_discount_does_not_reduce_seller_payout_snapshot():
+    db,seller,buyer,su,l,a,m=setup(); svc=MarketplaceCompletionService(db)
+    from app.core.models.marketplace import MarketplaceCustomerOrder, MarketplaceSellerOrder, MarketplaceOrder, MarketplacePayout
+    customer=MarketplaceCustomerOrder(reference='co-platform-payout',buyer_user_id=buyer.id,currency='YER',subtotal=Decimal('1000'),shipping_fee=0,total=Decimal('1000'))
+    db.add(customer); db.flush()
+    mo=MarketplaceOrder(reference='mo-platform-payout',buyer_user_id=buyer.id,seller_tenant_id=seller.id,customer_order_id=customer.id,currency='YER',subtotal=Decimal('1000'),shipping_fee=0,platform_fee=Decimal('50'),total=Decimal('1000'))
+    db.add(mo); db.flush()
+    so=MarketplaceSellerOrder(customer_order_id=customer.id,marketplace_order_id=mo.id,seller_tenant_id=seller.id,subtotal=Decimal('1000'),shipping_fee=0,total=Decimal('1000'))
+    db.add(so); db.flush()
+    payout=MarketplacePayout(market_id=mo.market_id,seller_tenant_id=seller.id,marketplace_order_id=mo.id,reference='P-PLATFORM',gross_amount=Decimal('1000'),seller_funded_discount=0,platform_funded_discount=0,platform_fee=Decimal('50'),net_amount=Decimal('950'),currency='YER',status='held')
+    db.add(payout); db.commit()
+    out=svc.allocate_order_discount(customer.id,[{'seller_order_id':so.id,'amount':Decimal('100')}],funding_source='platform')
+    db.refresh(payout); db.refresh(mo); db.refresh(so); db.refresh(customer)
+    assert out['discount']=='100.0000'
+    assert customer.total == Decimal('900.0000')
+    assert mo.total == Decimal('900.0000') and so.total == Decimal('900.0000')
+    assert payout.seller_funded_discount == Decimal('0.0000')
+    assert payout.platform_funded_discount == Decimal('100.0000')
+    assert payout.net_amount == Decimal('950.0000')
+
+
+def test_seller_funded_discount_reduces_seller_payout_snapshot():
+    db,seller,buyer,su,l,a,m=setup(); svc=MarketplaceCompletionService(db)
+    from app.core.models.marketplace import MarketplaceCustomerOrder, MarketplaceSellerOrder, MarketplaceOrder, MarketplacePayout
+    customer=MarketplaceCustomerOrder(reference='co-seller-payout',buyer_user_id=buyer.id,currency='YER',subtotal=Decimal('1000'),shipping_fee=0,total=Decimal('1000'))
+    db.add(customer); db.flush()
+    mo=MarketplaceOrder(reference='mo-seller-payout',buyer_user_id=buyer.id,seller_tenant_id=seller.id,customer_order_id=customer.id,currency='YER',subtotal=Decimal('1000'),shipping_fee=0,platform_fee=Decimal('50'),total=Decimal('1000'))
+    db.add(mo); db.flush()
+    so=MarketplaceSellerOrder(customer_order_id=customer.id,marketplace_order_id=mo.id,seller_tenant_id=seller.id,subtotal=Decimal('1000'),shipping_fee=0,total=Decimal('1000'))
+    db.add(so); db.flush()
+    payout=MarketplacePayout(market_id=mo.market_id,seller_tenant_id=seller.id,marketplace_order_id=mo.id,reference='P-SELLER',gross_amount=Decimal('1000'),seller_funded_discount=0,platform_funded_discount=0,platform_fee=Decimal('50'),net_amount=Decimal('950'),currency='YER',status='held')
+    db.add(payout); db.commit()
+    svc.allocate_order_discount(customer.id,[{'seller_order_id':so.id,'amount':Decimal('100')}],funding_source='seller')
+    db.refresh(payout); db.refresh(customer)
+    assert customer.total == Decimal('900.0000')
+    assert payout.seller_funded_discount == Decimal('100.0000')
+    assert payout.platform_funded_discount == Decimal('0.0000')
+    assert payout.net_amount == Decimal('850.0000')

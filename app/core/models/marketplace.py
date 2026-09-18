@@ -331,6 +331,8 @@ class MarketplacePayout(Base):
     marketplace_order_id: Mapped[int] = mapped_column(ForeignKey('marketplace_orders.id', ondelete='RESTRICT'), nullable=False, unique=True)
     reference: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
     gross_amount: Mapped[object] = mapped_column(Numeric(20,4), nullable=False)
+    seller_funded_discount: Mapped[object] = mapped_column(Numeric(20,4), nullable=False, default=0)
+    platform_funded_discount: Mapped[object] = mapped_column(Numeric(20,4), nullable=False, default=0)
     platform_fee: Mapped[object] = mapped_column(Numeric(20,4), nullable=False)
     net_amount: Mapped[object] = mapped_column(Numeric(20,4), nullable=False)
     currency: Mapped[str] = mapped_column(String(10), nullable=False)
@@ -344,7 +346,7 @@ class MarketplacePayout(Base):
     payout_provider: Mapped[str | None] = mapped_column(String(80), nullable=True)
     payout_destination_reference: Mapped[str | None] = mapped_column(String(255), nullable=True)
     requested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    __table_args__ = (CheckConstraint("status IN ('held','eligible','processing','paid','reversed')", name='ck_market_payout_status'), CheckConstraint('gross_amount >= platform_fee AND net_amount = gross_amount - platform_fee', name='ck_market_payout_math'))
+    __table_args__ = (CheckConstraint("status IN ('held','eligible','processing','paid','reversed')", name='ck_market_payout_status'), CheckConstraint('gross_amount >= platform_fee AND seller_funded_discount >= 0 AND platform_funded_discount >= 0 AND net_amount = gross_amount - seller_funded_discount - platform_fee', name='ck_market_payout_math'))
 
 class MarketplaceSellerBalanceEntry(Base):
     __tablename__ = 'marketplace_seller_balance_entries'
