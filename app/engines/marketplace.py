@@ -75,7 +75,7 @@ class MarketplaceService:
         gross = sum((Decimal(str(x.gross_amount)) for x in payouts), Decimal("0"))
         fees = sum((Decimal(str(x.platform_fee)) for x in payouts), Decimal("0"))
         net = sum((Decimal(str(x.net_amount)) for x in payouts), Decimal("0"))
-        currency = next((x.currency for x in orders if x.currency), None) or next((x.currency for x in payouts if x.currency), None) or "YER"
+        currency = next((x.currency for x in orders if x.currency), None) or next((x.currency for x in payouts if x.currency), None)
 
         actions = []
         if seller.status != "active": actions.append({"key":"seller_activation","priority":"high","title":"فعّل المتجر","count":1})
@@ -179,11 +179,6 @@ class MarketplaceService:
             elif r.scope=='global':
                 candidates.append((2,r))
         if not candidates:
-            # Unit/in-memory test databases may be created directly from metadata rather than migrations.
-            # Keep a deterministic bootstrap rule only when the table is completely empty; a deliberately
-            # configured-but-disabled rule set must fail closed. Production migrations seed the same rule.
-            if not configured_rules:
-                return MarketplaceFeeRule(id=0, name='Bootstrap Default Marketplace Commission', scope='global', commission_bps=500, fixed_fee=Decimal('0'), priority=100, active=True)
             raise MarketplaceError('no active marketplace fee rule configured')
         candidates.sort(key=lambda x:(x[0],x[1].priority,x[1].id))
         return candidates[0][1]
@@ -659,7 +654,11 @@ class MarketplaceService:
         product.catalog_group_id=group.id; product.updated_at=datetime.now(timezone.utc); self.db.commit(); return group
 
     def offer_competition(self, catalog_group_id:int, currency:str|None=None, market_id:int|None=None):
-        market_id=self._market_id(market_id); currency=self._assert_currency(market_id,currency or 'YER')
+        market_id=self._market_id(market_id)
+        if currency is None:
+            market=self.db.get(MarketContext, market_id)
+            currency=market.default_currency if market else None
+        currency=self._assert_currency(market_id,currency)
         group=self.db.scalar(select(MarketplaceCatalogGroup).where(MarketplaceCatalogGroup.id==catalog_group_id, MarketplaceCatalogGroup.status=='active'))
         if not group: raise MarketplaceError('catalog group not found')
         currency=(currency or '').strip().upper() or None

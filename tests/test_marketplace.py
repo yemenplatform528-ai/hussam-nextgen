@@ -4,7 +4,8 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 from app.core.persistence import Base
 from app.core.models import Tenant, User, TenantMembership, InventoryItem, Warehouse, InventoryMovementRecord
-from app.core.models.marketplace import MarketplaceSellerProfile, MarketplaceListing, MarketplaceOrder, MarketplacePayout, MarketplaceReview, MarketplaceDispute
+from app.core.models.marketplace import MarketplaceSellerProfile, MarketplaceListing, MarketplaceOrder, MarketplacePayout, MarketplaceReview, MarketplaceDispute, MarketplaceFeeRule
+from app.core.models.market import MarketContext, MarketCurrency
 from app.engines.marketplace import MarketplaceService, ListingInput, MarketplaceError
 from app.engines.identity import IdentityService
 from app.engines.inventory.production import InventoryProductionService
@@ -14,6 +15,8 @@ from app.core.contracts import StockMovement
 def setup():
     e=create_engine('sqlite+pysqlite:///:memory:',future=True); Base.metadata.create_all(e); db=sessionmaker(e,expire_on_commit=False)()
     ids=IdentityService(db); seller=ids.create_tenant('Seller'); buyer_t=ids.create_tenant('Buyer'); buyer=ids.create_user('buyer','buyer@example.com'); seller_user=ids.create_user('seller','seller@example.com'); ids.add_membership(buyer.id,buyer_t.id,'owner'); ids.add_membership(seller_user.id,seller.id,'owner')
+    market=MarketContext(code='YE',country_code='YE',name='Yemen',locale='ar-YE',timezone='Asia/Aden',default_currency='YER',status='active'); db.add(market); db.flush(); db.add(MarketCurrency(market_id=market.id,currency='YER',is_default=True))
+    db.add(MarketplaceFeeRule(name='Test Default Marketplace Commission',scope='global',commission_bps=500,fixed_fee=Decimal('0'),priority=100,active=True)); db.commit()
     inv=InventoryProductionService(db); inv.create_item(seller.id,'rice','Rice','bag'); inv.create_warehouse(seller.id,'wh','Main'); inv.record(seller.id,StockMovement('rice','wh',Decimal('20'),'in','opening'))
     return db,seller,buyer_t,buyer,seller_user
 

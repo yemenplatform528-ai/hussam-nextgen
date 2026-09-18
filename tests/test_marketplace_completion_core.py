@@ -44,6 +44,8 @@ def test_cpc_charge_and_budget_are_audited():
     assert ev['cost']=='5.0000'
     assert db.scalar(select(MarketplaceAdCharge).where(MarketplaceAdCharge.campaign_id==c.id)).amount==Decimal('5.0000')
     with pytest.raises(MarketplaceCompletionError): svc.ad_event(seller.id,c.id,'click',listing_id=l.id,currency='YER',bid=Decimal('20'))
+    with pytest.raises(MarketplaceCompletionError, match='currency is required'):
+        svc.ad_event(seller.id,c.id,'click',listing_id=l.id,bid=Decimal('1'))
 
 
 def test_health_snapshot_and_integration_primitives():

@@ -108,10 +108,12 @@ class MarketplaceCompletionService:
         self.db.add(x); self.db.commit(); self.db.refresh(x)
         return {'coupon_id': coupon.id, 'code': coupon.code, 'discount': str(discount), 'currency': currency, 'redemption_id': x.id}
 
-    def ad_event(self, seller_tenant_id, campaign_id, event_type, listing_id=None, ad_group_id=None, buyer_user_id=None, currency='USD', bid=None, attribution_key=None, metadata=None):
+    def ad_event(self, seller_tenant_id, campaign_id, event_type, listing_id=None, ad_group_id=None, buyer_user_id=None, currency=None, bid=None, attribution_key=None, metadata=None):
         campaign = self.db.scalar(select(MarketplaceAdCampaign).where(MarketplaceAdCampaign.id == campaign_id, MarketplaceAdCampaign.seller_tenant_id == seller_tenant_id))
         if not campaign: raise MarketplaceCompletionError('campaign not found for seller')
         if campaign.status not in {'active','scheduled'}: raise MarketplaceCompletionError('campaign is not active')
+        currency = (currency or '').strip().upper()
+        if not currency: raise MarketplaceCompletionError('currency is required for ad charges')
         cost = Decimal('0')
         if event_type == 'click': cost = money(bid if bid is not None else 0)
         ev = MarketplaceAdEvent(campaign_id=campaign_id, ad_group_id=ad_group_id, listing_id=listing_id, buyer_user_id=buyer_user_id, event_type=event_type, cost=cost, attribution_key=attribution_key, metadata_json=metadata or {})

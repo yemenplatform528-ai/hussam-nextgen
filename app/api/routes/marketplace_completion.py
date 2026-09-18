@@ -17,7 +17,7 @@ class CouponIn(BaseModel):
     minimum_subtotal:Decimal=Query(default=Decimal('0'),ge=0); max_redemptions:int|None=Field(default=None,ge=1); per_buyer_limit:int=Field(default=1,ge=1)
 class CouponRedeemIn(BaseModel): coupon_code:str; marketplace_order_id:int; subtotal:Decimal=Field(ge=0); currency:str
 class AdEventIn(BaseModel):
-    campaign_id:int; event_type:str; listing_id:int|None=None; ad_group_id:int|None=None; buyer_user_id:str|None=None; currency:str='USD'; bid:Decimal|None=Field(default=None,ge=0); attribution_key:str|None=None; metadata:dict={}
+    campaign_id:int; event_type:str; listing_id:int|None=None; ad_group_id:int|None=None; buyer_user_id:str|None=None; currency:str; bid:Decimal|None=Field(default=None,ge=0); attribution_key:str|None=None; metadata:dict={}
 class AdConversionIn(BaseModel): campaign_id:int; order_id:int; revenue:Decimal=Field(ge=0); listing_id:int|None=None
 class CaseMessageIn(BaseModel): sender_role:str; body:str=Field(min_length=1); internal:bool=False
 class HealthSnapshotIn(BaseModel): period_start:datetime; period_end:datetime
