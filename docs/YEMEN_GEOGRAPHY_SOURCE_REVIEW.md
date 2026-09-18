@@ -17,6 +17,12 @@ The current OCHA COD-AB status dashboard, updated 12 September 2026, lists Yemen
 
 `open-admin-data/yemen-administrative-divisions` currently publishes bilingual administrative data and reports 22 governorates and 335 districts under CC-BY-4.0. It is useful as an independent structural/name cross-check, but it is not promoted to canonical source status merely because it is public. cite-source:turn0search0
 
+#### Artifact-level finding (2026-09-19)
+
+The repository's `data/all-flat.csv` at commit `3eeb32f7811db7f4a91d1a86f64e01ccc60d22b6` was inspected directly. Despite the filename, the retrieved CSV contains the 22 governorate records only; district records are published separately in `data/all-district.json`. The CSV schema also does not match Hussam's ingestion contract directly (`code,level,name,name_ar,parent_code,status,metadata_json`).
+
+Therefore this specific CSV is **not accepted as the direct import artifact**. It may remain a cross-check/reference input, but any use in the canonical importer would require a documented, deterministic transformation and a newly hashed transformed artifact, followed by the normal hierarchy and independent-cross-check gates.
+
 ## Promotion gate
 
 Before any national geography is applied to production, the exact artifact must be:
