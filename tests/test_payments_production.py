@@ -73,3 +73,30 @@ def test_payment_finance_failure_rolls_back_capture():
     s.query(FiscalPeriod).filter_by(tenant_id=t.id).update({FiscalPeriod.closed: True}); s.commit()
     with pytest.raises(Exception): p.capture(t.id,'PAY-1',posting_date=date(2026,9,10))
     s.expire_all(); assert s.get(PaymentIntent,1).status=='authorized'; assert s.query(Journal).count()==0
+
+
+def test_reconciliation_batch_is_fail_closed_and_idempotent():
+    s,t,p=setup(); p.create_intent(t.id,'PAY-1','wallet',100,'YER'); p.attach_provider_payment(t.id,'PAY-1','prov-1')
+    run=p.reconcile_batch(t.id,provider='wallet',run_reference='RUN-1',source_reference='statement-1',source_sha256='a'*64,
+        rows=[{'provider_reference':'prov-1','actual_amount':100,'currency':'YER'}], expected_payment_references=['PAY-1'])
+    assert run.status=='matched' and run.total_items==1 and run.matched_items==1 and run.exception_items==0
+    same=p.reconcile_batch(t.id,provider='wallet',run_reference='RUN-1',source_reference='statement-1',source_sha256='a'*64,
+        rows=[{'provider_reference':'prov-1','actual_amount':100,'currency':'YER'}], expected_payment_references=['PAY-1'])
+    assert same.id==run.id
+    closed=p.close_reconciliation_run(t.id,'RUN-1'); assert closed.status=='closed'
+    assert p.close_reconciliation_run(t.id,'RUN-1').id==run.id
+
+
+def test_reconciliation_batch_blocks_amount_currency_and_missing_internal_exceptions():
+    s,t,p=setup(); p.create_intent(t.id,'PAY-1','wallet',100,'YER'); p.attach_provider_payment(t.id,'PAY-1','prov-1')
+    run=p.reconcile_batch(t.id,provider='wallet',run_reference='RUN-2',source_reference='statement-2',source_sha256='b'*64,
+        rows=[{'provider_reference':'prov-1','actual_amount':99,'currency':'YER'}, {'provider_reference':'unknown','actual_amount':5,'currency':'YER'}])
+    assert run.status=='exceptions' and run.exception_items==2
+    with pytest.raises(PaymentError,match='unresolved exceptions'): p.close_reconciliation_run(t.id,'RUN-2')
+
+
+def test_reconciliation_batch_rejects_duplicate_provider_rows():
+    s,t,p=setup(); p.create_intent(t.id,'PAY-1','wallet',100,'YER'); p.attach_provider_payment(t.id,'PAY-1','prov-1')
+    with pytest.raises(PaymentError,match='duplicate provider reference'):
+        p.reconcile_batch(t.id,provider='wallet',run_reference='RUN-3',source_reference='statement-3',source_sha256='c'*64,
+            rows=[{'provider_reference':'prov-1','actual_amount':100,'currency':'YER'}, {'provider_reference':'prov-1','actual_amount':100,'currency':'YER'}])

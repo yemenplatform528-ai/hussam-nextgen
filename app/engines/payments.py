@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.core.models.payments import PaymentIntent, PaymentWebhook, PaymentSettlement, PaymentReconciliation, PaymentRefund
+from app.core.models.payments import PaymentIntent, PaymentWebhook, PaymentSettlement, PaymentReconciliation, PaymentRefund, PaymentReconciliationRun, PaymentReconciliationItem
 from app.core.models.governance import OutboxEvent
 from app.core.models.core import Journal
 from app.engines.finance.production import PostingLine, post_journal
@@ -231,6 +231,95 @@ class PaymentProductionService:
         self._event(tenant_id, 'payments.refund.succeeded', r.id, {'payment_reference': p.reference, 'refund_reference': r.refund_reference, 'provider_refund_id': provider_refund_id, 'amount': str(r.amount), 'currency': r.currency})
         self.db.commit(); return r
 
+
+    def reconcile_batch(self, tenant_id: int, *, provider: str, run_reference: str,
+                       source_reference: str, source_sha256: str, rows: list[dict],
+                       expected_payment_references: list[str] | None = None,
+                       statement_date: datetime | None = None) -> PaymentReconciliationRun:
+        if not provider or not run_reference or not source_reference or len(source_sha256) != 64:
+            raise PaymentError('provider, run reference, source reference and SHA-256 are required')
+        existing = self.db.scalar(select(PaymentReconciliationRun).where(
+            PaymentReconciliationRun.tenant_id == tenant_id,
+            PaymentReconciliationRun.run_reference == run_reference))
+        if existing:
+            if existing.provider == provider and existing.source_reference == source_reference and existing.source_sha256 == source_sha256:
+                return existing
+            raise PaymentError('reconciliation run reference already belongs to another source')
+        if not rows:
+            raise PaymentError('reconciliation statement must contain at least one row')
+        refs = [str(r.get('provider_reference') or '') for r in rows]
+        if any(not r for r in refs):
+            raise PaymentError('every statement row requires a provider reference')
+        if len(set(refs)) != len(refs):
+            raise PaymentError('duplicate provider reference in statement')
+        run = PaymentReconciliationRun(tenant_id=tenant_id, provider=provider, run_reference=run_reference,
+            source_reference=source_reference, source_sha256=source_sha256, statement_date=statement_date,
+            status='reconciling')
+        self.db.add(run); self.db.flush()
+        expected_refs = set(expected_payment_references or [])
+        seen_internal = set()
+        resolved_internal = set()
+        matched = 0
+        exceptions = 0
+        for row in rows:
+            ref = str(row['provider_reference'])
+            actual = Decimal(str(row.get('actual_amount')))
+            currency = str(row.get('currency') or '')
+            if actual <= 0 or not currency:
+                self.db.rollback(); raise PaymentError('statement amounts must be positive and currencies must be present')
+            p = self.db.scalar(select(PaymentIntent).where(
+                PaymentIntent.tenant_id == tenant_id, PaymentIntent.provider == provider,
+                PaymentIntent.provider_payment_id == ref))
+            internal_ref = p.reference if p else None
+            expected = Decimal(str(p.amount)) if p else None
+            if p is None:
+                classification = 'missing_internal'
+            elif currency != p.currency:
+                classification = 'currency_mismatch'
+            elif actual != expected:
+                classification = 'amount_mismatch'
+            else:
+                classification = 'matched'
+            if internal_ref in seen_internal:
+                classification = 'duplicate_provider'
+            if internal_ref:
+                seen_internal.add(internal_ref)
+                resolved_internal.add(internal_ref)
+            if classification == 'matched': matched += 1
+            else: exceptions += 1
+            item = PaymentReconciliationItem(tenant_id=tenant_id, run_id=run.id, provider_reference=ref,
+                internal_reference=internal_ref, expected_amount=expected, actual_amount=actual, currency=currency,
+                classification=classification, details_json=json.dumps({'expected_currency': p.currency if p else None}, sort_keys=True))
+            self.db.add(item)
+        if expected_refs:
+            actual_internal = resolved_internal
+            # Explicit expected references are checked against the resolved internal references, never by date inference.
+            for missing in sorted(expected_refs - actual_internal):
+                p = self.db.scalar(select(PaymentIntent).where(PaymentIntent.tenant_id == tenant_id, PaymentIntent.reference == missing, PaymentIntent.provider == provider))
+                if p:
+                    self.db.add(PaymentReconciliationItem(tenant_id=tenant_id, run_id=run.id, provider_reference=f'__MISSING__:{missing}',
+                        internal_reference=missing, expected_amount=Decimal(str(p.amount)), actual_amount=Decimal('0'), currency=p.currency,
+                        classification='missing_in_provider', details_json=json.dumps({'expected_provider_reference': p.provider_payment_id}, sort_keys=True)))
+                    exceptions += 1
+        run.total_items = len(rows) + (len(expected_refs - actual_internal) if expected_refs else 0)
+        run.matched_items = matched
+        run.exception_items = exceptions
+        run.status = 'matched' if exceptions == 0 else 'exceptions'
+        self._event(tenant_id, 'payments.reconciliation.run.completed', run.id,
+                    {'provider': provider, 'run_reference': run_reference, 'status': run.status,
+                     'total_items': run.total_items, 'matched_items': matched, 'exception_items': exceptions})
+        self.db.commit(); self.db.refresh(run); return run
+
+    def close_reconciliation_run(self, tenant_id: int, run_reference: str) -> PaymentReconciliationRun:
+        run = self.db.scalar(select(PaymentReconciliationRun).where(
+            PaymentReconciliationRun.tenant_id == tenant_id, PaymentReconciliationRun.run_reference == run_reference).with_for_update())
+        if not run: raise PaymentError('reconciliation run not found')
+        if run.status == 'closed': return run
+        if run.exception_items != 0 or run.status != 'matched':
+            raise PaymentError('reconciliation run has unresolved exceptions')
+        run.status = 'closed'; run.closed_at = datetime.now(timezone.utc)
+        self._event(tenant_id, 'payments.reconciliation.run.closed', run.id, {'run_reference': run.run_reference})
+        self.db.commit(); self.db.refresh(run); return run
 
     def reconcile(self, tenant_id: int, *, provider: str, provider_reference: str,
                   actual_amount: Decimal, currency: str, internal_reference: str | None = None) -> PaymentReconciliation:
