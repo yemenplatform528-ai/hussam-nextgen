@@ -2,7 +2,7 @@
 
 ## Status
 
-The current engineering checkpoint is `1c608c9760c982789910f3a80ecd5245226cc671`.
+The verification record is anchored at the current documentation checkpoint `6583faf0c188043b1eecf313f47835e974eab3a3`.
 
 A single-process invocation of the complete 331-test suite did not finish within the execution window. The run consistently reached the marketplace refund area before the execution window expired; the individual test observed at the stopping point passes in isolation and when executed with its neighboring refund/payment tests.
 
