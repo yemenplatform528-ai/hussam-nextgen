@@ -150,12 +150,18 @@ class PaymentProductionService:
     def capture(self, tenant_id: int, payment_reference: str, *, posting_date: date,
                 clearing_account: str = 'payment_clearing', receivable_account: str = 'accounts_receivable',
                 actor_id: str | None = None) -> PaymentIntent:
+        return self.capture_verified(tenant_id, payment_reference, posting_date=posting_date,
+                                     clearing_account=clearing_account, receivable_account=receivable_account,
+                                     actor_id=actor_id, commit=True)
+
+    def capture_verified(self, tenant_id: int, payment_reference: str, *, posting_date: date,
+                         clearing_account: str = 'payment_clearing', receivable_account: str = 'accounts_receivable',
+                         actor_id: str | None = None, commit: bool = True) -> PaymentIntent:
         p = self._get(tenant_id, payment_reference, lock=True)
         if p.status not in {'authorized', 'processing'}:
             raise PaymentError('only authorized or processing payments can be captured')
         if not p.provider_payment_id:
             raise PaymentError('provider payment must be verified before capture')
-        # Accounting is authoritative only after provider verification is represented by provider_payment_id + status.
         post_journal(self.db, tenant_id=tenant_id, reference=f'PAY:{p.reference}:capture', currency=p.currency,
                      posting_date=posting_date, actor_id=actor_id,
                      lines=[PostingLine(clearing_account, debit=Decimal(str(p.amount))),
@@ -163,13 +169,13 @@ class PaymentProductionService:
         p.status = 'captured'; p.updated_at = datetime.now(timezone.utc)
         self._event(tenant_id, 'payments.captured', p.id,
                     {'reference': p.reference, 'amount': str(p.amount), 'currency': p.currency})
-        try:
-            self.db.commit()
-        except Exception:
-            self.db.rollback()
-            raise
+        if commit:
+            try:
+                self.db.commit()
+            except Exception:
+                self.db.rollback()
+                raise
         return p
-
     def settle(self, tenant_id: int, payment_reference: str, *, settlement_reference: str,
                actual_amount: Decimal, currency: str, posting_date: date,
                cash_account: str = 'cash', clearing_account: str = 'payment_clearing',

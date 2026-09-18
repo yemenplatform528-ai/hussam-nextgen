@@ -901,9 +901,14 @@ class MarketplaceService:
         if not allocations: raise MarketplaceError('payment session has no allocations')
         from app.engines.payments import PaymentProductionService
         payment_service=PaymentProductionService(self.db)
+        capture_date = datetime.now(timezone.utc).date()
         for a in allocations:
             p=payment_service.create_intent(a.seller_tenant_id,a.payment_reference,session.provider,a.amount,a.currency,commit=False)
-            p.status='captured'; p.provider_payment_id=f'{provider_payment_id}:{a.id}'; p.updated_at=datetime.now(timezone.utc)
+            p.provider_payment_id=f'{provider_payment_id}:{a.id}'
+            p.status='authorized'
+            p.updated_at=datetime.now(timezone.utc)
+            payment_service.capture_verified(a.seller_tenant_id, a.payment_reference,
+                                             posting_date=capture_date, commit=False)
             mo=self.db.scalar(select(MarketplaceOrder).where(MarketplaceOrder.id==a.marketplace_order_id).with_for_update())
             so=self.db.scalar(select(MarketplaceSellerOrder).where(MarketplaceSellerOrder.id==a.seller_order_id).with_for_update())
             if not mo or not so: raise MarketplaceError('payment allocation order not found')

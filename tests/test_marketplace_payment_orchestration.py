@@ -1,4 +1,5 @@
 from decimal import Decimal
+from datetime import date
 import pytest
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
@@ -8,6 +9,7 @@ from app.engines.marketplace import MarketplaceService, MarketplaceError, Listin
 from app.engines.identity import IdentityService
 from app.engines.inventory.production import InventoryProductionService
 from app.core.contracts import StockMovement
+from app.core.models.finance import FiscalPeriod
 
 
 def setup():
@@ -20,6 +22,7 @@ def setup():
     a=m.add_address(buyer.id,'Home','Buyer','700000000','Aden','Aden','Main')
     l=m.create_listing(seller.id,ListingInput('rice38','Rice','','product','YER',Decimal('1000'),'rice38','wh38')); m.moderate_listing(l.id,admin.id,'approved'); m.publish_listing(seller.id,l.id)
     m.add_to_cart(buyer.id,l.id,2); co=m.checkout(buyer.id,a.id)[0].customer_order_id
+    db.add(FiscalPeriod(tenant_id=seller.id,name='2026',starts_on=date(2026,1,1),ends_on=date(2026,12,31),closed=False)); db.commit()
     return db,m,buyer.id,co
 
 def test_unified_payment_session_reconciles_and_captures():
