@@ -196,6 +196,16 @@ class MarketplaceCompletionService:
         for item in allocations:
             seller_order_id = int(item['seller_order_id']); amount = money(item['amount'])
             if amount < 0: raise MarketplaceCompletionError('discount allocation cannot be negative')
+            if funding_source == 'seller':
+                seller_funded = amount; platform_funded = Decimal('0')
+            elif funding_source == 'platform':
+                seller_funded = Decimal('0'); platform_funded = amount
+            else:
+                if 'seller_amount' not in item or 'platform_amount' not in item:
+                    raise MarketplaceCompletionError('shared discount funding requires seller_amount and platform_amount')
+                seller_funded = money(item['seller_amount']); platform_funded = money(item['platform_amount'])
+                if seller_funded < 0 or platform_funded < 0 or seller_funded + platform_funded != amount:
+                    raise MarketplaceCompletionError('shared discount funding must conserve allocation amount')
             if seller_order_id in seen: raise MarketplaceCompletionError('duplicate seller order allocation')
             seen.add(seller_order_id)
             so = self.db.scalar(select(MarketplaceSellerOrder).where(MarketplaceSellerOrder.id == seller_order_id, MarketplaceSellerOrder.customer_order_id == customer_order_id).with_for_update())
@@ -206,7 +216,7 @@ class MarketplaceCompletionService:
             if existing:
                 if money(existing.amount) != amount: raise MarketplaceCompletionError('discount allocation already exists with a different amount')
                 created.append(existing); continue
-            x=MarketplaceDiscountAllocation(customer_order_id=customer_order_id,seller_order_id=seller_order_id,seller_tenant_id=so.seller_tenant_id,promotion_id=promotion_id,coupon_id=coupon_id,funding_source=funding_source,amount=amount,currency=order.currency)
+            x=MarketplaceDiscountAllocation(customer_order_id=customer_order_id,seller_order_id=seller_order_id,seller_tenant_id=so.seller_tenant_id,promotion_id=promotion_id,coupon_id=coupon_id,funding_source=funding_source,amount=amount,seller_funded_amount=seller_funded,platform_funded_amount=platform_funded,currency=order.currency)
             self.db.add(x); created.append(x)
         if total > money(order.subtotal): raise MarketplaceCompletionError('discount exceeds customer subtotal')
         self.db.commit()

@@ -919,6 +919,8 @@ class MarketplaceService:
             )
         ).all() if order.customer_order_id else []
         authoritative_discount = sum((money(x.amount) for x in discount_rows), Decimal("0"))
+        seller_funded_discount = sum((money(x.seller_funded_amount) for x in discount_rows if x.seller_funded_amount is not None), Decimal("0"))
+        platform_funded_discount = sum((money(x.platform_funded_amount) for x in discount_rows if x.platform_funded_amount is not None), Decimal("0"))
         seller_order_ids = {x.id for x in self.db.scalars(
             select(MarketplaceSellerOrder).where(
                 MarketplaceSellerOrder.marketplace_order_id == order.id
@@ -930,7 +932,10 @@ class MarketplaceService:
             "allocation_gross_matches_lines": alloc_gross == line_gross,
             "allocation_shipping_matches_order": alloc_shipping == money(order.shipping_fee),
             "allocation_fee_matches_order": alloc_fee == money(order.platform_fee),
-            "allocation_discount_matches_authority": alloc_discount == authoritative_discount,
+            "allocation_discount_matches_authority": alloc_discount == seller_funded_discount,
+            "discount_funding_conservation": all(x.seller_funded_amount is not None and x.platform_funded_amount is not None and money(x.seller_funded_amount) + money(x.platform_funded_amount) == money(x.amount) for x in discount_rows),
+            "discount_funding_source_matches_amounts": all((x.funding_source == "seller" and money(x.seller_funded_amount) == money(x.amount) and money(x.platform_funded_amount) == 0) or (x.funding_source == "platform" and money(x.seller_funded_amount) == 0 and money(x.platform_funded_amount) == money(x.amount)) or (x.funding_source == "shared" and money(x.seller_funded_amount) + money(x.platform_funded_amount) == money(x.amount)) for x in discount_rows if x.seller_funded_amount is not None and x.platform_funded_amount is not None),
+            "discount_total_matches_funding": seller_funded_discount + platform_funded_discount == authoritative_discount,
             "allocation_math": alloc_net == money(order.subtotal) + money(order.shipping_fee) - alloc_discount - alloc_fee,
             "allocation_count_matches_lines": len(allocations) == len(qlines),
             "allocation_currency_matches_order": all(x.currency == order.currency for x in allocations),

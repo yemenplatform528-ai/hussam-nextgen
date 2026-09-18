@@ -90,3 +90,26 @@ def test_repricing_job_lifecycle():
     assert job.status=='queued'
     out=svc.execute_repricing_job(seller.id,job.id)
     assert out['status']=='completed'
+
+def test_discount_funding_source_is_explicit_for_platform_and_shared():
+    db,seller,buyer,su,l,a,m=setup(); svc=MarketplaceCompletionService(db)
+    from app.core.models.marketplace import MarketplaceCustomerOrder, MarketplaceSellerOrder
+    from app.core.models.marketplace_operational import MarketplaceDiscountAllocation
+    customer=MarketplaceCustomerOrder(reference='co-funding',buyer_user_id=buyer.id,currency='YER',subtotal=Decimal('3000'),shipping_fee=0,total=Decimal('3000'))
+    db.add(customer); db.flush()
+    so=MarketplaceSellerOrder(customer_order_id=customer.id,seller_tenant_id=seller.id,subtotal=Decimal('3000'),shipping_fee=0,total=Decimal('3000'))
+    db.add(so); db.flush()
+    out=svc.allocate_order_discount(customer.id,[{'seller_order_id':so.id,'amount':300}],funding_source='platform')
+    row=db.scalar(select(MarketplaceDiscountAllocation).where(MarketplaceDiscountAllocation.id==out['allocations'][0]['seller_order_id'])) if False else db.scalar(select(MarketplaceDiscountAllocation).where(MarketplaceDiscountAllocation.customer_order_id==customer.id))
+    assert row.seller_funded_amount == Decimal('0.0000') and row.platform_funded_amount == Decimal('300.0000')
+
+
+def test_shared_discount_requires_explicit_funding_split():
+    db,seller,buyer,su,l,a,m=setup(); svc=MarketplaceCompletionService(db)
+    from app.core.models.marketplace import MarketplaceCustomerOrder, MarketplaceSellerOrder
+    customer=MarketplaceCustomerOrder(reference='co-shared',buyer_user_id=buyer.id,currency='YER',subtotal=Decimal('1000'),shipping_fee=0,total=Decimal('1000'))
+    db.add(customer); db.flush(); so=MarketplaceSellerOrder(customer_order_id=customer.id,seller_tenant_id=seller.id,subtotal=Decimal('1000'),shipping_fee=0,total=Decimal('1000')); db.add(so); db.commit()
+    with pytest.raises(Exception, match='shared discount funding requires'):
+        svc.allocate_order_discount(customer.id,[{'seller_order_id':so.id,'amount':100}],funding_source='shared')
+    out=svc.allocate_order_discount(customer.id,[{'seller_order_id':so.id,'amount':100,'seller_amount':40,'platform_amount':60}],funding_source='shared')
+    assert out['discount']=='100.0000'

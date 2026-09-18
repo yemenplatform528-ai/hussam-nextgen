@@ -18,11 +18,16 @@ class MarketplaceDiscountAllocation(Base):
     coupon_id: Mapped[int | None] = mapped_column(ForeignKey('marketplace_coupons.id', ondelete='SET NULL'), nullable=True, index=True)
     funding_source: Mapped[str] = mapped_column(String(30), nullable=False, default='seller')
     amount: Mapped[Decimal] = mapped_column(Numeric(20, 4), nullable=False)
+    seller_funded_amount: Mapped[Decimal | None] = mapped_column(Numeric(20, 4), nullable=True)
+    platform_funded_amount: Mapped[Decimal | None] = mapped_column(Numeric(20, 4), nullable=True)
     currency: Mapped[str] = mapped_column(String(10), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, nullable=False)
     __table_args__ = (
         CheckConstraint("funding_source IN ('seller','platform','shared')", name='ck_discount_funding_source'),
-        CheckConstraint('amount >= 0', name='ck_discount_allocation_nonnegative'),
+        CheckConstraint('amount >= 0 AND (seller_funded_amount IS NULL OR seller_funded_amount >= 0) AND (platform_funded_amount IS NULL OR platform_funded_amount >= 0)', name='ck_discount_allocation_nonnegative'),
+        CheckConstraint('(seller_funded_amount IS NULL AND platform_funded_amount IS NULL) OR (seller_funded_amount IS NOT NULL AND platform_funded_amount IS NOT NULL AND seller_funded_amount + platform_funded_amount = amount)', name='ck_discount_funding_conservation'),
+        CheckConstraint("funding_source != 'seller' OR (seller_funded_amount IS NULL OR seller_funded_amount = amount)", name='ck_discount_seller_funding'),
+        CheckConstraint("funding_source != 'platform' OR (platform_funded_amount IS NULL OR platform_funded_amount = amount)", name='ck_discount_platform_funding'),
         UniqueConstraint('customer_order_id', 'seller_order_id', 'promotion_id', 'coupon_id', name='uq_discount_allocation_scope'),
         Index('ix_discount_allocation_order', 'customer_order_id', 'seller_tenant_id'),
     )
