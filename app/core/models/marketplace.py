@@ -245,6 +245,51 @@ class MarketplaceFeeRule(Base):
         CheckConstraint('effective_to IS NULL OR effective_to > effective_from', name='ck_market_fee_rule_effective_window'),
     )
 
+class MarketplaceChargeRule(Base):
+    __tablename__ = 'marketplace_charge_rules'
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    market_id: Mapped[int | None] = mapped_column(ForeignKey('market_contexts.id', ondelete='CASCADE'), nullable=True, index=True)
+    name: Mapped[str] = mapped_column(String(160), nullable=False)
+    charge_type: Mapped[str] = mapped_column(String(40), nullable=False)
+    jurisdiction_code: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    rate_bps: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    fixed_amount: Mapped[object] = mapped_column(Numeric(20,4), nullable=False, default=0)
+    currency: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    priority: Mapped[int] = mapped_column(Integer, nullable=False, default=100)
+    active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    policy_version: Mapped[str] = mapped_column(String(80), nullable=False, default='v1')
+    effective_from: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, nullable=False)
+    effective_to: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, nullable=False)
+    __table_args__ = (
+        CheckConstraint("charge_type IN ('tax','regulatory_fee','levy')", name='ck_market_charge_rule_type'),
+        CheckConstraint('rate_bps >= 0 AND rate_bps <= 10000', name='ck_market_charge_rule_bps'),
+        CheckConstraint('fixed_amount >= 0', name='ck_market_charge_rule_fixed_nonnegative'),
+        CheckConstraint('effective_to IS NULL OR effective_to > effective_from', name='ck_market_charge_rule_effective_window'),
+    )
+
+class MarketplaceOrderCharge(Base):
+    __tablename__ = 'marketplace_order_charges'
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    marketplace_order_id: Mapped[int] = mapped_column(ForeignKey('marketplace_orders.id', ondelete='CASCADE'), nullable=False, index=True)
+    seller_tenant_id: Mapped[int] = mapped_column(ForeignKey('tenants.id', ondelete='RESTRICT'), nullable=False, index=True)
+    rule_id: Mapped[int | None] = mapped_column(ForeignKey('marketplace_charge_rules.id', ondelete='SET NULL'), nullable=True)
+    charge_type: Mapped[str] = mapped_column(String(40), nullable=False)
+    jurisdiction_code: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    basis_amount: Mapped[object] = mapped_column(Numeric(20,4), nullable=False)
+    rate_bps: Mapped[int] = mapped_column(Integer, nullable=False)
+    fixed_amount: Mapped[object] = mapped_column(Numeric(20,4), nullable=False, default=0)
+    amount: Mapped[object] = mapped_column(Numeric(20,4), nullable=False)
+    currency: Mapped[str] = mapped_column(String(10), nullable=False)
+    policy_version: Mapped[str] = mapped_column(String(80), nullable=False)
+    policy_snapshot: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, nullable=False)
+    __table_args__ = (
+        CheckConstraint("charge_type IN ('tax','regulatory_fee','levy')", name='ck_market_order_charge_type'),
+        CheckConstraint('basis_amount >= 0 AND rate_bps >= 0 AND fixed_amount >= 0 AND amount >= 0', name='ck_market_order_charge_amounts'),
+        UniqueConstraint('marketplace_order_id','charge_type','jurisdiction_code','policy_version', name='uq_market_order_charge_policy'),
+    )
+
 class MarketplaceOrderFee(Base):
     __tablename__ = 'marketplace_order_fees'
     id: Mapped[int] = mapped_column(Integer, primary_key=True)

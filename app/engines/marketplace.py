@@ -14,7 +14,7 @@ from app.core.models.marketplace import (
     MarketplaceSellerProfile, MarketplaceCategory, MarketplaceListing,
     MarketplaceBuyerProfile, MarketplaceAddress, MarketplaceCart, MarketplaceCartItem,
     MarketplaceOrder, MarketplaceOrderLine, MarketplaceCustomerOrder, MarketplaceSellerOrder, MarketplaceFulfillment, MarketplacePayout, MarketplaceSellerBalanceEntry, MarketplaceReview, MarketplaceDispute,
-    MarketplaceSellerVerification, MarketplaceShippingRate, MarketplaceShippingQuote, MarketplaceFavorite, MarketplaceReturnRequest, MarketplaceReturnLine, MarketplaceRefundLine, MarketplacePayoutDestination, MarketplacePaymentSession, MarketplacePaymentAllocation, MarketplaceFeeRule, MarketplaceOrderFee, MarketplaceOfferCompetition, MarketplaceOfferCompetitionScore,
+    MarketplaceSellerVerification, MarketplaceShippingRate, MarketplaceShippingQuote, MarketplaceFavorite, MarketplaceReturnRequest, MarketplaceReturnLine, MarketplaceRefundLine, MarketplacePayoutDestination, MarketplacePaymentSession, MarketplacePaymentAllocation, MarketplaceFeeRule, MarketplaceOrderFee, MarketplaceChargeRule, MarketplaceOrderCharge, MarketplaceOfferCompetition, MarketplaceOfferCompetitionScore,
 )
 from app.core.models.payments import PaymentIntent, PaymentSettlement
 from app.core.models.logistics import Shipment
@@ -193,6 +193,24 @@ class MarketplaceService:
             raise MarketplaceError('no active marketplace fee rule configured')
         candidates.sort(key=lambda x:(x[0],x[1].priority,x[1].id))
         return candidates[0][1]
+
+    def marketplace_charge_preview(self, basis_amount: Decimal, currency: str, charge_type: str, market_id: int | None = None, jurisdiction_code: str | None = None):
+        """Return an explicitly configured tax/regulatory charge rule; absent policy means zero, not an invented tax."""
+        market_id = self._market_id(market_id); currency = self._assert_currency(market_id, currency)
+        charge_type = (charge_type or '').strip().lower()
+        if charge_type not in {'tax','regulatory_fee','levy'}:
+            raise MarketplaceError('unsupported marketplace charge type')
+        now = datetime.now(timezone.utc)
+        rules = self.db.scalars(select(MarketplaceChargeRule).where(or_(MarketplaceChargeRule.market_id == market_id, MarketplaceChargeRule.market_id.is_(None)), MarketplaceChargeRule.charge_type == charge_type, MarketplaceChargeRule.active.is_(True))).all()
+        def aware(v): return v.replace(tzinfo=timezone.utc) if v is not None and v.tzinfo is None else v
+        candidates = [r for r in rules if aware(r.effective_from) <= now and (aware(r.effective_to) is None or aware(r.effective_to) > now) and (not r.currency or r.currency.upper() == currency) and (r.jurisdiction_code is None or r.jurisdiction_code == jurisdiction_code)]
+        if not candidates:
+            return None, Decimal('0.0000')
+        candidates.sort(key=lambda r: (0 if r.market_id == market_id else 1, 0 if r.jurisdiction_code == jurisdiction_code else 1, r.priority, r.id))
+        rule = candidates[0]
+        basis = _money(basis_amount)
+        amount = (basis * Decimal(rule.rate_bps) / Decimal(10000) + _money(rule.fixed_amount)).quantize(Decimal('0.0001'), rounding=ROUND_HALF_UP)
+        return rule, amount
 
     def marketplace_fee_preview(self, seller_tenant_id:int, basis_amount:Decimal, currency:str, category_ids:set[int]|None=None, market_id:int|None=None):
         market_id=self._market_id(market_id); currency=self._assert_currency(market_id,currency)
