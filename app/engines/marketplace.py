@@ -1244,6 +1244,12 @@ class MarketplaceService:
         destination=self.db.scalar(select(MarketplacePayoutDestination).where(MarketplacePayoutDestination.seller_tenant_id==seller_tenant_id).with_for_update())
         if not destination or destination.status!='verified':
             raise MarketplaceError('verified payout destination is required')
+        if not p.market_id:
+            raise MarketplaceError('market context is required for payout')
+        from app.engines.payment_adapters import evaluate_provider_production_gate
+        gate=evaluate_provider_production_gate(self.db, destination.provider, p.market_id, 'payout', currency=p.currency)
+        if not gate.allowed:
+            raise MarketplaceError('payout provider production gate blocked: ' + ';'.join(gate.blocked_reasons))
         if p.status=='processing' and p.payout_reference:
             return p
         if p.status!='eligible':

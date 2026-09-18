@@ -23,7 +23,7 @@ def setup():
     a=m.add_address(buyer.id,'Home','Buyer','700000000','Aden','Aden','Main')
     l=m.create_listing(seller.id,ListingInput('rice','Rice','','product','YER',Decimal('1000'),'rice','wh')); m.moderate_listing(l.id,admin.id,'approved'); m.publish_listing(seller.id,l.id)
     m.add_to_cart(buyer.id,l.id,1); o=m.checkout(buyer.id,a.id)[0]
-    p=PaymentIntent(tenant_id=seller.id,reference='MKT-PAY:'+o.reference,provider='test',amount=o.total,currency=o.currency,status='captured',provider_payment_id='PP-1'); db.add(p); db.flush(); o.payment_reference=p.reference; o.status='completed'; db.commit()
+    p=PaymentIntent(tenant_id=seller.id,reference='MKT-PAY:'+o.reference,provider='test-provider',amount=o.total,currency=o.currency,status='captured',provider_payment_id='PP-1',metadata_json='{"market_id": 1, "rail": ""}'); db.add(p); db.flush(); o.payment_reference=p.reference; o.status='completed'; db.commit()
     return db,m,ids,seller,admin,buyer,o
 
 def test_payment_refund_is_partial_and_idempotency_safe():
@@ -32,6 +32,14 @@ def test_payment_refund_is_partial_and_idempotency_safe():
     r=ps.complete_refund(seller.id,'REF-1',provider_refund_id='PR-1'); assert r.status=='succeeded'
     p=db.scalar(select(PaymentIntent).where(PaymentIntent.reference==o.payment_reference)); assert p.status=='captured'
     with pytest.raises(PaymentError): ps.create_refund(seller.id,o.payment_reference,refund_reference='REF-2',amount=Decimal('700'),currency='YER',reason='too-much')
+
+
+def test_refund_provider_requires_production_evidence():
+    from app.core.models.market import ProviderRegistryEntry
+    db,m,ids,seller,admin,buyer,o=setup(); provider=db.scalar(select(ProviderRegistryEntry).where(ProviderRegistryEntry.code=='test-provider')); provider.status='discovered'; db.commit()
+    ps=PaymentProductionService(db)
+    with pytest.raises(PaymentError, match='production gate blocked'):
+        ps.create_refund(seller.id,o.payment_reference,refund_reference='REF-GATE',amount=Decimal('100'),currency='YER',reason='gate')
 
 def test_return_lifecycle_requires_inspection_before_refund():
     db,m,ids,seller,admin,buyer,o=setup(); rr=m.request_return(buyer.id,o.id,'damaged','damaged item')

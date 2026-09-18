@@ -17,6 +17,7 @@ def ensure_market(db, code='YE', currency='YER'):
     }, sort_keys=True)
     provider = ProviderRegistryEntry(code='test-provider', organization_name='Test Provider', provider_type='payment', product_name='Test Pay', status='production', integration_mode='api', metadata_json=evidence)
     db.add(provider); db.flush()
-    db.add(ProviderMarketCapability(provider_id=provider.id, market_id=market.id, capability='payment', rail='', currency=currency, active=True))
+    for capability in ('payment', 'refund', 'payout'):
+        db.add(ProviderMarketCapability(provider_id=provider.id, market_id=market.id, capability=capability, rail='', currency=currency, active=True))
     db.commit()
     return market

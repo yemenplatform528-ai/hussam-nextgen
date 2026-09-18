@@ -235,6 +235,16 @@ class PaymentProductionService:
         return s
     def create_refund(self, tenant_id: int, payment_reference: str, *, refund_reference: str, amount: Decimal, currency: str, reason: str) -> PaymentRefund:
         p = self._get(tenant_id, payment_reference, lock=True)
+        metadata = json.loads(p.metadata_json or '{}')
+        market_id = metadata.get('market_id')
+        if market_id is None:
+            raise PaymentError('market context is required before refund')
+        gate = evaluate_provider_production_gate(
+            self.db, p.provider, int(market_id), 'refund',
+            rail=metadata.get('rail', ''), currency=p.currency
+        )
+        if not gate.allowed:
+            raise PaymentError('provider production gate blocked: ' + ';'.join(gate.blocked_reasons))
         if p.status != 'captured':
             raise PaymentError('only captured payments can be refunded')
         amount = Decimal(str(amount))
@@ -262,10 +272,20 @@ class PaymentProductionService:
             raise PaymentError('refund is already completed')
         if r.status != 'requested': raise PaymentError('refund is not awaiting provider completion')
         if not provider_refund_id: raise PaymentError('provider refund id is required')
+        p = self._get(tenant_id, r.payment_reference, lock=True)
+        metadata = json.loads(p.metadata_json or '{}')
+        market_id = metadata.get('market_id')
+        if market_id is None:
+            raise PaymentError('market context is required before refund completion')
+        gate = evaluate_provider_production_gate(
+            self.db, p.provider, int(market_id), 'refund',
+            rail=metadata.get('rail', ''), currency=p.currency
+        )
+        if not gate.allowed:
+            raise PaymentError('provider production gate blocked: ' + ';'.join(gate.blocked_reasons))
         conflict = self.db.scalar(select(PaymentRefund).where(PaymentRefund.tenant_id == tenant_id, PaymentRefund.provider_refund_id == provider_refund_id, PaymentRefund.id != r.id))
         if conflict: raise PaymentError('provider refund id already belongs to another refund')
         r.provider_refund_id = provider_refund_id; r.status='succeeded'; r.processed_at=datetime.now(timezone.utc)
-        p = self._get(tenant_id, r.payment_reference, lock=True)
         total = sum((Decimal(str(x.amount)) for x in self.db.scalars(select(PaymentRefund).where(PaymentRefund.tenant_id==tenant_id, PaymentRefund.payment_reference==p.reference, PaymentRefund.status=='succeeded')).all()), Decimal('0'))
         if total == Decimal(str(p.amount)): p.status='refunded'; p.updated_at=datetime.now(timezone.utc)
         self._event(tenant_id, 'payments.refund.succeeded', r.id, {'payment_reference': p.reference, 'refund_reference': r.refund_reference, 'provider_refund_id': provider_refund_id, 'amount': str(r.amount), 'currency': r.currency})
