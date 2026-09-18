@@ -35,3 +35,51 @@ def test_unconfigured_adapter_fails_closed_for_every_operation():
 def test_adapter_requires_a_name():
     with pytest.raises(PaymentAdapterError, match="name"):
         UnconfiguredPaymentAdapter("")
+
+
+def test_provider_production_gate_fails_closed_without_registry_evidence():
+    from app.core.models.market import ProviderRegistryEntry, ProviderMarketCapability
+    from app.engines.payment_adapters import evaluate_provider_production_gate, REQUIRED_PRODUCTION_EVIDENCE
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from app.core.persistence import Base
+    engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
+    Base.metadata.create_all(engine)
+    factory = sessionmaker(engine, expire_on_commit=False)
+    with factory() as db:
+        provider = ProviderRegistryEntry(
+            code="demo-provider", organization_name="Demo", provider_type="payment",
+            product_name="Demo Pay", status="production", integration_mode="api", metadata_json="{}"
+        )
+        db.add(provider); db.flush()
+        db.add(ProviderMarketCapability(provider_id=provider.id, market_id=1, capability="payment", active=True))
+        db.commit()
+        gate = evaluate_provider_production_gate(db, "demo-provider", 1, "payment")
+        assert not gate.allowed
+        assert any(x.startswith("missing_evidence:") for x in gate.blocked_reasons)
+        assert len(REQUIRED_PRODUCTION_EVIDENCE) == 11
+    engine.dispose()
+
+
+def test_provider_production_gate_allows_only_complete_evidence_and_capability():
+    import json
+    from app.core.models.market import ProviderRegistryEntry, ProviderMarketCapability
+    from app.engines.payment_adapters import evaluate_provider_production_gate, REQUIRED_PRODUCTION_EVIDENCE
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from app.core.persistence import Base
+    engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
+    Base.metadata.create_all(engine)
+    factory = sessionmaker(engine, expire_on_commit=False)
+    with factory() as db:
+        evidence = json.dumps({key: True for key in REQUIRED_PRODUCTION_EVIDENCE})
+        provider = ProviderRegistryEntry(
+            code="certified-provider", organization_name="Certified", provider_type="payment",
+            product_name="Certified Pay", status="production", integration_mode="api", metadata_json=evidence
+        )
+        db.add(provider); db.flush()
+        db.add(ProviderMarketCapability(provider_id=provider.id, market_id=1, capability="payment", rail="wallet", currency="YER", active=True))
+        db.commit()
+        assert evaluate_provider_production_gate(db, "certified-provider", 1, "payment", rail="wallet", currency="YER").allowed
+        assert not evaluate_provider_production_gate(db, "certified-provider", 1, "payment").allowed
+    engine.dispose()
