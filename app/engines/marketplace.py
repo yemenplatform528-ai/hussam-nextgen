@@ -1054,15 +1054,15 @@ class MarketplaceService:
         payment_service=PaymentProductionService(self.db)
         capture_date = datetime.now(timezone.utc).date()
         for a in allocations:
-            p=payment_service.create_intent(a.seller_tenant_id,a.payment_reference,session.provider,a.amount,a.currency,commit=False)
+            mo=self.db.scalar(select(MarketplaceOrder).where(MarketplaceOrder.id==a.marketplace_order_id).with_for_update())
+            so=self.db.scalar(select(MarketplaceSellerOrder).where(MarketplaceSellerOrder.id==a.seller_order_id).with_for_update())
+            if not mo or not so: raise MarketplaceError('payment allocation order not found')
+            p=payment_service.create_intent(a.seller_tenant_id,a.payment_reference,session.provider,a.amount,a.currency,market_id=mo.market_id,commit=False)
             p.provider_payment_id=f'{provider_payment_id}:{a.id}'
             p.status='authorized'
             p.updated_at=datetime.now(timezone.utc)
             payment_service.capture_verified(a.seller_tenant_id, a.payment_reference,
                                              posting_date=capture_date, commit=False)
-            mo=self.db.scalar(select(MarketplaceOrder).where(MarketplaceOrder.id==a.marketplace_order_id).with_for_update())
-            so=self.db.scalar(select(MarketplaceSellerOrder).where(MarketplaceSellerOrder.id==a.seller_order_id).with_for_update())
-            if not mo or not so: raise MarketplaceError('payment allocation order not found')
             mo.status='paid'; mo.payment_reference=a.payment_reference; mo.updated_at=datetime.now(timezone.utc)
             so.status='paid'; so.updated_at=datetime.now(timezone.utc)
             payout=self.db.scalar(select(MarketplacePayout).where(MarketplacePayout.marketplace_order_id==mo.id).with_for_update())
@@ -1080,7 +1080,7 @@ class MarketplaceService:
         if o.payment_reference: raise MarketplaceError('payment intent already exists for order')
         ref=f'MKT-PAY:{o.reference}'
         from app.engines.payments import PaymentProductionService
-        p=PaymentProductionService(self.db).create_intent(o.seller_tenant_id,ref,provider,Decimal(str(o.total)),o.currency)
+        p=PaymentProductionService(self.db).create_intent(o.seller_tenant_id,ref,provider,Decimal(str(o.total)),o.currency,market_id=o.market_id)
         o.payment_reference=p.reference; self.db.commit(); self.db.refresh(o)
         return p
 

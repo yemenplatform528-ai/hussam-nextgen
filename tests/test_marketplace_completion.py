@@ -41,7 +41,7 @@ def test_client_cannot_supply_arbitrary_shipping_fee():
 
 def test_payment_intent_is_attached_to_marketplace_order():
     db,seller,buyer,su,l,a,m=setup(); m.add_to_cart(buyer.id,l.id,1); o=m.checkout(buyer.id,a.id)[0]
-    p=m.attach_payment_intent(buyer.id,o.id,'provider-x'); assert o.payment_reference==p.reference
+    p=m.attach_payment_intent(buyer.id,o.id,'test-provider'); assert o.payment_reference==p.reference
     assert p.reference.startswith('MKT-PAY:')
 
 def test_paid_order_cannot_be_directly_cancelled():
