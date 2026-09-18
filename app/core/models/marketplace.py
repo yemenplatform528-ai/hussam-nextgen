@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, ForeignKeyConstraint, Integer, Numeric, String, Text, UniqueConstraint, Index, text
+from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, ForeignKeyConstraint, Integer, Numeric, String, Text, UniqueConstraint, Index, text, JSON
 from sqlalchemy.orm import Mapped, mapped_column
 from app.core.persistence import Base
 
@@ -233,12 +233,16 @@ class MarketplaceFeeRule(Base):
     currency: Mapped[str | None] = mapped_column(String(10), nullable=True)
     priority: Mapped[int] = mapped_column(Integer, nullable=False, default=100)
     active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    policy_version: Mapped[str] = mapped_column(String(80), nullable=False, default='v1')
+    effective_from: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, nullable=False)
+    effective_to: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, nullable=False)
     __table_args__ = (
         CheckConstraint("scope IN ('global','seller','category')", name='ck_market_fee_rule_scope'),
         CheckConstraint('commission_bps >= 0 AND commission_bps <= 3000', name='ck_market_fee_rule_bps'),
         CheckConstraint('fixed_fee >= 0', name='ck_market_fee_rule_fixed_nonnegative'),
         CheckConstraint("(scope = 'global' AND seller_tenant_id IS NULL AND category_id IS NULL) OR (scope = 'seller' AND seller_tenant_id IS NOT NULL AND category_id IS NULL) OR (scope = 'category' AND category_id IS NOT NULL AND seller_tenant_id IS NULL)", name='ck_market_fee_rule_scope_refs'),
+        CheckConstraint('effective_to IS NULL OR effective_to > effective_from', name='ck_market_fee_rule_effective_window'),
     )
 
 class MarketplaceOrderFee(Base):
@@ -253,6 +257,8 @@ class MarketplaceOrderFee(Base):
     fixed_fee: Mapped[object] = mapped_column(Numeric(20,4), nullable=False, default=0)
     amount: Mapped[object] = mapped_column(Numeric(20,4), nullable=False)
     currency: Mapped[str] = mapped_column(String(10), nullable=False)
+    policy_version: Mapped[str] = mapped_column(String(80), nullable=False, default='v1')
+    policy_snapshot: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, nullable=False)
     __table_args__ = (
         CheckConstraint("fee_type IN ('commission','payment','fulfillment','adjustment')", name='ck_market_order_fee_type'),

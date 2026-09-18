@@ -166,7 +166,11 @@ class MarketplaceService:
 
     def _fee_rule(self, seller_tenant_id:int, category_ids:set[int], currency:str, market_id:int):
         currency = currency.upper()
-        all_rules = self.db.scalars(select(MarketplaceFeeRule).where(or_(MarketplaceFeeRule.market_id==market_id,MarketplaceFeeRule.market_id.is_(None))).order_by(MarketplaceFeeRule.priority.asc(), MarketplaceFeeRule.id.asc())).all()
+        now = datetime.now(timezone.utc)
+        configured_rules = self.db.scalars(select(MarketplaceFeeRule).where(or_(MarketplaceFeeRule.market_id==market_id,MarketplaceFeeRule.market_id.is_(None)))).all()
+        def _aware(value):
+            return value.replace(tzinfo=timezone.utc) if value is not None and value.tzinfo is None else value
+        all_rules = [r for r in configured_rules if _aware(r.effective_from) <= now and (_aware(r.effective_to) is None or _aware(r.effective_to) > now)]
         rules = [r for r in all_rules if r.active]
         candidates=[]
         for r in rules:
@@ -184,7 +188,7 @@ class MarketplaceService:
             # Unit/in-memory test databases may be created directly from metadata rather than migrations.
             # Keep a deterministic bootstrap rule only when the table is completely empty; a deliberately
             # configured-but-disabled rule set must fail closed. Production migrations seed the same rule.
-            if not all_rules:
+            if not configured_rules:
                 return MarketplaceFeeRule(id=0, name='Bootstrap Default Marketplace Commission', scope='global', commission_bps=500, fixed_fee=Decimal('0'), priority=100, active=True)
             raise MarketplaceError('no active marketplace fee rule configured')
         candidates.sort(key=lambda x:(x[0],x[1].priority,x[1].id))
@@ -835,7 +839,7 @@ class MarketplaceService:
             for ci,l,_ in group:
                 line_total=_money(ci.quantity)*_money(l.unit_price)
                 self.db.add(MarketplaceOrderLine(marketplace_order_id=order.id,listing_id=l.id,sales_order_line_id=sales_lines[j].id if j<len(sales_lines) else None,title_snapshot=l.title,quantity=_money(ci.quantity),unit_price=_money(l.unit_price),line_total=line_total)); j+=1
-            self.db.add(MarketplaceOrderFee(marketplace_order_id=order.id,seller_tenant_id=seller_id,rule_id=fee_rule.id,fee_type='commission',basis_amount=subtotal,commission_bps=fee_rule.commission_bps,fixed_fee=_money(fee_rule.fixed_fee),amount=fee,currency=currency))
+            self.db.add(MarketplaceOrderFee(marketplace_order_id=order.id,seller_tenant_id=seller_id,rule_id=fee_rule.id if fee_rule.id else None,fee_type='commission',basis_amount=subtotal,commission_bps=fee_rule.commission_bps,fixed_fee=_money(fee_rule.fixed_fee),amount=fee,currency=currency,policy_version=fee_rule.policy_version,policy_snapshot={'name':fee_rule.name,'scope':fee_rule.scope,'market_id':fee_rule.market_id,'seller_tenant_id':fee_rule.seller_tenant_id,'category_id':fee_rule.category_id,'commission_bps':fee_rule.commission_bps,'fixed_fee':str(_money(fee_rule.fixed_fee)),'currency':fee_rule.currency,'priority':fee_rule.priority}))
             self.db.add(MarketplacePayout(market_id=market_id,seller_tenant_id=seller_id,marketplace_order_id=order.id,reference=f'PAYOUT:{ref}',gross_amount=total,platform_fee=fee,net_amount=total-fee,currency=currency,status='held'))
             line_rows=self.db.scalars(select(MarketplaceOrderLine).where(MarketplaceOrderLine.marketplace_order_id==order.id).order_by(MarketplaceOrderLine.id)).all()
             remaining_fee=fee; remaining_shipping=seller_shipping_fee
