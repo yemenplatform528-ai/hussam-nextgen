@@ -17,7 +17,7 @@ from app.core.models.marketplace import (
     MarketplaceOrder, MarketplaceOrderLine, MarketplaceCustomerOrder, MarketplaceSellerOrder, MarketplaceFulfillment, MarketplacePayout, MarketplaceSellerBalanceEntry, MarketplaceReview, MarketplaceDispute,
     MarketplaceSellerVerification, MarketplaceShippingRate, MarketplaceShippingQuote, MarketplaceFavorite, MarketplaceReturnRequest, MarketplaceReturnLine, MarketplaceRefundLine, MarketplacePayoutDestination, MarketplacePaymentSession, MarketplacePaymentAllocation, MarketplaceFeeRule, MarketplaceOrderFee, MarketplaceChargeRule, MarketplaceOrderCharge, MarketplaceOfferCompetition, MarketplaceOfferCompetitionScore,
 )
-from app.core.models.payments import PaymentIntent, PaymentSettlement, PaymentRefund
+from app.core.models.payments import PaymentIntent, PaymentSettlement, PaymentRefund, PaymentReconciliation
 from app.core.models.logistics import Shipment
 from app.core.models.commerce import SalesOrder, SalesOrderLine
 from app.core.models.inventory import InventoryItem, Warehouse
@@ -1030,6 +1030,88 @@ class MarketplaceService:
         if failed:
             raise MarketplaceError("financial invariant violation: " + ", ".join(failed))
         return {"marketplace_order_id": order.id, "currency": order.currency, "checks": checks, "allocation_net": str(alloc_net)}
+
+    def financial_reconciliation_report(self, marketplace_order_id: int):
+        """Return a read-only end-to-end money trail for one marketplace order.
+
+        This report joins order allocation, customer payment, provider settlement,
+        reconciliation, seller payout, and seller-balance effects. It never mutates
+        financial state; any invariant failure is surfaced as an exception.
+        """
+        order = self.db.get(MarketplaceOrder, marketplace_order_id)
+        if not order:
+            raise MarketplaceError("marketplace order not found")
+        customer = self.db.get(MarketplaceCustomerOrder, order.customer_order_id) if order.customer_order_id else None
+        session = self.db.scalar(select(MarketplacePaymentSession).where(
+            MarketplacePaymentSession.customer_order_id == order.customer_order_id
+        )) if order.customer_order_id else None
+        allocations = self.db.scalars(select(MarketplacePaymentAllocation).where(
+            MarketplacePaymentAllocation.marketplace_order_id == order.id
+        ).order_by(MarketplacePaymentAllocation.id)).all()
+        intents = []
+        settlements = []
+        reconciliations = []
+        for allocation in allocations:
+            intent = self.db.scalar(select(PaymentIntent).where(
+                PaymentIntent.tenant_id == allocation.seller_tenant_id,
+                PaymentIntent.reference == allocation.payment_reference
+            ))
+            if intent:
+                intents.append(intent)
+            settlements.extend(self.db.scalars(select(PaymentSettlement).where(
+                PaymentSettlement.tenant_id == allocation.seller_tenant_id,
+                PaymentSettlement.payment_reference == allocation.payment_reference
+            )).all())
+            reconciliations.extend(self.db.scalars(select(PaymentReconciliation).where(
+                PaymentReconciliation.tenant_id == allocation.seller_tenant_id,
+                PaymentReconciliation.internal_reference == allocation.payment_reference
+            )).all())
+        payout = self.db.scalar(select(MarketplacePayout).where(
+            MarketplacePayout.marketplace_order_id == order.id
+        ))
+        balance_entries = self.db.scalars(select(MarketplaceSellerBalanceEntry).where(
+            MarketplaceSellerBalanceEntry.marketplace_payout_id == payout.id
+        ).order_by(MarketplaceSellerBalanceEntry.id)).all() if payout else []
+
+        self.assert_financial_invariants(order.id)
+        if session:
+            self.assert_payment_conservation(session.id)
+        if payout and (balance_entries or payout.status in {'paid', 'reversed'}):
+            self.assert_seller_balance_conservation(payout)
+
+        payment_amount = sum((_money(x.amount) for x in intents if x.status in {'captured','authorized','refunded'}), Decimal('0'))
+        settlement_amount = sum((_money(x.amount) for x in settlements if x.status == 'settled'), Decimal('0'))
+        reconciled_amount = sum((_money(x.actual_amount) for x in reconciliations if x.status == 'matched'), Decimal('0'))
+        credit_amount = sum((_money(x.amount) for x in balance_entries if x.entry_type == 'credit'), Decimal('0'))
+        payout_debit_amount = sum((_money(x.amount) for x in balance_entries if x.entry_type == 'payout_debit'), Decimal('0'))
+        recovery_amount = sum((_money(x.amount) for x in balance_entries if x.entry_type == 'refund_recovery'), Decimal('0'))
+        reversal_amount = sum((_money(x.amount) for x in balance_entries if x.entry_type == 'refund_reversal'), Decimal('0'))
+
+        exceptions = []
+        if customer and _money(session.amount) != _money(customer.total) if session else False:
+            exceptions.append('customer_payment_session_amount')
+        if session and payment_amount and payment_amount != _money(session.amount):
+            exceptions.append('payment_intent_amount')
+        if settlement_amount and payment_amount and settlement_amount != payment_amount:
+            exceptions.append('settlement_amount')
+        if reconciliations and reconciled_amount and settlement_amount and reconciled_amount != settlement_amount:
+            exceptions.append('reconciliation_amount')
+        if payout and payout.status == 'paid' and payout_debit_amount != _money(payout.net_amount):
+            exceptions.append('payout_debit_amount')
+        if payout and credit_amount and payout_debit_amount > credit_amount + reversal_amount + recovery_amount:
+            exceptions.append('seller_balance_consumption')
+        return {
+            'marketplace_order_id': order.id,
+            'customer_order_id': order.customer_order_id,
+            'market_id': order.market_id,
+            'currency': order.currency,
+            'order': {'subtotal': str(_money(order.subtotal)), 'shipping': str(_money(order.shipping_fee)), 'platform_fee': str(_money(order.platform_fee)), 'total': str(_money(order.total)), 'status': order.status},
+            'payment': {'session_reference': session.reference if session else None, 'status': session.status if session else None, 'amount': str(_money(session.amount)) if session else None, 'intent_count': len(intents), 'captured_amount': str(payment_amount)},
+            'settlement': {'count': len(settlements), 'settled_amount': str(settlement_amount), 'reconciled_amount': str(reconciled_amount), 'statuses': sorted({x.reconciliation_status for x in settlements})},
+            'seller': {'payout_status': payout.status if payout else None, 'payout_net': str(_money(payout.net_amount)) if payout else None, 'credit': str(credit_amount), 'payout_debit': str(payout_debit_amount), 'refund_recovery': str(recovery_amount), 'refund_reversal': str(reversal_amount)},
+            'exceptions': exceptions,
+            'status': 'balanced' if not exceptions else 'exception',
+        }
 
     def assert_refund_invariants(self, marketplace_order_id: int, payment_refund_id: int):
         """Validate refund conservation without rewriting immutable order allocation history.

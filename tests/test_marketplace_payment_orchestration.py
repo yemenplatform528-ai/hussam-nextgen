@@ -5,7 +5,7 @@ import pytest
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 from app.core.persistence import Base
-from app.core.models.marketplace import MarketplaceCustomerOrder, MarketplaceSellerOrder, MarketplacePaymentAllocation
+from app.core.models.marketplace import MarketplaceCustomerOrder, MarketplaceSellerOrder, MarketplacePaymentAllocation, MarketplaceOrder
 from app.engines.marketplace import MarketplaceService, MarketplaceError, ListingInput
 from app.engines.identity import IdentityService
 from app.engines.inventory.production import InventoryProductionService
@@ -81,3 +81,17 @@ def test_payment_conservation_rejects_currency_drift():
     db.flush()
     with pytest.raises(MarketplaceError, match='payment conservation violation'):
         m.assert_payment_conservation(session.id)
+
+
+def test_financial_reconciliation_report_returns_end_to_end_balanced_view():
+    db,m,buyer,co_id=setup()
+    session=m.create_payment_session(buyer,co_id,'test-provider')
+    m.capture_payment_session(buyer,co_id,'PROV-REPORT-38')
+    order=db.scalar(select(MarketplaceOrder).where(MarketplaceOrder.customer_order_id==co_id))
+    report=m.financial_reconciliation_report(order.id)
+    assert report['status']=='balanced'
+    assert report['payment']['status']=='captured'
+    assert Decimal(report['payment']['amount'])==Decimal(report['order']['total'])
+    assert report['settlement']['count']==0
+    assert report['seller']['payout_status']=='held'
+    assert report['exceptions']==[]
