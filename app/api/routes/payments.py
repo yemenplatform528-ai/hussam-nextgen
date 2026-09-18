@@ -5,11 +5,11 @@ from app.api.dependencies import get_context,get_session
 from app.engines.payments import PaymentProductionService
 from app.core.security.payment_webhook import PaymentWebhookSignatureError, secret_for, verify_signature
 router=APIRouter(prefix="/payments",tags=["payments"])
-class Intent(BaseModel): reference:str;provider:str;amount:Decimal=Field(gt=0);currency:str
+class Intent(BaseModel): reference:str;provider:str;amount:Decimal=Field(gt=0);currency:str;market_id:int;rail:str=''
 class Provider(BaseModel):provider_payment_id:str
 @router.post("/intents",status_code=201)
 def create(body:Intent,ctx=Depends(get_context),db=Depends(get_session)):
-    x=PaymentProductionService(db).create_intent(ctx.tenant_id,body.reference,body.provider,body.amount,body.currency);return {"id":x.id,"reference":x.reference,"status":x.status,"amount":str(x.amount),"currency":x.currency}
+    x=PaymentProductionService(db).create_intent(ctx.tenant_id,body.reference,body.provider,body.amount,body.currency,market_id=body.market_id,rail=body.rail);return {"id":x.id,"reference":x.reference,"status":x.status,"amount":str(x.amount),"currency":x.currency}
 @router.post("/intents/{reference}/processing")
 def processing(reference:str,ctx=Depends(get_context),db=Depends(get_session)):
     x=PaymentProductionService(db).mark_processing(ctx.tenant_id,reference);return {"reference":x.reference,"status":x.status}

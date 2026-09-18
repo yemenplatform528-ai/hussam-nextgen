@@ -11,6 +11,7 @@ from app.core.models.payments import PaymentIntent, PaymentWebhook, PaymentSettl
 from app.core.models.governance import OutboxEvent
 from app.core.models.core import Journal
 from app.engines.finance.production import PostingLine, post_journal
+from app.engines.payment_adapters import evaluate_provider_production_gate
 
 
 class PaymentError(ValueError):
@@ -38,14 +39,21 @@ class PaymentProductionService:
         self.db.add(OutboxEvent(event_id=str(uuid4()), tenant_id=tenant_id, event_type=event_type,
                                 aggregate_type='payment', aggregate_id=str(aggregate_id), payload=payload, published=False))
 
-    def create_intent(self, tenant_id: int, reference: str, provider: str, amount: Decimal, currency: str, *, commit: bool = True) -> PaymentIntent:
+    def create_intent(self, tenant_id: int, reference: str, provider: str, amount: Decimal, currency: str, *, market_id: int | None = None, rail: str = "", commit: bool = True) -> PaymentIntent:
         amount = Decimal(str(amount))
         if tenant_id <= 0 or not reference or not provider or not currency or amount <= 0:
             raise PaymentError('valid tenant, reference, provider, currency and positive amount are required')
         if self.db.scalar(select(PaymentIntent).where(PaymentIntent.tenant_id == tenant_id, PaymentIntent.reference == reference)):
             raise PaymentError('duplicate payment reference')
+        metadata = {}
+        if market_id is not None:
+            gate = evaluate_provider_production_gate(self.db, provider, market_id, 'payment', rail=rail, currency=currency)
+            if not gate.allowed:
+                raise PaymentError('provider production gate blocked: ' + ';'.join(gate.blocked_reasons))
+            metadata['market_id'] = market_id
+            metadata['rail'] = rail
         p = PaymentIntent(tenant_id=tenant_id, reference=reference, provider=provider, amount=amount,
-                          currency=currency, status='pending')
+                          currency=currency, status='pending', metadata_json=json.dumps(metadata, sort_keys=True))
         self.db.add(p); self.db.flush()
         self._event(tenant_id, 'payments.intent.created', p.id,
                     {'reference': reference, 'provider': provider, 'amount': str(amount), 'currency': currency})
@@ -66,6 +74,15 @@ class PaymentProductionService:
     def attach_provider_payment(self, tenant_id: int, payment_reference: str, provider_payment_id: str) -> PaymentIntent:
         if not provider_payment_id: raise PaymentError('provider payment id is required')
         p = self._get(tenant_id, payment_reference, lock=True)
+        try:
+            metadata = json.loads(p.metadata_json or '{}')
+        except (TypeError, ValueError):
+            metadata = {}
+        market_id = metadata.get('market_id')
+        if market_id is not None:
+            gate = evaluate_provider_production_gate(self.db, p.provider, int(market_id), 'payment', rail=metadata.get('rail', ''), currency=p.currency)
+            if not gate.allowed:
+                raise PaymentError('provider production gate blocked: ' + ';'.join(gate.blocked_reasons))
         if p.provider_payment_id and p.provider_payment_id != provider_payment_id:
             raise PaymentError('provider payment id cannot be changed')
         conflict = self.db.scalar(select(PaymentIntent).where(
