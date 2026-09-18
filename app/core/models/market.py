@@ -201,6 +201,35 @@ class PaymentAdapterRegistryEntry(Base):
     )
 
 
+class MarketReadinessEvidence(Base):
+    """Reviewed evidence record for a market activation requirement.
+
+    Evidence is metadata only; acceptance never creates the underlying
+    geography, FX, provider, rail, or adapter configuration.
+    """
+    __tablename__ = "market_readiness_evidence"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    market_id: Mapped[int] = mapped_column(ForeignKey("market_contexts.id", ondelete="CASCADE"), nullable=False)
+    requirement_key: Mapped[str] = mapped_column(String(100), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="proposed")
+    source_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    source_uri: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    source_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    license_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    retrieved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    reviewer_reference: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    acceptance_reference: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    notes: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    metadata_json: Mapped[str] = mapped_column(Text, nullable=False, default="{}")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, nullable=False)
+    __table_args__ = (
+        UniqueConstraint("market_id", "requirement_key", "source_sha256", name="uq_market_readiness_evidence_source"),
+        CheckConstraint("status IN ('proposed','reviewed','accepted','rejected','superseded')", name="ck_market_readiness_evidence_status"),
+        Index("ix_market_readiness_evidence_market_requirement", "market_id", "requirement_key", "status"),
+    )
+
+
 class PaymentMethodCatalogEntry(Base):
     __tablename__ = "payment_method_catalog"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)

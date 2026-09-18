@@ -19,6 +19,7 @@ from app.core.models.market import (
     ProviderMarketCapability,
     PaymentRailRegistryEntry,
     PaymentAdapterRegistryEntry,
+    MarketReadinessEvidence,
 )
 from app.engines.payment_adapters import REQUIRED_PRODUCTION_EVIDENCE
 
@@ -96,11 +97,30 @@ def _payment_production_ready(db, market_id: int) -> bool:
     return False
 
 
+def _accepted_evidence(db, market_id: int) -> set[str]:
+    rows = db.scalars(
+        select(MarketReadinessEvidence).where(
+            MarketReadinessEvidence.market_id == market_id,
+            MarketReadinessEvidence.status == "accepted",
+        )
+    ).all()
+    accepted: set[str] = set()
+    for row in rows:
+        if row.source_sha256 and row.reviewed_at and row.acceptance_reference:
+            accepted.add(row.requirement_key)
+    return accepted
+
+
 def evaluate_market_readiness(db, market_id: int) -> MarketReadiness:
     """Return a conservative activation decision for one market."""
     checks: list[str] = []
     blockers: list[str] = []
     evidence: list[str] = []
+    accepted_evidence = _accepted_evidence(db, market_id)
+
+    def require_evidence(key: str) -> None:
+        if key not in accepted_evidence:
+            evidence.append(key)
 
     market = db.scalar(select(MarketContext).where(MarketContext.id == market_id))
     if market is None:
@@ -125,18 +145,18 @@ def evaluate_market_readiness(db, market_id: int) -> MarketReadiness:
         MarketMoneyUnit.status == "active",
     ))
     if money_unit is None:
-        evidence.append("money_unit_definition")
+        require_evidence("money_unit_definition")
     else:
         checks.append("money_unit_defined")
 
     geography_count = db.scalar(select(MarketGeography.id).where(MarketGeography.market_id == market_id).limit(1))
     if geography_count is None:
-        evidence.append("geography_dataset")
+        require_evidence("geography_dataset")
     else:
         checks.append("geography_present")
         coverage_count = db.scalar(select(MarketCoverage.id).where(MarketCoverage.market_id == market_id).limit(1))
         if coverage_count is None:
-            evidence.append("operational_coverage")
+            require_evidence("operational_coverage")
         else:
             checks.append("operational_coverage_present")
 
@@ -147,7 +167,7 @@ def evaluate_market_readiness(db, market_id: int) -> MarketReadiness:
     if _payment_production_ready(db, market_id):
         checks.append("payment_production_path")
     else:
-        evidence.append("certified_payment_production_path")
+        require_evidence("certified_payment_production_path")
 
     if blockers:
         status = MarketReadinessStatus.BLOCKED

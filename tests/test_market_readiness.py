@@ -4,7 +4,7 @@ from sqlalchemy.orm import sessionmaker
 from app.core.persistence import Base
 from app.core.models.market import (
     MarketContext, MarketCurrency, MarketMoneyUnit, ProviderRegistryEntry,
-    ProviderMarketCapability, PaymentRailRegistryEntry, PaymentAdapterRegistryEntry,
+    ProviderMarketCapability, PaymentRailRegistryEntry, PaymentAdapterRegistryEntry, MarketReadinessEvidence, MarketGeography,
 )
 from app.engines.market_readiness import evaluate_market_readiness, build_market_readiness_report, MarketReadinessStatus
 from app.engines.payment_adapters import REQUIRED_PRODUCTION_EVIDENCE
@@ -80,4 +80,48 @@ def test_missing_market_report_remains_blocked_without_inventing_context():
         assert report.market_name is None
         assert report.default_currency is None
         assert report.blockers == ("market_not_found",)
+    engine.dispose()
+
+
+def test_accepted_evidence_is_explicit_and_does_not_create_configuration():
+    engine, factory = db_factory()
+    with factory() as db:
+        market_id = seed_market(db)
+        from datetime import datetime, timezone
+        db.add(MarketReadinessEvidence(
+            market_id=market_id,
+            requirement_key="geography_dataset",
+            status="accepted",
+            source_name="Reviewed source",
+            source_uri="https://example.invalid/dataset",
+            source_sha256="a" * 64,
+            license_name="CC-BY-4.0",
+            retrieved_at=datetime.now(timezone.utc),
+            reviewed_at=datetime.now(timezone.utc),
+            reviewer_reference="review-1",
+            acceptance_reference="accept-1",
+        ))
+        db.commit()
+        result = evaluate_market_readiness(db, market_id)
+        assert "geography_dataset" not in result.evidence_required
+        assert db.query(MarketReadinessEvidence).count() == 1
+        assert db.query(MarketGeography).count() == 0
+    engine.dispose()
+
+
+def test_accepted_evidence_without_hash_or_acceptance_does_not_count():
+    engine, factory = db_factory()
+    with factory() as db:
+        market_id = seed_market(db)
+        from datetime import datetime, timezone
+        db.add(MarketReadinessEvidence(
+            market_id=market_id,
+            requirement_key="geography_dataset",
+            status="accepted",
+            reviewed_at=datetime.now(timezone.utc),
+            acceptance_reference=None,
+        ))
+        db.commit()
+        result = evaluate_market_readiness(db, market_id)
+        assert "geography_dataset" in result.evidence_required
     engine.dispose()
