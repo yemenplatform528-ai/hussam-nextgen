@@ -6,7 +6,7 @@ from app.core.models.market import (
     MarketContext, MarketCurrency, MarketMoneyUnit, ProviderRegistryEntry,
     ProviderMarketCapability, PaymentRailRegistryEntry, PaymentAdapterRegistryEntry,
 )
-from app.engines.market_readiness import evaluate_market_readiness, MarketReadinessStatus
+from app.engines.market_readiness import evaluate_market_readiness, build_market_readiness_report, MarketReadinessStatus
 from app.engines.payment_adapters import REQUIRED_PRODUCTION_EVIDENCE
 
 
@@ -52,4 +52,32 @@ def test_inactive_market_is_blocked_even_if_configuration_exists():
         result = evaluate_market_readiness(db, market_id)
         assert result.status is MarketReadinessStatus.BLOCKED
         assert "market_status:draft" in result.blockers
+    engine.dispose()
+
+
+def test_readiness_report_is_audit_friendly_and_read_only():
+    engine, factory = db_factory()
+    with factory() as db:
+        market_id = seed_market(db)
+        before = db.get(MarketContext, market_id).status
+        report = build_market_readiness_report(db, market_id)
+        assert report.market_code == "YE"
+        assert report.market_name == "Yemen"
+        assert report.default_currency == "YER"
+        assert report.status is MarketReadinessStatus.EVIDENCE_REQUIRED
+        assert "geography_dataset" in report.evidence_required
+        assert report.ready is False
+        assert db.get(MarketContext, market_id).status == before
+    engine.dispose()
+
+
+def test_missing_market_report_remains_blocked_without_inventing_context():
+    engine, factory = db_factory()
+    with factory() as db:
+        report = build_market_readiness_report(db, 404)
+        assert report.status is MarketReadinessStatus.BLOCKED
+        assert report.market_code is None
+        assert report.market_name is None
+        assert report.default_currency is None
+        assert report.blockers == ("market_not_found",)
     engine.dispose()

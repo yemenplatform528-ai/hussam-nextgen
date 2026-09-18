@@ -38,6 +38,24 @@ class MarketReadiness:
     evidence_required: tuple[str, ...]
 
 
+@dataclass(frozen=True)
+class MarketReadinessReport:
+    """Audit-friendly, read-only view of one market's activation readiness."""
+
+    market_id: int
+    status: MarketReadinessStatus
+    market_code: str | None
+    market_name: str | None
+    default_currency: str | None
+    checks: tuple[str, ...]
+    blockers: tuple[str, ...]
+    evidence_required: tuple[str, ...]
+
+    @property
+    def ready(self) -> bool:
+        return self.status is MarketReadinessStatus.READY
+
+
 def _payment_production_ready(db, market_id: int) -> bool:
     rows = db.execute(
         select(ProviderRegistryEntry, ProviderMarketCapability)
@@ -138,3 +156,24 @@ def evaluate_market_readiness(db, market_id: int) -> MarketReadiness:
     else:
         status = MarketReadinessStatus.READY
     return MarketReadiness(market_id, status, tuple(checks), tuple(blockers), tuple(evidence))
+
+
+def build_market_readiness_report(db, market_id: int) -> MarketReadinessReport:
+    """Build a deterministic, read-only readiness report for audit/review.
+
+    This intentionally reuses the same fail-closed evaluator and adds only
+    market identity/context. It never mutates market configuration or creates
+    evidence, geography, FX rates, providers, rails, or adapters.
+    """
+    market = db.scalar(select(MarketContext).where(MarketContext.id == market_id))
+    readiness = evaluate_market_readiness(db, market_id)
+    return MarketReadinessReport(
+        market_id=market_id,
+        status=readiness.status,
+        market_code=market.code if market else None,
+        market_name=market.name if market else None,
+        default_currency=market.default_currency if market else None,
+        checks=readiness.checks,
+        blockers=readiness.blockers,
+        evidence_required=readiness.evidence_required,
+    )
