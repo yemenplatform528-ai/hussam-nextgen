@@ -53,3 +53,10 @@ No national geography import, provider production certification, API credential,
 3. Preserve licensing/provenance and compute the artifact SHA-256.
 4. For each payment provider, obtain the actual integration package: legal/licensing basis, commercial basis, technical interface, authentication, webhook/idempotency semantics, settlement/reconciliation evidence, certification result, and operational owner.
 5. Only then promote the corresponding readiness evidence record.
+
+## Independent cross-check checkpoint
+
+The current candidate dataset claims 22 governorates and 335 districts, while independent reference sources report 22 governorates and 333 districts. This discrepancy is unresolved and is a blocking evidence issue. No candidate district dataset may be accepted or imported until the 335-vs-333 difference is explained at record level and provenance is established.
+
+Reviewed: 2026-09-19
+Disposition: PENDING_RECONCILIATION
