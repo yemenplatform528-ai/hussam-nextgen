@@ -307,7 +307,7 @@ class MarketplaceSellerBalanceEntry(Base):
     source_reference: Mapped[str] = mapped_column(String(255), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, nullable=False)
     __table_args__ = (
-        CheckConstraint("entry_type IN ('credit','debit','refund_reversal','payout_debit')", name='ck_market_seller_balance_entry_type'),
+        CheckConstraint("entry_type IN ('credit','debit','refund_reversal','refund_recovery','payout_debit')", name='ck_market_seller_balance_entry_type'),
         CheckConstraint('amount > 0', name='ck_market_seller_balance_entry_amount_positive'),
         UniqueConstraint('marketplace_payout_id','entry_type','source_reference', name='uq_market_seller_balance_source'),
     )

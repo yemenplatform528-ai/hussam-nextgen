@@ -439,7 +439,22 @@ class MarketplaceService:
                 elif payout.eligible_at and old_net > _money(payout.net_amount):
                     self._balance_entry(payout,'refund_reversal',old_net-_money(payout.net_amount),r.refund_reference)
             elif payout and payout.status=='paid':
-                self._event(o.seller_tenant_id,'marketplace.payout.refund_recovery_required','payout',payout.id,{'order_id':o.id,'refund_amount':str(r.amount),'currency':r.currency})
+                # A refund after seller payout creates a recoverable seller balance debit.
+                # Never debit more than the seller's original net proceeds, and make the
+                # operation idempotent per refund reference.
+                prior_recovery = self.db.scalars(select(MarketplaceSellerBalanceEntry).where(
+                    MarketplaceSellerBalanceEntry.marketplace_payout_id == payout.id,
+                    MarketplaceSellerBalanceEntry.entry_type == 'refund_recovery'
+                )).all()
+                recovered = sum((_money(e.amount) for e in prior_recovery), Decimal('0'))
+                remaining_exposure = max(Decimal('0'), _money(payout.net_amount) - recovered)
+                recovery_amount = min(_money(r.amount), remaining_exposure)
+                if recovery_amount > 0:
+                    self._balance_entry(payout, 'refund_recovery', recovery_amount, r.refund_reference)
+                self._event(o.seller_tenant_id,'marketplace.payout.refund_recovery_required','payout',payout.id,{
+                    'order_id':o.id,'refund_amount':str(r.amount),'recovery_amount':str(recovery_amount),
+                    'currency':r.currency,'refund_reference':r.refund_reference
+                })
             self._sync_customer_order(o.customer_order_id)
         self._event(actor_tenant_id,'marketplace.return.refunded','return_request',x.id,{'refund_reference':r.refund_reference,'provider_refund_id':provider_refund_id,'amount':str(r.amount)})
         self.db.commit(); return x,r
@@ -1063,7 +1078,7 @@ class MarketplaceService:
             MarketplaceSellerBalanceEntry.entry_type==entry_type,
             MarketplaceSellerBalanceEntry.source_reference==source_reference))
         if existing: return existing
-        prefix='CREDIT' if entry_type=='credit' else ('PAYOUT' if entry_type=='payout_debit' else 'REFUND')
+        prefix='CREDIT' if entry_type=='credit' else ('PAYOUT' if entry_type=='payout_debit' else ('REFUND-RECOVERY' if entry_type=='refund_recovery' else 'REFUND'))
         x=MarketplaceSellerBalanceEntry(
             market_id=payout.market_id, seller_tenant_id=payout.seller_tenant_id,
             marketplace_payout_id=payout.id, entry_type=entry_type, amount=amount,
