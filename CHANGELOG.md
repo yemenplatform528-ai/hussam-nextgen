@@ -48,3 +48,9 @@ The `1.0` label is reserved for the first real launch after all release gates pa
 - Defaulted the importer to dry-run; database mutation requires explicit `--apply`.
 - Added regression tests for valid hierarchy, cross-level parents, and duplicate codes.
 - Kept national geography data out of the repository until an externally sourced and reviewed dataset is approved.
+
+## 2026-09-18 — Yemen geography source review
+
+- Added `docs/YEMEN_GEOGRAPHY_SOURCE_REVIEW.md`.
+- Reviewed OCHA COD-AB as the primary candidate and Open Admin Data as an independent cross-check.
+- Kept national geography import blocked until the exact source artifact, license/provenance, structural validation, and SHA-256 review gate are satisfied.
