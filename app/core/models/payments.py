@@ -76,10 +76,13 @@ class PaymentSettlement(Base):
     currency: Mapped[str] = mapped_column(String(10), nullable=False)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default='pending')
     settled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    reconciliation_status: Mapped[str] = mapped_column(String(20), nullable=False, default='pending')
+    reconciliation_run_reference: Mapped[str | None] = mapped_column(String(255), nullable=True)
     __table_args__ = (
         UniqueConstraint('tenant_id', 'settlement_reference', name='uq_payment_settlement_tenant_reference'),
         CheckConstraint('amount > 0', name='ck_payment_settlement_positive_amount'),
         CheckConstraint("status IN ('pending','settled','reversed')", name='ck_payment_settlement_status'),
+        CheckConstraint("reconciliation_status IN ('pending','reconciled','exception')", name='ck_payment_settlement_reconciliation_status'),
     )
 
 

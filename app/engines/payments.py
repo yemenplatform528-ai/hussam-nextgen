@@ -237,9 +237,25 @@ class PaymentProductionService:
             PaymentSettlement.status == 'settled'))
         if prior:
             raise PaymentError('payment already has a settled settlement')
+        reconciled_run = self.db.scalar(select(PaymentReconciliationRun).where(
+            PaymentReconciliationRun.tenant_id == tenant_id,
+            PaymentReconciliationRun.provider == p.provider,
+            PaymentReconciliationRun.market_id == int(market_id),
+            PaymentReconciliationRun.status == 'closed',
+            PaymentReconciliationRun.currency == p.currency,
+            PaymentReconciliationRun.run_reference.in_(
+                select(PaymentReconciliationRun.run_reference).join(PaymentReconciliationItem, PaymentReconciliationItem.run_id == PaymentReconciliationRun.id).where(
+                    PaymentReconciliationItem.tenant_id == tenant_id,
+                    PaymentReconciliationItem.internal_reference == p.reference,
+                    PaymentReconciliationItem.classification == 'matched'
+                )
+            )
+        ))
         s = PaymentSettlement(tenant_id=tenant_id, provider=p.provider, market_id=int(market_id), settlement_reference=settlement_reference,
                               payment_reference=p.reference, amount=amount, currency=currency,
-                              status='settled', settled_at=datetime.now(timezone.utc))
+                              status='settled', settled_at=datetime.now(timezone.utc),
+                              reconciliation_status='reconciled' if reconciled_run else 'pending',
+                              reconciliation_run_reference=reconciled_run.run_reference if reconciled_run else None)
         self.db.add(s); self.db.flush()
         post_journal(self.db, tenant_id=tenant_id, reference=f'SET:{settlement_reference}', currency=currency,
                      posting_date=posting_date, actor_id=actor_id,
@@ -412,7 +428,24 @@ class PaymentProductionService:
         if run.exception_items != 0 or run.status != 'matched':
             raise PaymentError('reconciliation run has unresolved exceptions')
         run.status = 'closed'; run.closed_at = datetime.now(timezone.utc)
-        self._event(tenant_id, 'payments.reconciliation.run.closed', run.id, {'run_reference': run.run_reference})
+        matched_items = self.db.scalars(select(PaymentReconciliationItem).where(
+            PaymentReconciliationItem.tenant_id == tenant_id,
+            PaymentReconciliationItem.run_id == run.id,
+            PaymentReconciliationItem.classification == 'matched',
+            PaymentReconciliationItem.internal_reference.is_not(None),
+        )).all()
+        for item in matched_items:
+            settlements = self.db.scalars(select(PaymentSettlement).where(
+                PaymentSettlement.tenant_id == tenant_id,
+                PaymentSettlement.provider == run.provider,
+                PaymentSettlement.market_id == run.market_id,
+                PaymentSettlement.payment_reference == item.internal_reference,
+                PaymentSettlement.status == 'settled',
+            )).all()
+            for settlement in settlements:
+                settlement.reconciliation_status = 'reconciled'
+                settlement.reconciliation_run_reference = run.run_reference
+        self._event(tenant_id, 'payments.reconciliation.run.closed', run.id, {'run_reference': run.run_reference, 'reconciled_settlements': len(matched_items)})
         self.db.commit(); self.db.refresh(run); return run
 
     def reconcile(self, tenant_id: int, *, provider: str, provider_reference: str,

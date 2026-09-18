@@ -153,3 +153,39 @@ def test_webhook_terminal_states_cannot_reopen():
     p.process_webhook(t.id,provider='wallet',event_id='sm-5',event_type='failed',payment_reference='PAY-SM-2',status='failed')
     with pytest.raises(PaymentError, match='invalid payment state transition'):
         p.process_webhook(t.id,provider='wallet',event_id='sm-6',event_type='authorized',payment_reference='PAY-SM-2',status='authorized')
+
+def test_settlement_tracks_reconciliation_state_and_closure_promotes_it():
+    s,t,p=setup(); m=governed_market(s,t)
+    payment=p.create_intent(t.id,'PAY-RECON-SET','wallet',100,'YER',market_id=m.id)
+    p.attach_provider_payment(t.id,payment.reference,'prov-recon-set')
+    settlement=p.settle(t.id,payment.reference,settlement_reference='SET-RECON-SET',actual_amount=100,currency='YER',posting_date=date(2026,9,10)) if False else None
+    # Settlement requires captured state; drive the normal lifecycle first.
+    p.mark_processing(t.id,payment.reference)
+    p.process_webhook(t.id,provider='wallet',event_id='recon-set-e1',event_type='authorized',payment_reference=payment.reference,status='authorized')
+    p.capture(t.id,payment.reference,posting_date=date(2026,9,10))
+    settlement=p.settle(t.id,payment.reference,settlement_reference='SET-RECON-SET',actual_amount=100,currency='YER',posting_date=date(2026,9,10))
+    assert settlement.reconciliation_status == 'pending'
+    run=p.reconcile_batch(t.id,provider='wallet',market_id=m.id,currency='YER',run_reference='RUN-RECON-SET',source_reference='statement-recon-set',source_sha256='e'*64,
+        rows=[{'provider_reference':'prov-recon-set','actual_amount':100,'currency':'YER'}])
+    assert run.status == 'matched'
+    closed=p.close_reconciliation_run(t.id,'RUN-RECON-SET')
+    assert closed.status == 'closed'
+    s.refresh(settlement)
+    assert settlement.reconciliation_status == 'reconciled'
+    assert settlement.reconciliation_run_reference == 'RUN-RECON-SET'
+
+
+def test_settlement_created_after_closed_reconciliation_is_already_reconciled():
+    s,t,p=setup(); m=governed_market(s,t)
+    payment=p.create_intent(t.id,'PAY-RECON-FIRST','wallet',50,'YER',market_id=m.id)
+    p.attach_provider_payment(t.id,payment.reference,'prov-recon-first')
+    run=p.reconcile_batch(t.id,provider='wallet',market_id=m.id,currency='YER',run_reference='RUN-RECON-FIRST',source_reference='statement-recon-first',source_sha256='f'*64,
+        rows=[{'provider_reference':'prov-recon-first','actual_amount':50,'currency':'YER'}])
+    assert run.status == 'matched'
+    p.close_reconciliation_run(t.id,'RUN-RECON-FIRST')
+    p.mark_processing(t.id,payment.reference)
+    p.process_webhook(t.id,provider='wallet',event_id='recon-first-e1',event_type='authorized',payment_reference=payment.reference,status='authorized')
+    p.capture(t.id,payment.reference,posting_date=date(2026,9,10))
+    settlement=p.settle(t.id,payment.reference,settlement_reference='SET-RECON-FIRST',actual_amount=50,currency='YER',posting_date=date(2026,9,10))
+    assert settlement.reconciliation_status == 'reconciled'
+    assert settlement.reconciliation_run_reference == 'RUN-RECON-FIRST'
