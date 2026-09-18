@@ -125,3 +125,53 @@ def test_accepted_evidence_without_hash_or_acceptance_does_not_count():
         result = evaluate_market_readiness(db, market_id)
         assert "geography_dataset" in result.evidence_required
     engine.dispose()
+
+
+def test_evidence_coverage_matrix_is_complete_and_stable():
+    engine, factory = db_factory()
+    with factory() as db:
+        market_id = seed_market(db)
+        from app.engines.market_readiness import build_evidence_coverage_matrix
+        matrix = build_evidence_coverage_matrix(db, market_id)
+        assert [item.requirement_key for item in matrix] == [
+            "money_unit_definition",
+            "geography_dataset",
+            "operational_coverage",
+            "certified_payment_production_path",
+        ]
+        assert all(item.accepted is False for item in matrix)
+        assert all(item.blocking is True for item in matrix)
+    engine.dispose()
+
+
+def test_evidence_coverage_matrix_selects_latest_valid_accepted_source():
+    engine, factory = db_factory()
+    with factory() as db:
+        market_id = seed_market(db)
+        from datetime import datetime, timezone, timedelta
+        from app.engines.market_readiness import build_evidence_coverage_matrix
+        now = datetime.now(timezone.utc)
+        db.add_all([
+            MarketReadinessEvidence(
+                market_id=market_id, requirement_key="geography_dataset", status="accepted",
+                source_name="Older", source_uri="https://example.invalid/old", source_sha256="a" * 64,
+                reviewed_at=now - timedelta(days=1), acceptance_reference="old-accept",
+            ),
+            MarketReadinessEvidence(
+                market_id=market_id, requirement_key="geography_dataset", status="accepted",
+                source_name="Newer", source_uri="https://example.invalid/new", source_sha256="b" * 64,
+                reviewed_at=now, acceptance_reference="new-accept",
+            ),
+            MarketReadinessEvidence(
+                market_id=market_id, requirement_key="geography_dataset", status="accepted",
+                source_name="Invalid", source_uri="https://example.invalid/bad", source_sha256=None,
+                reviewed_at=now, acceptance_reference="bad-accept",
+            ),
+        ])
+        db.commit()
+        matrix = build_evidence_coverage_matrix(db, market_id)
+        geography = next(item for item in matrix if item.requirement_key == "geography_dataset")
+        assert geography.accepted is True
+        assert geography.source_name == "Newer"
+        assert geography.source_sha256 == "b" * 64
+    engine.dispose()

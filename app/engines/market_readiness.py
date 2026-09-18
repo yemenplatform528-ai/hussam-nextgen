@@ -40,6 +40,19 @@ class MarketReadiness:
 
 
 @dataclass(frozen=True)
+class EvidenceCoverageItem:
+    """Deterministic evidence coverage for one activation requirement."""
+
+    requirement_key: str
+    accepted: bool
+    blocking: bool
+    source_name: str | None
+    source_uri: str | None
+    source_sha256: str | None
+    status: str | None
+
+
+@dataclass(frozen=True)
 class MarketReadinessReport:
     """Audit-friendly, read-only view of one market's activation readiness."""
 
@@ -51,10 +64,52 @@ class MarketReadinessReport:
     checks: tuple[str, ...]
     blockers: tuple[str, ...]
     evidence_required: tuple[str, ...]
+    evidence_coverage: tuple[EvidenceCoverageItem, ...] = ()
 
     @property
     def ready(self) -> bool:
         return self.status is MarketReadinessStatus.READY
+
+
+# Requirements are deliberately explicit and ordered so audit output is stable.
+EVIDENCE_REQUIREMENTS: tuple[tuple[str, bool], ...] = (
+    ("money_unit_definition", True),
+    ("geography_dataset", True),
+    ("operational_coverage", True),
+    ("certified_payment_production_path", True),
+)
+
+
+def build_evidence_coverage_matrix(db, market_id: int) -> tuple[EvidenceCoverageItem, ...]:
+    """Return deterministic evidence coverage without mutating any configuration."""
+    rows = db.scalars(
+        select(MarketReadinessEvidence).where(MarketReadinessEvidence.market_id == market_id)
+    ).all()
+    by_requirement: dict[str, list[MarketReadinessEvidence]] = {}
+    for row in rows:
+        by_requirement.setdefault(row.requirement_key, []).append(row)
+
+    coverage: list[EvidenceCoverageItem] = []
+    for requirement_key, blocking in EVIDENCE_REQUIREMENTS:
+        candidates = by_requirement.get(requirement_key, [])
+        accepted = [
+            row for row in candidates
+            if row.status == "accepted"
+            and row.source_sha256
+            and row.reviewed_at
+            and row.acceptance_reference
+        ]
+        row = sorted(accepted, key=lambda item: (item.reviewed_at, item.id), reverse=True)[0] if accepted else None
+        coverage.append(EvidenceCoverageItem(
+            requirement_key=requirement_key,
+            accepted=row is not None,
+            blocking=blocking,
+            source_name=row.source_name if row else None,
+            source_uri=row.source_uri if row else None,
+            source_sha256=row.source_sha256 if row else None,
+            status=row.status if row else None,
+        ))
+    return tuple(coverage)
 
 
 def _payment_production_ready(db, market_id: int) -> bool:
@@ -196,4 +251,5 @@ def build_market_readiness_report(db, market_id: int) -> MarketReadinessReport:
         checks=readiness.checks,
         blockers=readiness.blockers,
         evidence_required=readiness.evidence_required,
+        evidence_coverage=build_evidence_coverage_matrix(db, market_id),
     )
