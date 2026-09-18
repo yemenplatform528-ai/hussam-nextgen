@@ -97,7 +97,19 @@ def validate_rows(rows: list[GeographyRow]) -> None:
             raise ValueError(f"{row.code}: parent {parent.code} must be level {expected_parent}")
 
 
-def import_rows(session: Session, market: MarketContext, rows: list[GeographyRow], apply: bool) -> int:
+def validate_provenance_for_apply(source_name: str | None, source_uri: str | None, license_name: str | None, retrieved_at: str | None) -> None:
+    required = {
+        "source_name": source_name,
+        "source_uri": source_uri,
+        "license": license_name,
+        "retrieved_at": retrieved_at,
+    }
+    missing = sorted(key for key, value in required.items() if not (value or "").strip())
+    if missing:
+        raise ValueError(f"--apply requires reviewed provenance: missing {', '.join(missing)}")
+
+
+def import_rows(session: Session, market: MarketContext, rows: list[GeographyRow], apply: bool, provenance: dict[str, str] | None = None) -> int:
     existing = {g.code: g for g in session.scalars(select(MarketGeography).where(MarketGeography.market_id == market.id)).all()}
     by_code: dict[str, GeographyRow] = {r.code: r for r in rows}
     ordered = sorted(rows, key=lambda r: LEVELS.index(r.level))
@@ -114,7 +126,10 @@ def import_rows(session: Session, market: MarketContext, rows: list[GeographyRow
         obj.name = row.name
         obj.name_ar = row.name_ar
         obj.status = row.status
-        obj.metadata_json = row.metadata_json
+        metadata = json.loads(row.metadata_json)
+        if provenance:
+            metadata["provenance"] = provenance
+        obj.metadata_json = json.dumps(metadata, ensure_ascii=False, sort_keys=True)
         session.flush()
         ids[row.code] = obj.id
         changed += 1
@@ -131,16 +146,30 @@ def main() -> int:
     parser.add_argument("--database-url", default="sqlite+pysqlite:////tmp/hussam-yemen-geography.db")
     parser.add_argument("--market-code", default="YE")
     parser.add_argument("--apply", action="store_true", help="commit changes; default is dry-run")
+    parser.add_argument("--source-name", help="reviewed dataset/provider name; required with --apply")
+    parser.add_argument("--source-uri", help="canonical source URL; required with --apply")
+    parser.add_argument("--license", dest="license_name", help="dataset license; required with --apply")
+    parser.add_argument("--retrieved-at", help="UTC retrieval timestamp; required with --apply")
     args = parser.parse_args()
 
     rows = load_rows(args.input)
     validate_rows(rows)
+    if args.apply:
+        validate_provenance_for_apply(args.source_name, args.source_uri, args.license_name, args.retrieved_at)
+    provenance = None
+    if args.apply:
+        provenance = {
+            "source_name": args.source_name.strip(),
+            "source_uri": args.source_uri.strip(),
+            "license": args.license_name.strip(),
+            "retrieved_at": args.retrieved_at.strip(),
+        }
     engine = create_engine(args.database_url, future=True)
     with Session(engine) as session:
         market = session.scalar(select(MarketContext).where(MarketContext.code == args.market_code))
         if market is None:
             raise SystemExit(f"market {args.market_code!r} does not exist; create/configure it first")
-        changed = import_rows(session, market, rows, args.apply)
+        changed = import_rows(session, market, rows, args.apply, provenance)
     mode = "APPLIED" if args.apply else "DRY-RUN"
     print(json.dumps({"status": "PASS", "mode": mode, "market": args.market_code, "rows": len(rows), "rows_processed": changed}, ensure_ascii=False))
     return 0

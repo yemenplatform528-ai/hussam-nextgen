@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from scripts.yemen_geography_import import load_rows, validate_rows
+from scripts.yemen_geography_import import load_rows, validate_provenance_for_apply, validate_rows
 
 
 def write_csv(tmp_path: Path, body: str) -> Path:
@@ -41,3 +41,17 @@ YE-ADN,governorate,Aden 2,عدن 2,YE,active,{}
 """)
     with pytest.raises(ValueError, match="duplicate geography code"):
         validate_rows(load_rows(path))
+
+
+def test_apply_requires_provenance():
+    with pytest.raises(ValueError, match="requires reviewed provenance"):
+        validate_provenance_for_apply("HDX", "", "CC BY", "2026-09-18T00:00:00Z")
+
+
+def test_complete_provenance_is_accepted():
+    validate_provenance_for_apply(
+        "HDX/OCHA candidate dataset",
+        "https://data.humdata.org/",
+        "reviewed-license",
+        "2026-09-18T00:00:00Z",
+    )
