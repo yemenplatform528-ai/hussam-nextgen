@@ -113,12 +113,6 @@ class MarketplaceService:
             return market.id
         active=self.db.scalars(select(MarketContext).where(MarketContext.status=='active').order_by(MarketContext.id)).all()
         if len(active)==1: return active[0].id
-        if not active and os.getenv('ENVIRONMENT','dev')!='production':
-            market=MarketContext(code='YE',country_code='YE',name='Yemen',locale='ar-YE',timezone='Asia/Aden',default_currency='YER',status='active')
-            self.db.add(market); self.db.flush()
-            for currency in ('YER','USD','SAR','AED'):
-                self.db.add(MarketCurrency(market_id=market.id,currency=currency,is_default=(currency=='YER')))
-            self.db.flush(); return market.id
         raise MarketplaceError('market context is required when multiple or no active markets exist')
 
     def _resolve_geography(self, market_id:int, *, governorate_id=None, district_id=None, locality_id=None, governorate=None, city=None):
