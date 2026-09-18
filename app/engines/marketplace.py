@@ -762,7 +762,9 @@ class MarketplaceService:
             items.append({'id':ci.id,'listing':self._listing_view(l,s),'quantity':str(ci.quantity),'line_total':str(_money(ci.quantity)*_money(l.unit_price))})
         return {'id':cart.id,'status':cart.status,'items':items}
 
-    def checkout(self,user_id, shipping_address_id=None, shipping_fee=Decimal('0'), platform_fee_bps=500, shipping_quote_id=None, shipping_quote_ids=None, market_id=None):
+    def checkout(self,user_id, shipping_address_id=None, shipping_fee=Decimal('0'), platform_fee_bps=None, shipping_quote_id=None, shipping_quote_ids=None, market_id=None):
+        if platform_fee_bps is not None:
+            raise MarketplaceError('platform fee is policy-controlled; client-supplied platform_fee_bps is not accepted')
         self.ensure_buyer(user_id)
         active_carts=self.db.scalars(select(MarketplaceCart).where(MarketplaceCart.buyer_user_id==user_id,MarketplaceCart.status=='active').order_by(MarketplaceCart.id)).all()
         if not active_carts: raise MarketplaceError('cart is empty')

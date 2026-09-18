@@ -1,3 +1,4 @@
+from tests.market_test_support import ensure_market
 from decimal import Decimal
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
@@ -11,7 +12,7 @@ from app.engines.marketplace import MarketplaceService, ListingInput
 from app.engines.fulfillment import FulfillmentService, FulfillmentError
 
 def setup():
-    e=create_engine('sqlite+pysqlite:///:memory:',future=True); Base.metadata.create_all(e); db=sessionmaker(e,expire_on_commit=False)()
+    e=create_engine('sqlite+pysqlite:///:memory:',future=True); Base.metadata.create_all(e); db=sessionmaker(e,expire_on_commit=False)(); ensure_market(db)
     ids=IdentityService(db); seller=ids.create_tenant('Seller'); buyer_t=ids.create_tenant('Buyer')
     admin=ids.create_user('seller','seller@example.com'); buyer=ids.create_user('buyer','buyer@example.com')
     ids.add_membership(admin.id,seller.id,'owner'); ids.add_membership(buyer.id,buyer_t.id,'owner')

@@ -28,7 +28,7 @@ def test_seller_listing_public_cart_multiseller_checkout_and_payment_boundary():
     m.publish_listing(seller.id,l.id)
     assert m.public_listings()[0]['seller']['slug']=='seller-one'
     m.add_to_cart(buyer.id,l.id,Decimal('2'))
-    orders=m.checkout(buyer.id,platform_fee_bps=500)
+    orders=m.checkout(buyer.id)
     assert len(orders)==1 and orders[0].subtotal==Decimal('2000.0000') and orders[0].platform_fee==Decimal('100.0000') and orders[0].total==Decimal('2000.0000')
     payout=db.scalar(select(MarketplacePayout).where(MarketplacePayout.marketplace_order_id==orders[0].id)); assert payout.net_amount==Decimal('1900.0000')
     # reserved stock is 2, not consumed until seller fulfills the authoritative SalesOrder.

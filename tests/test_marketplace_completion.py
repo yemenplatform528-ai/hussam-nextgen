@@ -1,3 +1,4 @@
+from tests.market_test_support import ensure_market
 from datetime import datetime, timezone
 from decimal import Decimal
 import pytest
@@ -13,7 +14,7 @@ from app.engines.marketplace import MarketplaceService, ListingInput, Marketplac
 from app.engines.marketplace_completion import MarketplaceCompletionService
 
 def setup():
-    e=create_engine('sqlite+pysqlite:///:memory:',future=True); Base.metadata.create_all(e); db=sessionmaker(e,expire_on_commit=False)()
+    e=create_engine('sqlite+pysqlite:///:memory:',future=True); Base.metadata.create_all(e); db=sessionmaker(e,expire_on_commit=False)(); ensure_market(db)
     ids=IdentityService(db); seller=ids.create_tenant('Seller'); buyer_t=ids.create_tenant('Buyer'); buyer=ids.create_user('buyer','buyer@example.com'); su=ids.create_user('seller','seller@example.com'); ids.add_membership(buyer.id,buyer_t.id,'owner'); ids.add_membership(su.id,seller.id,'owner')
     inv=InventoryProductionService(db); inv.create_item(seller.id,'rice','Rice','bag'); inv.create_warehouse(seller.id,'wh','Main'); inv.record(seller.id,StockMovement('rice','wh',Decimal('20'),'in','opening'))
     m=MarketplaceService(db); m.register_seller(seller.id,'seller','Seller'); m.review_seller_verification(seller.id,su.id,'approved')
@@ -30,7 +31,7 @@ def test_verification_is_required_for_activation_and_public_visibility():
 def test_shipping_quote_is_server_owned_and_consumed():
     db,seller,buyer,su,l,a,m=setup(); m.add_shipping_rate(seller.id,'Aden','Aden','YER',Decimal('250'))
     m.add_to_cart(buyer.id,l.id,1); q=m.quote_shipping(buyer.id,a.id,seller.id,'YER'); assert q.fee==Decimal('250.0000')
-    orders=m.checkout(buyer.id,a.id,Decimal('0'),500,q.id); assert orders[0].shipping_fee==Decimal('250.0000'); assert q.consumed_at is not None
+    orders=m.checkout(buyer.id,a.id,Decimal('0'),None,q.id); assert orders[0].shipping_fee==Decimal('250.0000'); assert q.consumed_at is not None
     m.add_to_cart(buyer.id,l.id,1)
     with pytest.raises(MarketplaceError): m.checkout(buyer.id,a.id,Decimal('250'),500,q.id)
 
@@ -62,7 +63,7 @@ def test_multi_seller_checkout_accepts_one_shipping_quote_per_seller():
     m.add_shipping_rate(seller.id,'Aden','Aden','YER',Decimal('250')); m.add_shipping_rate(seller2_t.id,'Aden','Aden','YER',Decimal('150'))
     m.add_to_cart(buyer.id,l.id,1); m.add_to_cart(buyer.id,l2.id,1)
     q1=m.quote_shipping(buyer.id,a.id,seller.id,'YER'); q2=m.quote_shipping(buyer.id,a.id,seller2_t.id,'YER')
-    orders=m.checkout(buyer.id,a.id,Decimal('0'),500,None,[q1.id,q2.id])
+    orders=m.checkout(buyer.id,a.id,Decimal('0'),None,None,[q1.id,q2.id])
     assert len(orders)==2 and all(o.shipping_fee in {Decimal('250.0000'),Decimal('150.0000')} for o in orders)
     assert q1.consumed_at is not None and q2.consumed_at is not None
 
