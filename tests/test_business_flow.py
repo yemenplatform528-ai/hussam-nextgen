@@ -77,7 +77,13 @@ def test_complete_business_flow_from_purchase_to_settlement():
         assert stock.reserved == Decimal("0.0000")
 
         # 3) Payment -> provider verification -> capture -> settlement.
-        payment = payments.create_intent(1, "PAY-001", "test-provider", Decimal("300"), "YER")
+        from app.core.models.market import MarketContext, MarketCurrency, ProviderRegistryEntry, ProviderMarketCapability
+        from app.engines.payment_adapters import REQUIRED_PRODUCTION_EVIDENCE
+        market = MarketContext(code='MKT-TEST', country_code='YE', name='Test Market', locale='en', timezone='UTC', default_currency='YER', status='active')
+        db.add(market); db.flush(); db.add(MarketCurrency(market_id=market.id, currency='YER', is_default=True)); db.flush()
+        provider = ProviderRegistryEntry(code='test-provider', organization_name='Test Provider', provider_type='payment', product_name='Test Pay', status='production', integration_mode='api', metadata_json=__import__('json').dumps({k: True for k in REQUIRED_PRODUCTION_EVIDENCE}))
+        db.add(provider); db.flush(); db.add_all([ProviderMarketCapability(provider_id=provider.id, market_id=market.id, capability='payment', currency='YER', active=True), ProviderMarketCapability(provider_id=provider.id, market_id=market.id, capability='settlement', currency='YER', active=True)]); db.commit()
+        payment = payments.create_intent(1, "PAY-001", "test-provider", Decimal("300"), "YER", market_id=market.id)
         payments.mark_processing(1, payment.reference)
         payments.process_webhook(
             1, provider="test-provider", event_id="evt-001", event_type="payment.authorized",

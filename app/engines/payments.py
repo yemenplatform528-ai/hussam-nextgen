@@ -194,6 +194,19 @@ class PaymentProductionService:
         amount = Decimal(str(actual_amount))
         if amount != Decimal(str(p.amount)) or currency != p.currency:
             raise PaymentError('settlement amount/currency does not match captured payment')
+        try:
+            metadata = json.loads(p.metadata_json or '{}')
+        except (TypeError, ValueError):
+            metadata = {}
+        market_id = metadata.get('market_id')
+        if market_id is None:
+            raise PaymentError('market context is required before settlement')
+        gate = evaluate_provider_production_gate(
+            self.db, p.provider, int(market_id), 'settlement',
+            rail=metadata.get('rail', ''), currency=p.currency
+        )
+        if not gate.allowed:
+            raise PaymentError('provider production gate blocked: ' + ';'.join(gate.blocked_reasons))
         existing = self.db.scalar(select(PaymentSettlement).where(
             PaymentSettlement.tenant_id == tenant_id,
             PaymentSettlement.settlement_reference == settlement_reference))
@@ -209,7 +222,7 @@ class PaymentProductionService:
             PaymentSettlement.status == 'settled'))
         if prior:
             raise PaymentError('payment already has a settled settlement')
-        s = PaymentSettlement(tenant_id=tenant_id, provider=p.provider, settlement_reference=settlement_reference,
+        s = PaymentSettlement(tenant_id=tenant_id, provider=p.provider, market_id=int(market_id), settlement_reference=settlement_reference,
                               payment_reference=p.reference, amount=amount, currency=currency,
                               status='settled', settled_at=datetime.now(timezone.utc))
         self.db.add(s); self.db.flush()
@@ -292,12 +305,12 @@ class PaymentProductionService:
         self.db.commit(); return r
 
 
-    def reconcile_batch(self, tenant_id: int, *, provider: str, run_reference: str,
+    def reconcile_batch(self, tenant_id: int, *, provider: str, market_id: int, currency: str, run_reference: str,
                        source_reference: str, source_sha256: str, rows: list[dict],
                        expected_payment_references: list[str] | None = None,
                        statement_date: datetime | None = None) -> PaymentReconciliationRun:
-        if not provider or not run_reference or not source_reference or len(source_sha256) != 64:
-            raise PaymentError('provider, run reference, source reference and SHA-256 are required')
+        if not provider or not market_id or not currency or not run_reference or not source_reference or len(source_sha256) != 64:
+            raise PaymentError('provider, market, currency, run reference, source reference and SHA-256 are required')
         existing = self.db.scalar(select(PaymentReconciliationRun).where(
             PaymentReconciliationRun.tenant_id == tenant_id,
             PaymentReconciliationRun.run_reference == run_reference))
@@ -305,6 +318,9 @@ class PaymentProductionService:
             if existing.provider == provider and existing.source_reference == source_reference and existing.source_sha256 == source_sha256:
                 return existing
             raise PaymentError('reconciliation run reference already belongs to another source')
+        gate = evaluate_provider_production_gate(self.db, provider, market_id, 'settlement', currency=currency)
+        if not gate.allowed:
+            raise PaymentError('provider production gate blocked: ' + ';'.join(gate.blocked_reasons))
         if not rows:
             raise PaymentError('reconciliation statement must contain at least one row')
         refs = [str(r.get('provider_reference') or '') for r in rows]
@@ -312,7 +328,7 @@ class PaymentProductionService:
             raise PaymentError('every statement row requires a provider reference')
         if len(set(refs)) != len(refs):
             raise PaymentError('duplicate provider reference in statement')
-        run = PaymentReconciliationRun(tenant_id=tenant_id, provider=provider, run_reference=run_reference,
+        run = PaymentReconciliationRun(tenant_id=tenant_id, provider=provider, market_id=market_id, currency=currency, run_reference=run_reference,
             source_reference=source_reference, source_sha256=source_sha256, statement_date=statement_date,
             status='reconciling')
         self.db.add(run); self.db.flush()
@@ -324,17 +340,32 @@ class PaymentProductionService:
         for row in rows:
             ref = str(row['provider_reference'])
             actual = Decimal(str(row.get('actual_amount')))
-            currency = str(row.get('currency') or '')
-            if actual <= 0 or not currency:
+            row_currency = str(row.get('currency') or '')
+            if actual <= 0 or not row_currency:
                 self.db.rollback(); raise PaymentError('statement amounts must be positive and currencies must be present')
             p = self.db.scalar(select(PaymentIntent).where(
                 PaymentIntent.tenant_id == tenant_id, PaymentIntent.provider == provider,
                 PaymentIntent.provider_payment_id == ref))
             internal_ref = p.reference if p else None
             expected = Decimal(str(p.amount)) if p else None
+            if p is not None:
+                try:
+                    payment_metadata = json.loads(p.metadata_json or '{}')
+                except (TypeError, ValueError):
+                    payment_metadata = {}
+                payment_market = payment_metadata.get('market_id')
+                if payment_market is not None and int(payment_market) != int(market_id):
+                    p = None
+                    internal_ref = None
+                    expected = None
+                    classification = 'missing_internal'
+                elif payment_market is None:
+                    raise PaymentError('payment market context is required for reconciliation')
             if p is None:
                 classification = 'missing_internal'
-            elif currency != p.currency:
+            elif row_currency != currency:
+                classification = 'currency_mismatch'
+            elif row_currency != p.currency:
                 classification = 'currency_mismatch'
             elif actual != expected:
                 classification = 'amount_mismatch'
@@ -348,7 +379,7 @@ class PaymentProductionService:
             if classification == 'matched': matched += 1
             else: exceptions += 1
             item = PaymentReconciliationItem(tenant_id=tenant_id, run_id=run.id, provider_reference=ref,
-                internal_reference=internal_ref, expected_amount=expected, actual_amount=actual, currency=currency,
+                internal_reference=internal_ref, expected_amount=expected, actual_amount=actual, currency=row_currency,
                 classification=classification, details_json=json.dumps({'expected_currency': p.currency if p else None}, sort_keys=True))
             self.db.add(item)
         if expected_refs:
