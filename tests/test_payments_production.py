@@ -52,6 +52,10 @@ def test_settlement_requires_exact_amount_and_moves_clearing_to_cash():
     s1=p.settle(t.id,'PAY-1',settlement_reference='SET-1',actual_amount=75,currency='YER',posting_date=date(2026,9,10))
     assert s1.status=='settled' and s.query(PaymentSettlement).count()==1
     assert s.query(Journal).filter_by(reference='SET:SET-1').count()==1
+    same=p.settle(t.id,'PAY-1',settlement_reference='SET-1',actual_amount=75,currency='YER',posting_date=date(2026,9,10))
+    assert same.id == s1.id and s.query(Journal).filter_by(reference='SET:SET-1').count()==1
+    with pytest.raises(PaymentError,match='already has a settled'):
+        p.settle(t.id,'PAY-1',settlement_reference='SET-2',actual_amount=75,currency='YER',posting_date=date(2026,9,10))
 
 def test_reconciliation_detects_unknown_amount_and_currency_and_match():
     s,t,p=setup(); p.create_intent(t.id,'PAY-1','wallet',100,'YER'); p.attach_provider_payment(t.id,'PAY-1','prov-1')

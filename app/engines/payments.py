@@ -162,9 +162,21 @@ class PaymentProductionService:
         amount = Decimal(str(actual_amount))
         if amount != Decimal(str(p.amount)) or currency != p.currency:
             raise PaymentError('settlement amount/currency does not match captured payment')
-        if self.db.scalar(select(PaymentSettlement).where(PaymentSettlement.tenant_id == tenant_id,
-                                                          PaymentSettlement.settlement_reference == settlement_reference)):
-            raise PaymentError('duplicate settlement reference')
+        existing = self.db.scalar(select(PaymentSettlement).where(
+            PaymentSettlement.tenant_id == tenant_id,
+            PaymentSettlement.settlement_reference == settlement_reference))
+        if existing:
+            if (existing.payment_reference == p.reference and
+                    Decimal(str(existing.amount)) == amount and
+                    existing.currency == currency and existing.provider == p.provider):
+                return existing
+            raise PaymentError('settlement reference already belongs to another settlement')
+        prior = self.db.scalar(select(PaymentSettlement).where(
+            PaymentSettlement.tenant_id == tenant_id,
+            PaymentSettlement.payment_reference == p.reference,
+            PaymentSettlement.status == 'settled'))
+        if prior:
+            raise PaymentError('payment already has a settled settlement')
         s = PaymentSettlement(tenant_id=tenant_id, provider=p.provider, settlement_reference=settlement_reference,
                               payment_reference=p.reference, amount=amount, currency=currency,
                               status='settled', settled_at=datetime.now(timezone.utc))
