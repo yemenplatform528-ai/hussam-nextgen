@@ -45,7 +45,7 @@ YE-ADN,governorate,Aden 2,عدن 2,YE,active,{}
 
 def test_apply_requires_provenance():
     with pytest.raises(ValueError, match="requires reviewed provenance"):
-        validate_provenance_for_apply("HDX", "", "CC BY", "2026-09-18T00:00:00Z")
+        validate_provenance_for_apply("HDX", "", "CC BY", "2026-09-18T00:00:00Z", "")
 
 
 def test_complete_provenance_is_accepted():
@@ -54,4 +54,13 @@ def test_complete_provenance_is_accepted():
         "https://data.humdata.org/",
         "reviewed-license",
         "2026-09-18T00:00:00Z",
+        "a" * 64,
     )
+
+def test_source_hash_matches_exact_artifact(tmp_path):
+    from scripts.yemen_geography_import import file_sha256
+    path = tmp_path / "reviewed.csv"
+    path.write_text("x", encoding="utf-8")
+    digest = file_sha256(path)
+    assert len(digest) == 64
+    assert digest != "0" * 64

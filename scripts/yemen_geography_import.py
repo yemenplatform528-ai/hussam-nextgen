@@ -16,6 +16,7 @@ import argparse
 import csv
 import json
 import sys
+import hashlib
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -97,12 +98,21 @@ def validate_rows(rows: list[GeographyRow]) -> None:
             raise ValueError(f"{row.code}: parent {parent.code} must be level {expected_parent}")
 
 
-def validate_provenance_for_apply(source_name: str | None, source_uri: str | None, license_name: str | None, retrieved_at: str | None) -> None:
+def file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as fh:
+        for chunk in iter(lambda: fh.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def validate_provenance_for_apply(source_name: str | None, source_uri: str | None, license_name: str | None, retrieved_at: str | None, source_sha256: str | None) -> None:
     required = {
         "source_name": source_name,
         "source_uri": source_uri,
         "license": license_name,
         "retrieved_at": retrieved_at,
+        "source_sha256": source_sha256,
     }
     missing = sorted(key for key, value in required.items() if not (value or "").strip())
     if missing:
@@ -150,12 +160,16 @@ def main() -> int:
     parser.add_argument("--source-uri", help="canonical source URL; required with --apply")
     parser.add_argument("--license", dest="license_name", help="dataset license; required with --apply")
     parser.add_argument("--retrieved-at", help="UTC retrieval timestamp; required with --apply")
+    parser.add_argument("--source-sha256", help="SHA-256 of the exact reviewed input artifact; required with --apply")
     args = parser.parse_args()
 
     rows = load_rows(args.input)
     validate_rows(rows)
     if args.apply:
-        validate_provenance_for_apply(args.source_name, args.source_uri, args.license_name, args.retrieved_at)
+        validate_provenance_for_apply(args.source_name, args.source_uri, args.license_name, args.retrieved_at, args.source_sha256)
+        actual_sha256 = file_sha256(args.input)
+        if actual_sha256.lower() != args.source_sha256.strip().lower():
+            raise ValueError(f"reviewed source SHA-256 mismatch: expected {args.source_sha256}, got {actual_sha256}")
     provenance = None
     if args.apply:
         provenance = {
@@ -163,6 +177,7 @@ def main() -> int:
             "source_uri": args.source_uri.strip(),
             "license": args.license_name.strip(),
             "retrieved_at": args.retrieved_at.strip(),
+            "source_sha256": args.source_sha256.strip().lower(),
         }
     engine = create_engine(args.database_url, future=True)
     with Session(engine) as session:

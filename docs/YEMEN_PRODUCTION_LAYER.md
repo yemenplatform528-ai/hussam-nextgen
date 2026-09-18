@@ -39,8 +39,9 @@ The importer fails closed when:
   than duplicated.
 - No payment, FX, provider credential, logistics, or political/administrative
   assumption is inferred by the importer.
-- The dataset source, review date, and provenance should be recorded in
-  `metadata_json` before production import.
+- The exact reviewed artifact must be fingerprinted with SHA-256. The source,
+  license, retrieval timestamp, and artifact hash are recorded in `metadata_json`
+  before production import.
 
 ## Source policy
 
@@ -54,7 +55,9 @@ specific dataset is admitted to production.
 
 ```text
 python scripts/yemen_geography_import.py <reviewed.csv>
-python scripts/yemen_geography_import.py <reviewed.csv> --apply --database-url <DATABASE_URL>
+python scripts/yemen_geography_import.py <reviewed.csv> --apply --database-url <DATABASE_URL> \
+  --source-name "<provider/dataset>" --source-uri "<canonical-source-uri>" \
+  --license "<license>" --retrieved-at "<UTC timestamp>" --source-sha256 "<sha256>"
 ```
 
 The first command is the mandatory validation/dry-run. The second is the
