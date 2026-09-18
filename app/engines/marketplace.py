@@ -896,6 +896,55 @@ class MarketplaceService:
         self.db.commit()
         return created
 
+    def assert_seller_balance_conservation(self, payout):
+        """Validate seller-balance entries against the payout lifecycle.
+
+        This is deliberately stricter than a running-balance calculation: it checks
+        that lifecycle transitions have exactly the expected financial entries and
+        that a paid payout cannot silently create or consume seller funds.
+        """
+        entries = self.db.scalars(select(MarketplaceSellerBalanceEntry).where(
+            MarketplaceSellerBalanceEntry.marketplace_payout_id == payout.id,
+            MarketplaceSellerBalanceEntry.seller_tenant_id == payout.seller_tenant_id,
+            MarketplaceSellerBalanceEntry.market_id == payout.market_id,
+            MarketplaceSellerBalanceEntry.currency == payout.currency,
+        ).order_by(MarketplaceSellerBalanceEntry.id)).all()
+        credits = [e for e in entries if e.entry_type == 'credit']
+        payout_debits = [e for e in entries if e.entry_type == 'payout_debit']
+        refund_reversals = [e for e in entries if e.entry_type == 'refund_reversal']
+        refund_recoveries = [e for e in entries if e.entry_type == 'refund_recovery']
+        other = [e for e in entries if e.entry_type not in {'credit', 'payout_debit', 'refund_reversal', 'refund_recovery'}]
+        if other:
+            raise MarketplaceError('unsupported seller balance entry type')
+        if len(credits) > 1:
+            raise MarketplaceError('seller payout has duplicate credit entries')
+        credit_total = sum((_money(e.amount) for e in credits), Decimal('0'))
+        reversal_total = sum((_money(e.amount) for e in refund_reversals), Decimal('0'))
+        recovery_total = sum((_money(e.amount) for e in refund_recoveries), Decimal('0'))
+        payout_debit_total = sum((_money(e.amount) for e in payout_debits), Decimal('0'))
+        net = _money(payout.net_amount)
+
+        if payout.status == 'paid':
+            if len(payout_debits) != 1 or payout_debit_total != net:
+                raise MarketplaceError('paid payout seller balance debit is not conserved')
+            if refund_reversals:
+                raise MarketplaceError('paid payout cannot contain refund reversal entries')
+            if recovery_total > payout_debit_total:
+                raise MarketplaceError('refund recovery exceeds paid seller proceeds')
+            if credit_total != net:
+                raise MarketplaceError('paid payout seller credit is not conserved')
+        elif payout.status == 'reversed':
+            if payout_debits or refund_recoveries:
+                raise MarketplaceError('reversed payout cannot contain payout or recovery debits')
+            if credit_total != net + reversal_total:
+                raise MarketplaceError('reversed payout seller balance is not conserved')
+        else:
+            if payout_debits or refund_recoveries:
+                raise MarketplaceError('unpaid payout cannot contain payout or recovery debits')
+            if credit_total != net + reversal_total:
+                raise MarketplaceError('unpaid payout seller balance is not conserved')
+        return True
+
     def assert_financial_invariants(self, marketplace_order_id: int):
         """Validate order, line allocation, payout, and customer-order financial conservation.
 
@@ -1143,6 +1192,9 @@ class MarketplaceService:
         if so: so.status='paid'; so.updated_at=datetime.now(timezone.utc)
         self._sync_customer_order(o.customer_order_id)
         self.assert_financial_invariants(o.id)
+        payout_for_audit = self.db.scalar(select(MarketplacePayout).where(MarketplacePayout.marketplace_order_id == o.id))
+        if payout_for_audit:
+            self.assert_seller_balance_conservation(payout_for_audit)
         self._event(seller_tenant_id,'marketplace.order.paid','marketplace_order',o.id,{'payment_reference':payment_reference}); self.db.commit(); return o
 
     def mark_processing(self,seller_tenant_id:int,order_id:int):
@@ -1220,6 +1272,9 @@ class MarketplaceService:
             payout.status='eligible'; payout.eligible_at=datetime.now(timezone.utc)
             self._balance_entry(payout,'credit',payout.net_amount,f'settlement:{settlement_reference}')
         self.assert_financial_invariants(o.id)
+        payout_for_audit = self.db.scalar(select(MarketplacePayout).where(MarketplacePayout.marketplace_order_id == o.id))
+        if payout_for_audit:
+            self.assert_seller_balance_conservation(payout_for_audit)
         self._event(seller_tenant_id,'marketplace.payout.settlement.linked','payout',payout.id,{'order_id':o.id,'payment_reference':o.payment_reference,'settlement_reference':settlement_reference})
         self.db.commit(); return payout
 
@@ -1353,6 +1408,9 @@ class MarketplaceService:
         self._balance_entry(p,'payout_debit',p.net_amount,p.payout_reference or external_reference)
         p.external_reference=external_reference; p.status='paid'; p.paid_at=datetime.now(timezone.utc)
         self.assert_financial_invariants(o.id)
+        payout_for_audit = self.db.scalar(select(MarketplacePayout).where(MarketplacePayout.marketplace_order_id == o.id))
+        if payout_for_audit:
+            self.assert_seller_balance_conservation(payout_for_audit)
         self._event(seller_tenant_id,'marketplace.payout.paid','payout',p.id,{'external_reference':external_reference,'amount':str(p.net_amount),'currency':p.currency,'settlement_reference':p.settlement_reference})
         self.db.commit(); return p
 

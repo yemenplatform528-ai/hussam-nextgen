@@ -256,3 +256,31 @@ def test_dispute_after_paid_payout_does_not_create_implicit_recovery():
         __import__('app.core.models.marketplace', fromlist=['MarketplaceSellerBalanceEntry']).MarketplaceSellerBalanceEntry.marketplace_payout_id == payout.id,
         __import__('app.core.models.marketplace', fromlist=['MarketplaceSellerBalanceEntry']).MarketplaceSellerBalanceEntry.entry_type == 'refund_recovery'
     )).all() == []
+
+
+def test_seller_balance_conservation_rejects_duplicate_credit():
+    db, m, ids, seller, admin, buyer, o = setup()
+    payout = db.scalar(select(MarketplacePayout).where(MarketplacePayout.marketplace_order_id == o.id))
+    payout.status = 'eligible'
+    payout.eligible_at = __import__('datetime').datetime.now(__import__('datetime').timezone.utc)
+    m._balance_entry(payout, 'credit', payout.net_amount, 'settlement:CONSERVE-1')
+    duplicate = __import__('app.core.models.marketplace', fromlist=['MarketplaceSellerBalanceEntry']).MarketplaceSellerBalanceEntry(
+        market_id=payout.market_id, seller_tenant_id=payout.seller_tenant_id, marketplace_payout_id=payout.id,
+        entry_type='credit', amount=payout.net_amount, currency=payout.currency,
+        reference='SBAL:DUPLICATE', source_reference='settlement:CONSERVE-2')
+    db.add(duplicate)
+    db.flush()
+    from app.engines.marketplace import MarketplaceError
+    with pytest.raises(MarketplaceError, match='duplicate credit'):
+        m.assert_seller_balance_conservation(payout)
+
+
+def test_seller_balance_conservation_requires_paid_payout_debit():
+    db, m, ids, seller, admin, buyer, o = setup()
+    payout = db.scalar(select(MarketplacePayout).where(MarketplacePayout.marketplace_order_id == o.id))
+    payout.status = 'paid'
+    m._balance_entry(payout, 'credit', payout.net_amount, 'settlement:CONSERVE-PAID')
+    db.commit()
+    from app.engines.marketplace import MarketplaceError
+    with pytest.raises(MarketplaceError, match='paid payout seller balance debit'):
+        m.assert_seller_balance_conservation(payout)
