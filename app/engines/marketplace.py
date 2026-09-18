@@ -1127,7 +1127,45 @@ class MarketplaceService:
             if not mo or mo.currency!=co.currency or _money(mo.total)!=_money(so.total): raise MarketplaceError('seller order payment allocation mismatch')
             ref=f'{session.reference}:{so.id}'
             self.db.add(MarketplacePaymentAllocation(session_id=session.id,seller_order_id=so.id,marketplace_order_id=mo.id,seller_tenant_id=so.seller_tenant_id,amount=_money(so.total),currency=co.currency,payment_reference=ref))
+        self.db.flush(); self.assert_payment_conservation(session.id)
         self.db.commit(); self.db.refresh(session); return session
+
+    def assert_payment_conservation(self, session_id: int):
+        """Validate customer payment session against its immutable seller allocations.
+
+        This boundary prevents the charged customer amount from drifting away from
+        the seller-order amounts that the marketplace intends to settle.
+        """
+        session = self.db.get(MarketplacePaymentSession, session_id)
+        if not session:
+            raise MarketplaceError("payment session not found")
+        co = self.db.get(MarketplaceCustomerOrder, session.customer_order_id)
+        if not co:
+            raise MarketplaceError("payment session customer order not found")
+        allocations = self.db.scalars(
+            select(MarketplacePaymentAllocation)
+            .where(MarketplacePaymentAllocation.session_id == session.id)
+            .order_by(MarketplacePaymentAllocation.id)
+        ).all()
+        if not allocations:
+            raise MarketplaceError("payment session has no allocations")
+        allocation_total = sum((_money(x.amount) for x in allocations), Decimal('0'))
+        checks = {
+            "session_currency_matches_customer": session.currency == co.currency,
+            "session_amount_matches_customer": _money(session.amount) == _money(co.total),
+            "allocation_total_matches_session": allocation_total == _money(session.amount),
+            "allocation_currency_matches_session": all(x.currency == session.currency for x in allocations),
+        }
+        for allocation in allocations:
+            so = self.db.get(MarketplaceSellerOrder, allocation.seller_order_id)
+            mo = self.db.get(MarketplaceOrder, allocation.marketplace_order_id)
+            checks[f"allocation_{allocation.id}_seller_order"] = bool(so and so.customer_order_id == co.id and so.marketplace_order_id == mo.id)
+            checks[f"allocation_{allocation.id}_amount"] = bool(so and mo and _money(allocation.amount) == _money(so.total) == _money(mo.total))
+            checks[f"allocation_{allocation.id}_currency"] = bool(so and mo and mo.currency == session.currency and allocation.currency == mo.currency)
+        failed = [name for name, ok in checks.items() if not ok]
+        if failed:
+            raise MarketplaceError("payment conservation violation: " + ", ".join(failed))
+        return {"session_id": session.id, "currency": session.currency, "amount": str(_money(session.amount)), "checks": checks}
 
     def capture_payment_session(self, buyer_user_id:str, customer_order_id:int, provider_payment_id:str):
         if not provider_payment_id: raise MarketplaceError('provider payment id required')
@@ -1139,6 +1177,7 @@ class MarketplaceService:
         if session.status!='pending': raise MarketplaceError('payment session is not capturable')
         allocations=self.db.scalars(select(MarketplacePaymentAllocation).where(MarketplacePaymentAllocation.session_id==session.id).order_by(MarketplacePaymentAllocation.id)).all()
         if not allocations: raise MarketplaceError('payment session has no allocations')
+        self.assert_payment_conservation(session.id)
         from app.engines.payments import PaymentProductionService
         payment_service=PaymentProductionService(self.db)
         capture_date = datetime.now(timezone.utc).date()

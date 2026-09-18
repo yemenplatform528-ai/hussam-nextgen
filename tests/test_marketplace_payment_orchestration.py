@@ -57,3 +57,27 @@ def test_multi_seller_capture_is_atomic_when_a_later_allocation_fails():
     assert db.query(MarketplacePaymentAllocation).filter_by(session_id=session.id).count() == 1
     from app.core.models.payments import PaymentIntent
     assert db.query(PaymentIntent).filter(PaymentIntent.reference.like(f'{session.reference}:%')).count() == 0
+from decimal import Decimal
+import pytest
+from sqlalchemy import select
+from app.core.models.marketplace import MarketplacePaymentAllocation
+from app.engines.marketplace import MarketplaceError
+from tests.test_marketplace_payment_orchestration import setup
+
+def test_payment_conservation_rejects_allocation_amount_drift():
+    db,m,buyer,co_id=setup()
+    session=m.create_payment_session(buyer,co_id,'test-provider')
+    allocation=db.scalar(select(MarketplacePaymentAllocation).where(MarketplacePaymentAllocation.session_id==session.id))
+    allocation.amount=Decimal(str(allocation.amount))+Decimal('1.0000')
+    db.flush()
+    with pytest.raises(MarketplaceError, match='payment conservation violation'):
+        m.assert_payment_conservation(session.id)
+
+def test_payment_conservation_rejects_currency_drift():
+    db,m,buyer,co_id=setup()
+    session=m.create_payment_session(buyer,co_id,'test-provider')
+    allocation=db.scalar(select(MarketplacePaymentAllocation).where(MarketplacePaymentAllocation.session_id==session.id))
+    allocation.currency='USD'
+    db.flush()
+    with pytest.raises(MarketplaceError, match='payment conservation violation'):
+        m.assert_payment_conservation(session.id)
