@@ -142,12 +142,16 @@ def evaluate_provider_production_gate(db, provider_code: str, market_id: int, ca
     if provider.integration_mode == "none":
         reasons.append("integration_mode:none")
 
+    # Empty rail/currency means the capability is intentionally unrestricted.
+    # Accept either an exact scope or the corresponding wildcard so the database
+    # invariant and the documented capability semantics stay aligned.
+    from sqlalchemy import or_
     cap = db.scalar(select(ProviderMarketCapability).where(
         ProviderMarketCapability.provider_id == provider.id,
         ProviderMarketCapability.market_id == market_id,
         ProviderMarketCapability.capability == capability,
-        ProviderMarketCapability.rail == rail,
-        ProviderMarketCapability.currency == currency,
+        or_(ProviderMarketCapability.rail == rail, ProviderMarketCapability.rail == ""),
+        or_(ProviderMarketCapability.currency == currency, ProviderMarketCapability.currency == ""),
         ProviderMarketCapability.active.is_(True),
     ))
     if cap is None:
