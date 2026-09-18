@@ -60,6 +60,8 @@ No national geography import, provider production certification, API credential,
 
 ## Independent cross-check checkpoint
 
+A complete machine-readable structural cross-check was performed against `YemenOpenSource/Yemen-info` (`yemen-info.json`, blob `30c22263c57022bed8bf511c1b2f975164897bb1`). The full JSON parses to 22 governorates and 335 districts. The current candidate `all-district.json` parses to 335 records with 335 unique IDs, and every candidate district references an existing parent governorate ID. This strengthens the structural evidence but does not close the OCHA artifact gate because the independent records do not provide the same OCHA P-code key for direct 1:1 reconciliation.
+
 The earlier 335-vs-333 note has been refined. The current candidate publishes 22 governorates and 335 districts, and the OCHA/HDX `cod-ab-yem` metadata independently identifies the reviewed COD-AB v01 dataset as 22 governorates and 335 districts. Its XLSX metadata reports 336 `yem_admin2` rows (335 districts plus header) and 23 `yem_admin1` rows (22 governorates plus header), with P-codes. Older references that report 333 are therefore treated as historical/version-variant references rather than a sufficient basis to reject the 335-district candidate.
 
 The evidence gate remains open for a different reason: Hussam has not yet preserved the exact OCHA resource bytes locally, computed their SHA-256, and performed a record-level P-code/parent comparison against the candidate. Until that exact artifact-level reconciliation is complete, no national geography is accepted or imported.
