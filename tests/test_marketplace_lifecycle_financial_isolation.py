@@ -52,3 +52,38 @@ def test_partial_refund_reduces_unpaid_payout():
     assert payout.status == 'held'
     assert payout.gross_amount == Decimal('500.0000')
     assert payout.net_amount == Decimal('450.0000')
+
+
+def test_seller_balance_is_credited_once_and_debited_on_payout():
+    db, m, ids, seller, admin, buyer, o = setup()
+    payout = db.scalar(select(MarketplacePayout).where(MarketplacePayout.marketplace_order_id == o.id))
+    payout.status = 'eligible'
+    payout.eligible_at = __import__('datetime').datetime.now(__import__('datetime').timezone.utc)
+    m._balance_entry(payout, 'credit', payout.net_amount, 'settlement:SET-BAL-1')
+    db.commit()
+    assert m.seller_balance(seller.id, payout.market_id, payout.currency) == {'YER': str(payout.net_amount)}
+    m.set_payout_destination(seller.id, 'test-provider', 'DEST-BAL')
+    m.verify_payout_destination(seller.id, admin.id)
+    payout.payment_reference = 'PAY-BAL'
+    payout.settlement_reference = 'SET-BAL-1'
+    db.commit()
+    m.request_payout(seller.id, o.id)
+    m.mark_payout_paid(seller.id, o.id, 'EXT-BAL-1')
+    assert m.seller_balance(seller.id, payout.market_id, payout.currency) == {'YER': '0.0000'}
+
+
+def test_eligible_refund_reverses_seller_balance():
+    db, m, ids, seller, admin, buyer, o = setup()
+    payout = db.scalar(select(MarketplacePayout).where(MarketplacePayout.marketplace_order_id == o.id))
+    payout.status = 'eligible'
+    payout.eligible_at = __import__('datetime').datetime.now(__import__('datetime').timezone.utc)
+    m._balance_entry(payout, 'credit', payout.net_amount, 'settlement:SET-BAL-2')
+    db.commit()
+    rr = m.request_return(buyer.id, o.id, 'damaged', 'damage')
+    m.review_return(seller.id, rr.id, 'approved')
+    m.advance_return(seller.id, rr.id, 'pickup')
+    m.advance_return(seller.id, rr.id, 'received')
+    m.advance_return(seller.id, rr.id, 'inspected')
+    m.approve_refund(seller.id, rr.id)
+    m.complete_return_refund(seller.id, rr.id, 'PR-BAL-2')
+    assert m.seller_balance(seller.id, payout.market_id, payout.currency) == {'YER': '0.0000'}

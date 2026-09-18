@@ -13,7 +13,7 @@ from app.core.models.catalog import MarketplaceCatalogGroup, MarketplaceProduct,
 from app.core.models.marketplace import (
     MarketplaceSellerProfile, MarketplaceCategory, MarketplaceListing,
     MarketplaceBuyerProfile, MarketplaceAddress, MarketplaceCart, MarketplaceCartItem,
-    MarketplaceOrder, MarketplaceOrderLine, MarketplaceCustomerOrder, MarketplaceSellerOrder, MarketplaceFulfillment, MarketplacePayout, MarketplaceReview, MarketplaceDispute,
+    MarketplaceOrder, MarketplaceOrderLine, MarketplaceCustomerOrder, MarketplaceSellerOrder, MarketplaceFulfillment, MarketplacePayout, MarketplaceSellerBalanceEntry, MarketplaceReview, MarketplaceDispute,
     MarketplaceSellerVerification, MarketplaceShippingRate, MarketplaceShippingQuote, MarketplaceFavorite, MarketplaceReturnRequest, MarketplaceReturnLine, MarketplaceRefundLine, MarketplacePayoutDestination, MarketplacePaymentSession, MarketplacePaymentAllocation, MarketplaceFeeRule, MarketplaceOrderFee, MarketplaceOfferCompetition, MarketplaceOfferCompetitionScore,
 )
 from app.core.models.payments import PaymentIntent, PaymentSettlement
@@ -426,6 +426,7 @@ class MarketplaceService:
             payout=self.db.scalar(select(MarketplacePayout).where(MarketplacePayout.marketplace_order_id==o.id,MarketplacePayout.seller_tenant_id==o.seller_tenant_id).with_for_update())
             if payout and payout.status in {'held','eligible'}:
                 refund_amount=_money(r.amount)
+                old_net=_money(payout.net_amount)
                 if refund_amount >= _money(payout.gross_amount):
                     payout.gross_amount=_money(payout.platform_fee)
                     payout.net_amount=Decimal('0')
@@ -433,6 +434,10 @@ class MarketplaceService:
                 else:
                     payout.gross_amount=_money(payout.gross_amount)-refund_amount
                     payout.net_amount=max(Decimal('0'),_money(payout.gross_amount)-_money(payout.platform_fee))
+                if payout.status=='reversed' and old_net>0 and payout.eligible_at:
+                    self._balance_entry(payout,'refund_reversal',old_net,r.refund_reference)
+                elif payout.eligible_at and old_net > _money(payout.net_amount):
+                    self._balance_entry(payout,'refund_reversal',old_net-_money(payout.net_amount),r.refund_reference)
             elif payout and payout.status=='paid':
                 self._event(o.seller_tenant_id,'marketplace.payout.refund_recovery_required','payout',payout.id,{'order_id':o.id,'refund_amount':str(r.amount),'currency':r.currency})
             self._sync_customer_order(o.customer_order_id)
@@ -1011,8 +1016,45 @@ class MarketplaceService:
         payout.settlement_reference=settlement_reference
         if o.status=='completed' and payout.status=='held':
             payout.status='eligible'; payout.eligible_at=datetime.now(timezone.utc)
+            self._balance_entry(payout,'credit',payout.net_amount,f'settlement:{settlement_reference}')
         self._event(seller_tenant_id,'marketplace.payout.settlement.linked','payout',payout.id,{'order_id':o.id,'payment_reference':o.payment_reference,'settlement_reference':settlement_reference})
         self.db.commit(); return payout
+
+    def seller_balance(self, seller_tenant_id:int, market_id:int|None=None, currency:str|None=None):
+        q=select(MarketplaceSellerBalanceEntry).where(MarketplaceSellerBalanceEntry.seller_tenant_id==seller_tenant_id)
+        if market_id is not None: q=q.where(MarketplaceSellerBalanceEntry.market_id==market_id)
+        if currency is not None: q=q.where(MarketplaceSellerBalanceEntry.currency==currency.upper())
+        entries=self.db.scalars(q.order_by(MarketplaceSellerBalanceEntry.id)).all()
+        by_currency={}
+        for e in entries:
+            sign=Decimal('1') if e.entry_type=='credit' else Decimal('-1')
+            by_currency[e.currency]=by_currency.get(e.currency,Decimal('0')) + sign*_money(e.amount)
+        return {k:str(v) for k,v in by_currency.items()}
+
+    def _balance_entry(self, payout, entry_type, amount, source_reference):
+        amount=_money(amount)
+        if amount <= 0: return None
+        existing=self.db.scalar(select(MarketplaceSellerBalanceEntry).where(
+            MarketplaceSellerBalanceEntry.marketplace_payout_id==payout.id,
+            MarketplaceSellerBalanceEntry.entry_type==entry_type,
+            MarketplaceSellerBalanceEntry.source_reference==source_reference))
+        if existing: return existing
+        prefix='CREDIT' if entry_type=='credit' else ('PAYOUT' if entry_type=='payout_debit' else 'REFUND')
+        x=MarketplaceSellerBalanceEntry(
+            market_id=payout.market_id, seller_tenant_id=payout.seller_tenant_id,
+            marketplace_payout_id=payout.id, entry_type=entry_type, amount=amount,
+            currency=payout.currency, reference=f'SBAL:{prefix}:{payout.reference}:{uuid4().hex[:12].upper()}',
+            source_reference=source_reference)
+        self.db.add(x); self.db.flush(); return x
+
+    def _available_balance_amount(self, seller_tenant_id, market_id, currency):
+        entries=self.db.scalars(select(MarketplaceSellerBalanceEntry).where(
+            MarketplaceSellerBalanceEntry.seller_tenant_id==seller_tenant_id,
+            MarketplaceSellerBalanceEntry.market_id==market_id,
+            MarketplaceSellerBalanceEntry.currency==currency)).all()
+        total=Decimal('0')
+        for e in entries: total += _money(e.amount) if e.entry_type=='credit' else -_money(e.amount)
+        return total
 
     def payout_eligible(self,seller_tenant_id:int,order_id:int):
         p=self.db.scalar(select(MarketplacePayout).where(MarketplacePayout.marketplace_order_id==order_id,MarketplacePayout.seller_tenant_id==seller_tenant_id).with_for_update())
@@ -1056,6 +1098,10 @@ class MarketplaceService:
         if not external_reference: raise MarketplaceError('external payout reference required')
         conflict=self.db.scalar(select(MarketplacePayout).where(MarketplacePayout.external_reference==external_reference, MarketplacePayout.id!=p.id))
         if conflict: raise MarketplaceError('external payout reference already used')
+        available=self._available_balance_amount(seller_tenant_id,p.market_id,p.currency)
+        if available < _money(p.net_amount):
+            raise MarketplaceError('seller available balance is insufficient')
+        self._balance_entry(p,'payout_debit',p.net_amount,p.payout_reference or external_reference)
         p.external_reference=external_reference; p.status='paid'; p.paid_at=datetime.now(timezone.utc)
         self._event(seller_tenant_id,'marketplace.payout.paid','payout',p.id,{'external_reference':external_reference,'amount':str(p.net_amount),'currency':p.currency,'settlement_reference':p.settlement_reference})
         self.db.commit(); return p

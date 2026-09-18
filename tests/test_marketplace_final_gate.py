@@ -32,7 +32,7 @@ def test_payout_requires_verified_destination():
     db,seller,buyer,admin,m=setup(); l=m.create_listing(seller.id,ListingInput('rice','Rice','', 'product','YER',Decimal('1000'),'rice','wh')); m.moderate_listing(l.id,admin.id,'approved'); m.publish_listing(seller.id,l.id)
     m.ensure_buyer(buyer.id); m.add_to_cart(buyer.id,l.id,1); o=m.checkout(buyer.id)[0]; o.status='completed'; db.commit()
     from app.core.models.marketplace import MarketplacePayout
-    p=db.scalar(select(MarketplacePayout).where(MarketplacePayout.marketplace_order_id==o.id)); p.status='eligible'; db.commit(); p=m.payout_eligible(seller.id,o.id)
+    p=db.scalar(select(MarketplacePayout).where(MarketplacePayout.marketplace_order_id==o.id)); p.status='eligible'; p.eligible_at=__import__('datetime').datetime.now(__import__('datetime').timezone.utc); m._balance_entry(p,'credit',p.net_amount,'settlement:SET-1'); db.commit(); p=m.payout_eligible(seller.id,o.id)
     with pytest.raises(MarketplaceError): m.mark_payout_paid(seller.id,o.id,'EXT-1')
     d=m.set_payout_destination(seller.id,'test-provider','DEST-1'); assert d.status=='pending'
     m.verify_payout_destination(seller.id,admin.id)

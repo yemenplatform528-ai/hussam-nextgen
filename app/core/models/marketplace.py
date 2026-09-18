@@ -294,6 +294,24 @@ class MarketplacePayout(Base):
     requested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     __table_args__ = (CheckConstraint("status IN ('held','eligible','processing','paid','reversed')", name='ck_market_payout_status'), CheckConstraint('gross_amount >= platform_fee AND net_amount = gross_amount - platform_fee', name='ck_market_payout_math'))
 
+class MarketplaceSellerBalanceEntry(Base):
+    __tablename__ = 'marketplace_seller_balance_entries'
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    market_id: Mapped[int | None] = mapped_column(ForeignKey('market_contexts.id', ondelete='RESTRICT'), nullable=True, index=True)
+    seller_tenant_id: Mapped[int] = mapped_column(ForeignKey('tenants.id', ondelete='RESTRICT'), nullable=False, index=True)
+    marketplace_payout_id: Mapped[int] = mapped_column(ForeignKey('marketplace_payouts.id', ondelete='RESTRICT'), nullable=False, index=True)
+    entry_type: Mapped[str] = mapped_column(String(30), nullable=False)
+    amount: Mapped[object] = mapped_column(Numeric(20,4), nullable=False)
+    currency: Mapped[str] = mapped_column(String(10), nullable=False)
+    reference: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
+    source_reference: Mapped[str] = mapped_column(String(255), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, nullable=False)
+    __table_args__ = (
+        CheckConstraint("entry_type IN ('credit','debit','refund_reversal','payout_debit')", name='ck_market_seller_balance_entry_type'),
+        CheckConstraint('amount > 0', name='ck_market_seller_balance_entry_amount_positive'),
+        UniqueConstraint('marketplace_payout_id','entry_type','source_reference', name='uq_market_seller_balance_source'),
+    )
+
 class MarketplaceReview(Base):
     __tablename__ = 'marketplace_reviews'
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
