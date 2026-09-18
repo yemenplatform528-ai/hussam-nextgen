@@ -1312,6 +1312,10 @@ class MarketplaceService:
         self.db.commit(); return p
 
     def mark_payout_paid(self,seller_tenant_id:int,order_id:int,external_reference:str):
+        # Serialize seller-level balance consumption so concurrent payouts cannot
+        # both observe the same available balance and overdraw the seller.
+        seller_lock=self.db.scalar(select(Tenant).where(Tenant.id==seller_tenant_id).with_for_update())
+        if not seller_lock: raise MarketplaceError('seller tenant not found')
         p=self.db.scalar(select(MarketplacePayout).where(MarketplacePayout.marketplace_order_id==order_id,MarketplacePayout.seller_tenant_id==seller_tenant_id).with_for_update())
         if not p: raise MarketplaceError('payout not found')
         o=self.db.scalar(select(MarketplaceOrder).where(MarketplaceOrder.id==order_id,MarketplaceOrder.seller_tenant_id==seller_tenant_id).with_for_update())

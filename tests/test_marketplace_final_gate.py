@@ -91,3 +91,14 @@ def test_paid_payout_rejects_different_external_reference():
     assert m.mark_payout_paid(seller.id,o.id,'EXT-PAID').status=='paid'
     with pytest.raises(MarketplaceError, match='different external reference'):
         m.mark_payout_paid(seller.id,o.id,'EXT-OTHER')
+
+
+def test_payout_completion_serializes_seller_balance_consumption():
+    from app.core.models.marketplace import MarketplacePayout
+    db,seller,buyer,admin,m=setup(); l=m.create_listing(seller.id,ListingInput('rice','Rice','', 'product','YER',Decimal('1000'),'rice','wh')); m.moderate_listing(l.id,admin.id,'approved'); m.publish_listing(seller.id,l.id)
+    m.ensure_buyer(buyer.id); m.add_to_cart(buyer.id,l.id,1); o=m.checkout(buyer.id)[0]; o.status='completed'; db.commit()
+    p=db.scalar(select(MarketplacePayout).where(MarketplacePayout.marketplace_order_id==o.id)); p.status='eligible'; p.eligible_at=__import__('datetime').datetime.now(__import__('datetime').timezone.utc); p.payment_reference='PAY-SERIAL'; p.settlement_reference='SET-SERIAL'; m._balance_entry(p,'credit',p.net_amount,'settlement:SET-SERIAL'); db.commit()
+    m.set_payout_destination(seller.id,'test-provider','DEST-SERIAL'); m.verify_payout_destination(seller.id,admin.id); m.request_payout(seller.id,o.id)
+    paid=m.mark_payout_paid(seller.id,o.id,'EXT-SERIAL')
+    assert paid.status=='paid'
+    assert m._available_balance_amount(seller.id,p.market_id,p.currency)==Decimal('0')
