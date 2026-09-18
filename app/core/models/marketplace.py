@@ -228,7 +228,7 @@ class MarketplaceFeeRule(Base):
     scope: Mapped[str] = mapped_column(String(20), nullable=False, default='global')
     seller_tenant_id: Mapped[int | None] = mapped_column(ForeignKey('tenants.id', ondelete='CASCADE'), nullable=True, index=True)
     category_id: Mapped[int | None] = mapped_column(ForeignKey('marketplace_categories.id', ondelete='CASCADE'), nullable=True, index=True)
-    commission_bps: Mapped[int] = mapped_column(Integer, nullable=False, default=500)
+    commission_bps: Mapped[int] = mapped_column(Integer, nullable=False)
     fixed_fee: Mapped[object] = mapped_column(Numeric(20,4), nullable=False, default=0)
     currency: Mapped[str | None] = mapped_column(String(10), nullable=True)
     priority: Mapped[int] = mapped_column(Integer, nullable=False, default=100)
