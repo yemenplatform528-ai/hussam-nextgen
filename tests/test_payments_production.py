@@ -72,14 +72,22 @@ def test_settlement_requires_exact_amount_and_moves_clearing_to_cash():
 
 def test_reconciliation_detects_unknown_amount_and_currency_and_match():
     s,t,p=setup(); m=governed_market(s,t); p.create_intent(t.id,'PAY-1','wallet',100,'YER',market_id=m.id); p.attach_provider_payment(t.id,'PAY-1','prov-1')
-    assert p.reconcile(t.id,provider='wallet',provider_reference='unknown',actual_amount=5,currency='YER').status=='unknown'
-    assert p.reconcile(t.id,provider='wallet',provider_reference='prov-1',actual_amount=99,currency='YER').status=='amount_mismatch'
+    assert p.reconcile(t.id,provider='wallet',provider_reference='unknown',actual_amount=5,currency='YER',market_id=m.id).status=='unknown'
+    assert p.reconcile(t.id,provider='wallet',provider_reference='prov-1',actual_amount=99,currency='YER',market_id=m.id).status=='amount_mismatch'
     # A distinct provider reference maps to a distinct intent only if attached.
-    p.create_intent(t.id,'PAY-2','wallet',100,'YER'); p.attach_provider_payment(t.id,'PAY-2','prov-2')
-    assert p.reconcile(t.id,provider='wallet',provider_reference='prov-2',actual_amount=100,currency='SAR').status=='currency_mismatch'
-    assert p.reconcile(t.id,provider='wallet',provider_reference='prov-1',actual_amount=99,currency='YER').status=='amount_mismatch'
-    p.create_intent(t.id,'PAY-3','wallet',100,'YER'); p.attach_provider_payment(t.id,'PAY-3','prov-3')
-    assert p.reconcile(t.id,provider='wallet',provider_reference='prov-3',actual_amount=100,currency='YER').status=='matched'
+    p.create_intent(t.id,'PAY-2','wallet',100,'YER',market_id=m.id); p.attach_provider_payment(t.id,'PAY-2','prov-2')
+    assert p.reconcile(t.id,provider='wallet',provider_reference='prov-2',actual_amount=100,currency='SAR',market_id=m.id).status=='currency_mismatch'
+    assert p.reconcile(t.id,provider='wallet',provider_reference='prov-1',actual_amount=99,currency='YER',market_id=m.id).status=='amount_mismatch'
+    p.create_intent(t.id,'PAY-3','wallet',100,'YER',market_id=m.id); p.attach_provider_payment(t.id,'PAY-3','prov-3')
+    assert p.reconcile(t.id,provider='wallet',provider_reference='prov-3',actual_amount=100,currency='YER',market_id=m.id).status=='matched'
+
+
+def test_single_reconciliation_is_fail_closed_without_market_context():
+    s,t,p=setup(); m=governed_market(s,t); p.create_intent(t.id,'PAY-RECON-GATE','wallet',100,'YER',market_id=m.id); p.attach_provider_payment(t.id,'PAY-RECON-GATE','prov-recon-gate')
+    with pytest.raises(PaymentError, match='market context'):
+        p.reconcile(t.id,provider='wallet',provider_reference='unknown-gate',actual_amount=5,currency='YER')
+    with pytest.raises(PaymentError, match='does not match payment market'):
+        p.reconcile(t.id,provider='wallet',provider_reference='prov-recon-gate',actual_amount=100,currency='YER',market_id=m.id + 999)
 
 def test_payment_finance_failure_rolls_back_capture():
     s,t,p=setup(); p.create_intent(t.id,'PAY-1','wallet',30,'YER'); p.mark_processing(t.id,'PAY-1'); p.attach_provider_payment(t.id,'PAY-1','prov-1'); p.process_webhook(t.id,provider='wallet',event_id='e1',event_type='authorized',payment_reference='PAY-1',status='authorized')

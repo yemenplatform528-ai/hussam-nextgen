@@ -416,8 +416,11 @@ class PaymentProductionService:
         self.db.commit(); self.db.refresh(run); return run
 
     def reconcile(self, tenant_id: int, *, provider: str, provider_reference: str,
-                  actual_amount: Decimal, currency: str, internal_reference: str | None = None) -> PaymentReconciliation:
+                  actual_amount: Decimal, currency: str, market_id: int | None = None,
+                  internal_reference: str | None = None) -> PaymentReconciliation:
         actual = Decimal(str(actual_amount))
+        if actual <= 0 or not provider or not provider_reference or not currency:
+            raise PaymentError('provider reference, currency and positive actual amount are required')
         existing = self.db.scalar(select(PaymentReconciliation).where(
             PaymentReconciliation.tenant_id == tenant_id, PaymentReconciliation.provider == provider,
             PaymentReconciliation.provider_reference == provider_reference))
@@ -425,6 +428,22 @@ class PaymentProductionService:
         p = self.db.scalar(select(PaymentIntent).where(
             PaymentIntent.tenant_id == tenant_id, PaymentIntent.provider == provider,
             PaymentIntent.provider_payment_id == provider_reference))
+        if p is not None:
+            try:
+                payment_metadata = json.loads(p.metadata_json or '{}')
+            except (TypeError, ValueError):
+                payment_metadata = {}
+            payment_market = payment_metadata.get('market_id')
+            if payment_market is None:
+                raise PaymentError('payment market context is required for reconciliation')
+            if market_id is None:
+                market_id = int(payment_market)
+            if int(payment_market) != int(market_id):
+                raise PaymentError('reconciliation market does not match payment market')
+        elif market_id is None:
+            raise PaymentError('market context is required for reconciliation exceptions')
+        registry_currency = p.currency if p is not None else currency
+        self._registry(provider, int(market_id), 'settlement', '', registry_currency)
         expected = Decimal(str(p.amount)) if p else None
         ref = internal_reference or (p.reference if p else None)
         if p is None: status = 'unknown'
