@@ -67,3 +67,8 @@ The `1.0` label is reserved for the first real launch after all release gates pa
 - Added market/geography-scoped FX observations with explicit source provenance and effective time.
 - Kept provider execution and certification separate from the financial data model.
 - Added financial-layer integrity tests.
+
+## 2026-09-18 — Yemen payment-provider evidence register
+- Added a fail-closed Yemen payment-provider certification matrix separating public capability evidence from actual Hussam integration certification.
+- Recorded primary-source evidence for Al-Kuraimi, Al-Qutaibi, Shalan, and YPCC; Al-Najm remains unaccepted until a sufficiently verified primary source and integration path are established.
+- Added a machine-checkable evidence-register audit so provider capability claims cannot silently become production certification claims.
