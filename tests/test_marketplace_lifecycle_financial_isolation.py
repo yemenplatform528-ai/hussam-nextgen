@@ -210,3 +210,49 @@ def test_paid_payout_refund_completion_is_idempotent_for_same_provider_reference
         __import__('app.core.models.marketplace', fromlist=['MarketplaceSellerBalanceEntry']).MarketplaceSellerBalanceEntry.marketplace_payout_id == payout.id,
         __import__('app.core.models.marketplace', fromlist=['MarketplaceSellerBalanceEntry']).MarketplaceSellerBalanceEntry.entry_type == 'refund_recovery')).all()
     assert len(rows) == 1
+
+
+def test_dispute_resolution_does_not_bypass_refund_or_payout_financial_controls():
+    db, m, ids, seller, admin, buyer, o = setup()
+    payout = db.scalar(select(MarketplacePayout).where(MarketplacePayout.marketplace_order_id == o.id))
+    payout.status = 'eligible'
+    payout.eligible_at = __import__('datetime').datetime.now(__import__('datetime').timezone.utc)
+    m._balance_entry(payout, 'credit', payout.net_amount, 'settlement:SET-DISPUTE-BOUNDARY')
+    db.commit()
+
+    dispute = m.open_dispute(buyer.id, o.id, 'not-as-described', 'financial boundary')
+    assert dispute.status == 'open'
+    assert payout.status == 'eligible'
+    with pytest.raises(MarketplaceError):
+        m.payout_eligible(seller.id, o.id)
+
+    available_before = m._available_balance_amount(seller.id, payout.market_id, payout.currency)
+    resolved = m.resolve_dispute(dispute.id, admin.id, 'resolved', 'review completed; financial action handled separately')
+    assert resolved.status == 'resolved'
+
+    db.refresh(payout)
+    assert payout.status == 'eligible'
+    assert m._available_balance_amount(seller.id, payout.market_id, payout.currency) == available_before
+
+
+def test_dispute_after_paid_payout_does_not_create_implicit_recovery():
+    db, m, ids, seller, admin, buyer, o = setup()
+    payout = db.scalar(select(MarketplacePayout).where(MarketplacePayout.marketplace_order_id == o.id))
+    payout.status = 'eligible'
+    payout.eligible_at = __import__('datetime').datetime.now(__import__('datetime').timezone.utc)
+    payout.payment_reference = 'PAY-DISPUTE-PAID'
+    payout.settlement_reference = 'SET-DISPUTE-PAID'
+    m._balance_entry(payout, 'credit', payout.net_amount, 'settlement:SET-DISPUTE-PAID')
+    db.commit()
+    m.set_payout_destination(seller.id, 'test-provider', 'DEST-DISPUTE-PAID')
+    m.verify_payout_destination(seller.id, admin.id)
+    m.request_payout(seller.id, o.id)
+    m.mark_payout_paid(seller.id, o.id, 'EXT-DISPUTE-PAID')
+
+    dispute = m.open_dispute(buyer.id, o.id, 'not-as-described', 'post-payout dispute')
+    assert dispute.status == 'open'
+    assert payout.status == 'paid'
+    assert db.scalars(select(__import__('app.core.models.marketplace', fromlist=['MarketplaceSellerBalanceEntry']).MarketplaceSellerBalanceEntry).where(
+        __import__('app.core.models.marketplace', fromlist=['MarketplaceSellerBalanceEntry']).MarketplaceSellerBalanceEntry.marketplace_payout_id == payout.id,
+        __import__('app.core.models.marketplace', fromlist=['MarketplaceSellerBalanceEntry']).MarketplaceSellerBalanceEntry.entry_type == 'refund_recovery'
+    )).all() == []
