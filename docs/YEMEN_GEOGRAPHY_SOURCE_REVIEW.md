@@ -25,6 +25,12 @@ A stronger independent checkpoint is now available from the OCHA/HDX Yemen COD-A
 
 This materially changes the interpretation of the earlier `335-vs-333` note: 333 is present in older/historical references, but 335 is directly corroborated by the reviewed OCHA/HDX COD-AB v01 metadata and by the current independent candidate. The discrepancy should therefore no longer be described as evidence that the candidate count is wrong. It remains a **provenance/artifact-acquisition gate**, because the exact OCHA resource bytes have not yet been preserved locally and SHA-256ed by Hussam, and a record-level P-code comparison against the candidate has not yet been executed.
 
+### Independent structural cross-check: YemenOpenSource
+
+A second independent public dataset was inspected directly from `YemenOpenSource/Yemen-info`, `main`, using the repository blob for `yemen-info.json` (Git blob SHA `30c22263c57022bed8bf511c1b2f975164897bb1`). Parsing the complete JSON yields **22 governorates and 335 districts**. Its repository documentation states that the project contains governorates, districts, uzaal and villages, while also warning that its information may become outdated and is not guaranteed to be error-free; therefore it is used only as an independent structural cross-check, not as the canonical source.
+
+This gives Hussam two independent public structural corroborations of the 22/335 count: the current `open-admin-data/yemen-administrative-divisions` dataset and `YemenOpenSource/Yemen-info`. Neither substitutes for preservation and hashing of the exact canonical OCHA/HDX artifact.
+
 ## Promotion gate
 
 Before any national geography is applied to production, the exact artifact must be:

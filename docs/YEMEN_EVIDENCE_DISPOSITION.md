@@ -17,6 +17,10 @@ The project requires the exact preserved artifact, provenance, license/attributi
 
 The current OCHA COD-AB status information does not by itself establish a finalized Yemen artifact for this project. An independent public administrative-divisions dataset may be used as a cross-check, but is not automatically canonical.
 
+### Independent geography cross-check update
+
+A second independent public dataset was inspected directly from `YemenOpenSource/Yemen-info` (`main`, `yemen-info.json`, Git blob SHA `30c22263c57022bed8bf511c1b2f975164897bb1`). Complete JSON parsing returns 22 governorates and 335 districts. The repository itself cautions that its data are not guaranteed error-free and may become outdated, so this result is corroboration only. It strengthens the 22/335 structural finding but does not close the canonical-artifact gate.
+
 ## 2. Payment providers and payment infrastructure
 
 **Disposition: `PUBLIC_CAPABILITY_ONLY` unless a provider-specific certification package exists.**
