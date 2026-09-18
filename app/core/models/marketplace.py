@@ -289,7 +289,10 @@ class MarketplacePayout(Base):
     payment_reference: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
     settlement_reference: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
     external_reference: Mapped[str | None] = mapped_column(String(255), nullable=True, unique=True)
-    __table_args__ = (CheckConstraint("status IN ('held','eligible','paid','reversed')", name='ck_market_payout_status'), CheckConstraint('gross_amount >= platform_fee AND net_amount = gross_amount - platform_fee', name='ck_market_payout_math'))
+    payout_reference: Mapped[str | None] = mapped_column(String(255), nullable=True, unique=True)
+    payout_provider: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    requested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    __table_args__ = (CheckConstraint("status IN ('held','eligible','processing','paid','reversed')", name='ck_market_payout_status'), CheckConstraint('gross_amount >= platform_fee AND net_amount = gross_amount - platform_fee', name='ck_market_payout_math'))
 
 class MarketplaceReview(Base):
     __tablename__ = 'marketplace_reviews'

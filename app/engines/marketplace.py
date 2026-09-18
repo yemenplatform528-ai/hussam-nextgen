@@ -1024,8 +1024,31 @@ class MarketplaceService:
         if p.status!='eligible': raise MarketplaceError('payout is not eligible')
         return p
 
-    def mark_payout_paid(self,seller_tenant_id:int,order_id:int,external_reference:str):
+    def request_payout(self,seller_tenant_id:int,order_id:int):
         p=self.payout_eligible(seller_tenant_id,order_id)
+        destination=self.db.scalar(select(MarketplacePayoutDestination).where(MarketplacePayoutDestination.seller_tenant_id==seller_tenant_id).with_for_update())
+        if not destination or destination.status!='verified':
+            raise MarketplaceError('verified payout destination is required')
+        if p.status=='processing' and p.payout_reference:
+            return p
+        if p.status!='eligible':
+            raise MarketplaceError('payout is not eligible')
+        p.status='processing'
+        p.payout_provider=destination.provider
+        p.payout_reference=f'PAYOUT-REQ:{p.reference}:{uuid4().hex[:12].upper()}'
+        p.requested_at=datetime.now(timezone.utc)
+        self._event(seller_tenant_id,'marketplace.payout.requested','payout',p.id,{'payout_reference':p.payout_reference,'provider':destination.provider,'destination_reference':destination.external_reference,'amount':str(p.net_amount),'currency':p.currency})
+        self.db.commit(); return p
+
+    def mark_payout_paid(self,seller_tenant_id:int,order_id:int,external_reference:str):
+        p=self.db.scalar(select(MarketplacePayout).where(MarketplacePayout.marketplace_order_id==order_id,MarketplacePayout.seller_tenant_id==seller_tenant_id).with_for_update())
+        if not p: raise MarketplaceError('payout not found')
+        o=self.db.scalar(select(MarketplaceOrder).where(MarketplaceOrder.id==order_id,MarketplaceOrder.seller_tenant_id==seller_tenant_id).with_for_update())
+        if not o: raise MarketplaceError('marketplace order not found')
+        if p.market_id is not None and o.market_id != p.market_id: raise MarketplaceError('payout market mismatch')
+        if o.status in {'refunded','partially_refunded','disputed'}: raise MarketplaceError('payout is blocked by order financial state')
+        if p.status=='paid': return p
+        if p.status!='processing': raise MarketplaceError('payout request must be created before payment completion')
         if not p.payment_reference or not p.settlement_reference:
             raise MarketplaceError('payout requires a linked settled payment')
         destination=self.db.scalar(select(MarketplacePayoutDestination).where(MarketplacePayoutDestination.seller_tenant_id==seller_tenant_id))

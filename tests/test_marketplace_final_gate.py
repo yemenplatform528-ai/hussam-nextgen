@@ -39,6 +39,7 @@ def test_payout_requires_verified_destination():
     with pytest.raises(MarketplaceError): m.mark_payout_paid(seller.id,o.id,'EXT-1')
     # the payment/settlement boundary requires a verified payment + settlement link before payout.
     p.payment_reference='PAY-SETTLED'; p.settlement_reference='SET-1'; db.commit()
+    requested=m.request_payout(seller.id,o.id); assert requested.status=='processing'; assert requested.payout_reference; assert requested.payout_provider=='test-provider'
     paid=m.mark_payout_paid(seller.id,o.id,'EXT-1'); assert paid.status=='paid'
 
 def test_ai_marketplace_snapshot_is_tenant_scoped_and_in_business_snapshot():
