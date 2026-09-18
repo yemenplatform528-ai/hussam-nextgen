@@ -272,6 +272,16 @@ def settlement_link(order_id:int, settlement_reference:str,ctx=Depends(get_conte
 def payout_paid(order_id:int,body:PayoutIn,ctx=Depends(get_context),db=Depends(get_session)):
     seller_guard(ctx); x=MarketplaceService(db).mark_payout_paid(ctx.tenant_id,order_id,body.external_reference); return {'id':x.id,'status':x.status,'net_amount':str(x.net_amount),'currency':x.currency}
 
+@router.get('/seller/statement')
+def seller_statement(market_id:int, currency:str, from_at:str|None=None, to_at:str|None=None, ctx=Depends(get_context),db=Depends(get_session)):
+    seller_guard(ctx)
+    from datetime import datetime, timezone
+    def parse(value):
+        if not value: return None
+        x=datetime.fromisoformat(value.replace('Z','+00:00'))
+        return x if x.tzinfo else x.replace(tzinfo=timezone.utc)
+    return MarketplaceService(db).seller_statement(ctx.tenant_id, market_id, currency, parse(from_at), parse(to_at))
+
 @router.get('/seller/payouts')
 def seller_payouts(ctx=Depends(get_context),db=Depends(get_session)):
     seller_guard(ctx); rows=db.scalars(select(MarketplacePayout).where(MarketplacePayout.seller_tenant_id==ctx.tenant_id).order_by(desc(MarketplacePayout.id))).all(); return {'items':[{'id':x.id,'order_id':x.marketplace_order_id,'reference':x.reference,'gross_amount':str(x.gross_amount),'platform_fee':str(x.platform_fee),'net_amount':str(x.net_amount),'currency':x.currency,'status':x.status,'eligible_at':x.eligible_at.isoformat() if x.eligible_at else None,'paid_at':x.paid_at.isoformat() if x.paid_at else None} for x in rows]}

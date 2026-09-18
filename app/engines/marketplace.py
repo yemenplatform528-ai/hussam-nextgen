@@ -1020,6 +1020,30 @@ class MarketplaceService:
         self._event(seller_tenant_id,'marketplace.payout.settlement.linked','payout',payout.id,{'order_id':o.id,'payment_reference':o.payment_reference,'settlement_reference':settlement_reference})
         self.db.commit(); return payout
 
+    def seller_statement(self, seller_tenant_id:int, market_id:int, currency:str, from_at=None, to_at=None):
+        currency=currency.upper()
+        base=select(MarketplaceSellerBalanceEntry).where(
+            MarketplaceSellerBalanceEntry.seller_tenant_id==seller_tenant_id,
+            MarketplaceSellerBalanceEntry.market_id==market_id,
+            MarketplaceSellerBalanceEntry.currency==currency)
+        if from_at is not None:
+            opening_rows=self.db.scalars(base.where(MarketplaceSellerBalanceEntry.created_at < from_at).order_by(MarketplaceSellerBalanceEntry.id)).all()
+        else:
+            opening_rows=[]
+        def signed(e):
+            return _money(e.amount) if e.entry_type=='credit' else -_money(e.amount)
+        opening=sum((signed(e) for e in opening_rows), Decimal('0'))
+        q=base
+        if from_at is not None: q=q.where(MarketplaceSellerBalanceEntry.created_at >= from_at)
+        if to_at is not None: q=q.where(MarketplaceSellerBalanceEntry.created_at <= to_at)
+        rows=self.db.scalars(q.order_by(MarketplaceSellerBalanceEntry.id)).all()
+        running=opening
+        items=[]
+        for e in rows:
+            delta=signed(e); running += delta
+            items.append({'id':e.id,'created_at':e.created_at.isoformat(),'entry_type':e.entry_type,'amount':str(_money(e.amount)),'currency':e.currency,'reference':e.reference,'source_reference':e.source_reference,'running_balance':str(running.quantize(Decimal('0.0001')))})
+        return {'market_id':market_id,'currency':currency,'from_at':from_at.isoformat() if from_at else None,'to_at':to_at.isoformat() if to_at else None,'opening_balance':str(opening.quantize(Decimal('0.0001'))),'credits':str(sum((_money(e.amount) for e in rows if e.entry_type=='credit'),Decimal('0')).quantize(Decimal('0.0001'))),'refunds':str(sum((_money(e.amount) for e in rows if e.entry_type=='refund_reversal'),Decimal('0')).quantize(Decimal('0.0001'))),'payouts':str(sum((_money(e.amount) for e in rows if e.entry_type=='payout_debit'),Decimal('0')).quantize(Decimal('0.0001'))),'available_balance':str(running.quantize(Decimal('0.0001'))),'items':items}
+
     def seller_balance(self, seller_tenant_id:int, market_id:int|None=None, currency:str|None=None):
         q=select(MarketplaceSellerBalanceEntry).where(MarketplaceSellerBalanceEntry.seller_tenant_id==seller_tenant_id)
         if market_id is not None: q=q.where(MarketplaceSellerBalanceEntry.market_id==market_id)

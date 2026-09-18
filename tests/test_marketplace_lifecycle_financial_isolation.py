@@ -87,3 +87,18 @@ def test_eligible_refund_reverses_seller_balance():
     m.approve_refund(seller.id, rr.id)
     m.complete_return_refund(seller.id, rr.id, 'PR-BAL-2')
     assert m.seller_balance(seller.id, payout.market_id, payout.currency) == {'YER': '0.0000'}
+
+
+def test_seller_statement_has_running_balance_and_period_totals():
+    db, m, ids, seller, admin, buyer, o = setup()
+    payout = db.scalar(select(MarketplacePayout).where(MarketplacePayout.marketplace_order_id == o.id))
+    payout.status = 'eligible'
+    payout.eligible_at = __import__('datetime').datetime.now(__import__('datetime').timezone.utc)
+    m._balance_entry(payout, 'credit', payout.net_amount, 'settlement:SET-STATEMENT')
+    db.commit()
+    statement = m.seller_statement(seller.id, payout.market_id, payout.currency)
+    assert statement['opening_balance'] == '0.0000'
+    assert statement['credits'] == str(payout.net_amount)
+    assert statement['payouts'] == '0.0000'
+    assert statement['available_balance'] == str(payout.net_amount)
+    assert statement['items'][-1]['running_balance'] == str(payout.net_amount)
