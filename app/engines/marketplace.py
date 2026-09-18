@@ -1276,6 +1276,7 @@ class MarketplaceService:
             raise MarketplaceError('payout is not eligible')
         p.status='processing'
         p.payout_provider=destination.provider
+        p.payout_destination_reference=destination.external_reference
         p.payout_reference=f'PAYOUT-REQ:{p.reference}:{uuid4().hex[:12].upper()}'
         p.requested_at=datetime.now(timezone.utc)
         self._event(seller_tenant_id,'marketplace.payout.requested','payout',p.id,{'payout_reference':p.payout_reference,'provider':destination.provider,'destination_reference':destination.external_reference,'amount':str(p.net_amount),'currency':p.currency})
@@ -1295,6 +1296,8 @@ class MarketplaceService:
             raise MarketplaceError('payout requires a linked settled payment')
         destination=self.db.scalar(select(MarketplacePayoutDestination).where(MarketplacePayoutDestination.seller_tenant_id==seller_tenant_id))
         if not destination or destination.status!='verified': raise MarketplaceError('verified payout destination is required')
+        if destination.provider != p.payout_provider or destination.external_reference != p.payout_destination_reference:
+            raise MarketplaceError('payout destination changed after payout request')
         if not external_reference: raise MarketplaceError('external payout reference required')
         conflict=self.db.scalar(select(MarketplacePayout).where(MarketplacePayout.external_reference==external_reference, MarketplacePayout.id!=p.id))
         if conflict: raise MarketplaceError('external payout reference already used')
