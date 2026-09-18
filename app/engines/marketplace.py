@@ -16,7 +16,7 @@ from app.core.models.marketplace import (
     MarketplaceOrder, MarketplaceOrderLine, MarketplaceCustomerOrder, MarketplaceSellerOrder, MarketplaceFulfillment, MarketplacePayout, MarketplaceSellerBalanceEntry, MarketplaceReview, MarketplaceDispute,
     MarketplaceSellerVerification, MarketplaceShippingRate, MarketplaceShippingQuote, MarketplaceFavorite, MarketplaceReturnRequest, MarketplaceReturnLine, MarketplaceRefundLine, MarketplacePayoutDestination, MarketplacePaymentSession, MarketplacePaymentAllocation, MarketplaceFeeRule, MarketplaceOrderFee, MarketplaceChargeRule, MarketplaceOrderCharge, MarketplaceOfferCompetition, MarketplaceOfferCompetitionScore,
 )
-from app.core.models.payments import PaymentIntent, PaymentSettlement
+from app.core.models.payments import PaymentIntent, PaymentSettlement, PaymentRefund
 from app.core.models.logistics import Shipment
 from app.core.models.commerce import SalesOrder, SalesOrderLine
 from app.core.models.inventory import InventoryItem, Warehouse
@@ -479,6 +479,7 @@ class MarketplaceService:
                     'currency':r.currency,'refund_reference':r.refund_reference
                 })
             self._sync_customer_order(o.customer_order_id)
+        self.assert_refund_invariants(o.id, r.id)
         self._event(actor_tenant_id,'marketplace.return.refunded','return_request',x.id,{'refund_reference':r.refund_reference,'provider_refund_id':provider_refund_id,'amount':str(r.amount)})
         self.db.commit(); return x,r
 
@@ -879,7 +880,12 @@ class MarketplaceService:
         # The selected market cart is materialized into immutable orders; other market carts remain untouched.
         for ci in list(self.db.scalars(select(MarketplaceCartItem).where(MarketplaceCartItem.cart_id==cart.id)).all()):
             self.db.delete(ci)
-        cart.status='active'; cart.updated_at=datetime.now(timezone.utc); self.db.commit()
+        cart.status='active'; cart.updated_at=datetime.now(timezone.utc)
+        # Runtime financial conservation gate: checkout cannot commit an order whose
+        # line allocations/payout snapshot do not reconcile.
+        for created_order in created:
+            self.assert_financial_invariants(created_order.id)
+        self.db.commit()
         return created
 
     def assert_financial_invariants(self, marketplace_order_id: int):
@@ -940,6 +946,36 @@ class MarketplaceService:
         if failed:
             raise MarketplaceError("financial invariant violation: " + ", ".join(failed))
         return {"marketplace_order_id": order.id, "currency": order.currency, "checks": checks, "allocation_net": str(alloc_net)}
+
+    def assert_refund_invariants(self, marketplace_order_id: int, payment_refund_id: int):
+        """Validate refund conservation without rewriting immutable order allocation history.
+
+        Refunds are lifecycle adjustments; the original order allocation remains the
+        historical basis, while payout/balance effects are validated separately.
+        """
+        order = self.db.get(MarketplaceOrder, marketplace_order_id)
+        refund = self.db.get(PaymentRefund, payment_refund_id)
+        if not order or not refund:
+            raise MarketplaceError('refund invariant target not found')
+        if refund.currency != order.currency or _money(refund.amount) <= 0 or _money(refund.amount) > _money(order.total):
+            raise MarketplaceError('refund invariant violation: refund amount/currency')
+        if refund.status != 'succeeded':
+            raise MarketplaceError('refund invariant violation: refund not completed')
+        payout = self.db.scalar(select(MarketplacePayout).where(MarketplacePayout.marketplace_order_id == order.id))
+        if payout:
+            if payout.currency != order.currency or _money(payout.net_amount) != max(Decimal('0'), _money(payout.gross_amount) - _money(payout.platform_fee)):
+                raise MarketplaceError('refund invariant violation: payout math')
+            if payout.status == 'reversed' and _money(payout.net_amount) != 0:
+                raise MarketplaceError('refund invariant violation: reversed payout retains balance')
+            recoveries = self.db.scalars(select(MarketplaceSellerBalanceEntry).where(
+                MarketplaceSellerBalanceEntry.marketplace_payout_id == payout.id,
+                MarketplaceSellerBalanceEntry.entry_type == 'refund_recovery')).all()
+            recovery_total = sum((_money(x.amount) for x in recoveries), Decimal('0'))
+            if recovery_total < 0:
+                raise MarketplaceError('refund invariant violation: negative recovery')
+            if payout.status == 'paid' and recovery_total > _money(payout.net_amount):
+                raise MarketplaceError('refund invariant violation: recovery exceeds seller proceeds')
+        return {'marketplace_order_id': order.id, 'refund_id': refund.id, 'amount': str(_money(refund.amount)), 'currency': refund.currency}
 
     def financial_allocation(self, marketplace_order_id:int):
         """Return immutable line-level financial allocation for one seller order."""
@@ -1036,6 +1072,7 @@ class MarketplaceService:
             so.status='paid'; so.updated_at=datetime.now(timezone.utc)
             payout=self.db.scalar(select(MarketplacePayout).where(MarketplacePayout.marketplace_order_id==mo.id).with_for_update())
             if payout: payout.payment_reference=a.payment_reference
+            self.assert_financial_invariants(mo.id)
             self._event(a.seller_tenant_id,'marketplace.order.paid','marketplace_order',mo.id,{'payment_session':session.reference,'provider_payment_id':provider_payment_id})
         session.status='captured'; session.provider_payment_id=provider_payment_id; session.updated_at=datetime.now(timezone.utc)
         co=self.db.scalar(select(MarketplaceCustomerOrder).where(MarketplaceCustomerOrder.id==session.customer_order_id).with_for_update())
@@ -1064,6 +1101,7 @@ class MarketplaceService:
         so=self.db.scalar(select(MarketplaceSellerOrder).where(MarketplaceSellerOrder.marketplace_order_id==o.id))
         if so: so.status='paid'; so.updated_at=datetime.now(timezone.utc)
         self._sync_customer_order(o.customer_order_id)
+        self.assert_financial_invariants(o.id)
         self._event(seller_tenant_id,'marketplace.order.paid','marketplace_order',o.id,{'payment_reference':payment_reference}); self.db.commit(); return o
 
     def mark_processing(self,seller_tenant_id:int,order_id:int):
@@ -1132,6 +1170,7 @@ class MarketplaceService:
         if o.status=='completed' and payout.status=='held':
             payout.status='eligible'; payout.eligible_at=datetime.now(timezone.utc)
             self._balance_entry(payout,'credit',payout.net_amount,f'settlement:{settlement_reference}')
+        self.assert_financial_invariants(o.id)
         self._event(seller_tenant_id,'marketplace.payout.settlement.linked','payout',payout.id,{'order_id':o.id,'payment_reference':o.payment_reference,'settlement_reference':settlement_reference})
         self.db.commit(); return payout
 
@@ -1242,6 +1281,7 @@ class MarketplaceService:
             raise MarketplaceError('seller available balance is insufficient')
         self._balance_entry(p,'payout_debit',p.net_amount,p.payout_reference or external_reference)
         p.external_reference=external_reference; p.status='paid'; p.paid_at=datetime.now(timezone.utc)
+        self.assert_financial_invariants(o.id)
         self._event(seller_tenant_id,'marketplace.payout.paid','payout',p.id,{'external_reference':external_reference,'amount':str(p.net_amount),'currency':p.currency,'settlement_reference':p.settlement_reference})
         self.db.commit(); return p
 
