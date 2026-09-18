@@ -1,0 +1,13 @@
+{
+  "gate": "postgresql",
+  "environment": "REPLACE_WITH_REAL_ENVIRONMENT",
+  "source": "REPLACE_WITH_REAL_SOURCE",
+  "performed_at": "REPLACE_WITH_REAL_ISO8601_TIME",
+  "result": "PASS",
+  "reviewed_by": "REPLACE_WITH_AUTHORIZED_REVIEWER",
+  "checks": ["REPLACE_WITH_REAL_CHECK"],
+  "artifact": {
+    "path": "REPLACE_WITH_REVIEWED_ARTIFACT",
+    "sha256": "REPLACE_WITH_64_HEX_SHA256"
+  }
+}
