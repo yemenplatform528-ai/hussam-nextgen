@@ -882,6 +882,65 @@ class MarketplaceService:
         cart.status='active'; cart.updated_at=datetime.now(timezone.utc); self.db.commit()
         return created
 
+    def assert_financial_invariants(self, marketplace_order_id: int):
+        """Validate order, line allocation, payout, and customer-order financial conservation.
+
+        This is an assertion boundary, not a source of accounting truth: it never mutates
+        financial state and raises when money would be created, lost, or allocated twice.
+        """
+        order = self.db.scalar(select(MarketplaceOrder).where(MarketplaceOrder.id == marketplace_order_id))
+        if not order:
+            raise MarketplaceError("marketplace order not found")
+        qlines = self.db.scalars(select(MarketplaceOrderLine).where(MarketplaceOrderLine.marketplace_order_id == order.id).order_by(MarketplaceOrderLine.id)).all()
+        allocations = self.db.scalars(select(MarketplaceOrderFinancialAllocation).where(MarketplaceOrderFinancialAllocation.marketplace_order_id == order.id)).all()
+        payout = self.db.scalar(select(MarketplacePayout).where(MarketplacePayout.marketplace_order_id == order.id))
+
+        money = lambda v: _money(v)
+        line_gross = sum((money(x.line_total) for x in qlines), Decimal("0"))
+        alloc_gross = sum((money(x.gross_amount) for x in allocations), Decimal("0"))
+        alloc_shipping = sum((money(x.shipping_amount) for x in allocations), Decimal("0"))
+        alloc_discount = sum((money(x.discount_amount) for x in allocations), Decimal("0"))
+        alloc_fee = sum((money(x.platform_fee) for x in allocations), Decimal("0"))
+        alloc_net = sum((money(x.net_amount) for x in allocations), Decimal("0"))
+
+        checks = {
+            "order_total": money(order.total) == money(order.subtotal) + money(order.shipping_fee),
+            "line_gross_matches_subtotal": line_gross == money(order.subtotal),
+            "allocation_gross_matches_lines": alloc_gross == line_gross,
+            "allocation_shipping_matches_order": alloc_shipping == money(order.shipping_fee),
+            "allocation_fee_matches_order": alloc_fee == money(order.platform_fee),
+            "allocation_math": alloc_net == money(order.subtotal) + money(order.shipping_fee) - alloc_discount - alloc_fee,
+            "allocation_count_matches_lines": len(allocations) == len(qlines),
+            "allocation_currency_matches_order": all(x.currency == order.currency for x in allocations),
+            "allocation_seller_matches_order": all(x.seller_tenant_id == order.seller_tenant_id for x in allocations),
+            "allocation_market_matches_order": all(x.market_id == order.market_id for x in allocations),
+        }
+        if payout:
+            checks.update({
+                "payout_gross_matches_order": money(payout.gross_amount) == money(order.total),
+                "payout_fee_matches_order": money(payout.platform_fee) == money(order.platform_fee),
+                "payout_net_math": money(payout.net_amount) == money(payout.gross_amount) - money(payout.platform_fee),
+                "payout_currency_matches_order": payout.currency == order.currency,
+            })
+        else:
+            checks["payout_exists"] = False
+
+        if order.customer_order_id:
+            children = self.db.scalars(select(MarketplaceSellerOrder).where(MarketplaceSellerOrder.customer_order_id == order.customer_order_id)).all()
+            customer = self.db.scalar(select(MarketplaceCustomerOrder).where(MarketplaceCustomerOrder.id == order.customer_order_id))
+            if customer:
+                checks.update({
+                    "customer_subtotal_conservation": sum((money(x.subtotal) for x in children), Decimal("0")) == money(customer.subtotal),
+                    "customer_shipping_conservation": sum((money(x.shipping_fee) for x in children), Decimal("0")) == money(customer.shipping_fee),
+                    "customer_total_conservation": sum((money(x.total) for x in children), Decimal("0")) == money(customer.total),
+                    "customer_currency_matches": all(x.currency == customer.currency for x in [order]),
+                })
+
+        failed = [name for name, ok in checks.items() if not ok]
+        if failed:
+            raise MarketplaceError("financial invariant violation: " + ", ".join(failed))
+        return {"marketplace_order_id": order.id, "currency": order.currency, "checks": checks, "allocation_net": str(alloc_net)}
+
     def financial_allocation(self, marketplace_order_id:int):
         """Return immutable line-level financial allocation for one seller order."""
         rows=self.db.scalars(select(MarketplaceOrderFinancialAllocation).where(MarketplaceOrderFinancialAllocation.marketplace_order_id==marketplace_order_id).order_by(MarketplaceOrderFinancialAllocation.order_line_id)).all()
