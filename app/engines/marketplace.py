@@ -1319,7 +1319,10 @@ class MarketplaceService:
         if p.market_id is None or o.market_id is None or o.market_id != p.market_id: raise MarketplaceError('payout market mismatch')
         if p.currency != o.currency: raise MarketplaceError('payout currency mismatch')
         if o.status in {'refunded','partially_refunded','disputed'}: raise MarketplaceError('payout is blocked by order financial state')
-        if p.status=='paid': return p
+        if p.status=='paid':
+            if p.external_reference != external_reference:
+                raise MarketplaceError('payout already completed with a different external reference')
+            return p
         if p.status!='processing': raise MarketplaceError('payout request must be created before payment completion')
         if not p.payment_reference or not p.settlement_reference:
             raise MarketplaceError('payout requires a linked settled payment')
@@ -1328,6 +1331,10 @@ class MarketplaceService:
         if destination.provider != p.payout_provider or destination.external_reference != p.payout_destination_reference:
             raise MarketplaceError('payout destination changed after payout request')
         if not external_reference: raise MarketplaceError('external payout reference required')
+        from app.engines.payment_adapters import evaluate_provider_production_gate
+        gate=evaluate_provider_production_gate(self.db, p.payout_provider, p.market_id, 'payout', currency=p.currency)
+        if not gate.allowed:
+            raise MarketplaceError('payout provider production gate blocked: ' + ';'.join(gate.blocked_reasons))
         conflict=self.db.scalar(select(MarketplacePayout).where(MarketplacePayout.external_reference==external_reference, MarketplacePayout.id!=p.id))
         if conflict: raise MarketplaceError('external payout reference already used')
         available=self._available_balance_amount(seller_tenant_id,p.market_id,p.currency)

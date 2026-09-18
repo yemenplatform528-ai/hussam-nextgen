@@ -66,3 +66,28 @@ def test_hus_marketplace_template_is_deterministic_and_uses_allowlist():
     assert a['contract_hash']==b['contract_hash']
     assert any(d['engine']=='marketplace' for d in a['contract']['domains'])
     assert {'marketplace.read','marketplace.order','marketplace.payout'} <= set(next(d for d in a['contract']['domains'] if d['engine']=='marketplace')['capabilities'])
+
+
+def test_mark_payout_paid_rechecks_provider_gate_and_idempotency_reference():
+    from app.core.models.marketplace import MarketplacePayout
+    db,seller,buyer,admin,m=setup(); l=m.create_listing(seller.id,ListingInput('rice','Rice','', 'product','YER',Decimal('1000'),'rice','wh')); m.moderate_listing(l.id,admin.id,'approved'); m.publish_listing(seller.id,l.id)
+    m.ensure_buyer(buyer.id); m.add_to_cart(buyer.id,l.id,1); o=m.checkout(buyer.id)[0]; o.status='completed'; db.commit()
+    p=db.scalar(select(MarketplacePayout).where(MarketplacePayout.marketplace_order_id==o.id)); p.status='eligible'; p.eligible_at=__import__('datetime').datetime.now(__import__('datetime').timezone.utc); p.payment_reference='PAY-SETTLED'; p.settlement_reference='SET-1'; m._balance_entry(p,'credit',p.net_amount,'settlement:SET-1'); db.commit()
+    m.set_payout_destination(seller.id,'test-provider','DEST-GATE-2'); m.verify_payout_destination(seller.id,admin.id)
+    m.request_payout(seller.id,o.id)
+    from app.core.models.market import ProviderRegistryEntry
+    provider=db.scalar(select(ProviderRegistryEntry).where(ProviderRegistryEntry.code=='test-provider')); provider.status='suspended'; db.commit()
+    with pytest.raises(MarketplaceError, match='production gate blocked'):
+        m.mark_payout_paid(seller.id,o.id,'EXT-GATE-2')
+
+
+def test_paid_payout_rejects_different_external_reference():
+    from app.core.models.marketplace import MarketplacePayout
+    db,seller,buyer,admin,m=setup(); l=m.create_listing(seller.id,ListingInput('rice','Rice','', 'product','YER',Decimal('1000'),'rice','wh')); m.moderate_listing(l.id,admin.id,'approved'); m.publish_listing(seller.id,l.id)
+    m.ensure_buyer(buyer.id); m.add_to_cart(buyer.id,l.id,1); o=m.checkout(buyer.id)[0]; o.status='completed'; db.commit()
+    p=db.scalar(select(MarketplacePayout).where(MarketplacePayout.marketplace_order_id==o.id)); p.status='eligible'; p.eligible_at=__import__('datetime').datetime.now(__import__('datetime').timezone.utc); p.payment_reference='PAY-SETTLED'; p.settlement_reference='SET-1'; m._balance_entry(p,'credit',p.net_amount,'settlement:SET-1'); db.commit()
+    m.set_payout_destination(seller.id,'test-provider','DEST-1'); m.verify_payout_destination(seller.id,admin.id)
+    m.request_payout(seller.id,o.id)
+    assert m.mark_payout_paid(seller.id,o.id,'EXT-PAID').status=='paid'
+    with pytest.raises(MarketplaceError, match='different external reference'):
+        m.mark_payout_paid(seller.id,o.id,'EXT-OTHER')
