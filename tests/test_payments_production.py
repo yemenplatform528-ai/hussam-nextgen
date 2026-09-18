@@ -100,3 +100,21 @@ def test_reconciliation_batch_rejects_duplicate_provider_rows():
     with pytest.raises(PaymentError,match='duplicate provider reference'):
         p.reconcile_batch(t.id,provider='wallet',run_reference='RUN-3',source_reference='statement-3',source_sha256='c'*64,
             rows=[{'provider_reference':'prov-1','actual_amount':100,'currency':'YER'}, {'provider_reference':'prov-1','actual_amount':100,'currency':'YER'}])
+
+
+def test_webhook_state_machine_blocks_unverified_capture_and_backward_moves():
+    s,t,p=setup(); p.create_intent(t.id,'PAY-SM-1','wallet',50,'YER')
+    with pytest.raises(PaymentError, match='invalid payment state transition'):
+        p.process_webhook(t.id,provider='wallet',event_id='sm-1',event_type='captured',payment_reference='PAY-SM-1',status='captured')
+    p.mark_processing(t.id,'PAY-SM-1'); p.attach_provider_payment(t.id,'PAY-SM-1','prov-sm-1')
+    p.process_webhook(t.id,provider='wallet',event_id='sm-2',event_type='authorized',payment_reference='PAY-SM-1',status='authorized')
+    p.process_webhook(t.id,provider='wallet',event_id='sm-3',event_type='captured',payment_reference='PAY-SM-1',status='captured')
+    with pytest.raises(PaymentError, match='invalid payment state transition'):
+        p.process_webhook(t.id,provider='wallet',event_id='sm-4',event_type='authorized',payment_reference='PAY-SM-1',status='authorized')
+
+
+def test_webhook_terminal_states_cannot_reopen():
+    s,t,p=setup(); p.create_intent(t.id,'PAY-SM-2','wallet',50,'YER'); p.mark_processing(t.id,'PAY-SM-2')
+    p.process_webhook(t.id,provider='wallet',event_id='sm-5',event_type='failed',payment_reference='PAY-SM-2',status='failed')
+    with pytest.raises(PaymentError, match='invalid payment state transition'):
+        p.process_webhook(t.id,provider='wallet',event_id='sm-6',event_type='authorized',payment_reference='PAY-SM-2',status='authorized')

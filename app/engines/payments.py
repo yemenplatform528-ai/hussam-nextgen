@@ -123,12 +123,21 @@ class PaymentProductionService:
                 raise PaymentError('provider payment id already belongs to another payment')
             p.provider_payment_id = provider_payment_id
         allowed = {'processing','authorized','captured','failed','cancelled','refunded'}
+        transitions = {
+            'pending': {'processing', 'authorized', 'failed', 'cancelled'},
+            'processing': {'processing', 'authorized', 'failed', 'cancelled'},
+            'authorized': {'authorized', 'captured', 'failed', 'cancelled'},
+            'captured': {'captured', 'refunded'},
+            'failed': {'failed'},
+            'cancelled': {'cancelled'},
+            'refunded': {'refunded'},
+        }
         if status is not None:
             if status not in allowed: raise PaymentError('unsupported payment status')
-            if p.status == 'captured' and status not in {'captured','refunded'}:
-                raise PaymentError('captured payment cannot move backwards')
-            if p.status == 'refunded' and status != 'refunded':
-                raise PaymentError('refunded payment is terminal')
+            if status not in transitions.get(p.status, set()):
+                raise PaymentError(f'invalid payment state transition: {p.status} -> {status}')
+            if status in {'authorized', 'captured'} and not p.provider_payment_id:
+                raise PaymentError('provider payment must be verified before authorized/captured webhook state')
             p.status = status
             p.updated_at = datetime.now(timezone.utc)
         hook = PaymentWebhook(tenant_id=tenant_id, provider=provider, event_id=event_id,
