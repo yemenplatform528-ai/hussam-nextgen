@@ -1,27 +1,28 @@
 # Hussam NextGen — Final Release Verification
 
 Reviewed: 2026-09-19
-Canonical HEAD: `83ab8e2809bfed628fdae4a0d889a3395514dfe1`
+Canonical HEAD at documentation refresh: `022ba4fdc31fdf9d39edf54264bb2610c202b06a`
 
 ## Engineering verification
 
 - Pytest collection: 361 tests.
-- Isolated verification batches: 361 passed.
+- Focused marketplace/Yemen/payment/readiness regression batch: **52 passed**.
+- Yemen geography importer tests: **6 passed**.
 - `python -m compileall -q app alembic tests`: PASS.
 - `git diff --check`: PASS.
-- `scripts/baseline_audit.py`: 0 failures, 0 warnings.
+- `scripts/baseline_audit.py`: **0 failures, 0 warnings**.
 - `scripts/ui_audit.py`: PASS.
-- `scripts/payment_provider_matrix_audit.py`: PASS.
+- `scripts/payment_provider_matrix_audit.py`: PASS; fail-closed.
 - `scripts/release_1_0_audit.py`: PASS; 202 public routes.
 
-## Production infrastructure verification
+An unbounded full-suite pytest run was attempted but exceeded the execution window; therefore this document does not claim a full-suite pass.
 
-The Neon production project exists and its primary `main` branch has active read-write compute. The production database currently has no Hussam application tables. The staging database also does not contain the Hussam application schema.
+## Production database verification
 
-Therefore the repository is a verified production candidate, but the production database migration has not been falsely marked complete.
+Neon production project `hussam-nextgen-production`, branch `main`, was queried directly during this review. The database contains **182 public tables / 613 public indexes**, with Alembic head `0028_market_readiness_evidence`. Business data remains empty: 0 tenants, 0 users, 0 markets, 0 products, 0 orders, 0 payment intents and 0 geography rows.
+
+The production application schema is therefore present and the empty business dataset is intentional.
 
 ## Release boundary
 
-The application is designed to operate without requiring future provider contracts to be fabricated. Cash-on-delivery and governed payment-adapter paths remain valid product mechanisms; certified external payment integrations are added when their real contracts, credentials and test evidence exist.
-
-The remaining deployment action that changes live production data is the execution and verification of the application schema migration against Neon production `main`. That is an explicit production write and must be approved before execution.
+The marketplace product candidate is engineering-complete and can operate through governed payment paths without inventing future provider contracts. External identity, provider, carrier, security, backup/restore, operations, legal/compliance and exact national geography-artifact evidence remain separate production certification gates.
