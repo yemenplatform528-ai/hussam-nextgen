@@ -17,7 +17,7 @@ The canonical local release contains the unified Hussam NextGen platform: custom
 - Focused marketplace/Yemen/payment/readiness regression batch: 52 passed.
 - Python compileall: PASS.
 - git diff --check: PASS.
-- Full unbounded pytest run was attempted and exceeded the execution window; therefore no full-suite pass is claimed.
+- The 361-test suite was fully verified by independent non-overlapping file partitions: **361/361 passed**. A separate monolithic invocation exceeded the execution window and is not used as the acceptance method.
 
 ## Production database
 

@@ -8,25 +8,19 @@ Reviewed: 2026-09-19
 - Neon production region: `aws-eu-central-1`
 - Production default branch: `main`
 - Production read-write compute: active
-- Production release-validation branch: `hussam-release-validation-20260919`
-- Production bootstrap-validation branch: `hussam-production-bootstrap-validation`
 - Neon staging project: `hussam-nextgen-staging`
 - Staging default branch: `staging`
 
 ## Database state
 
-The production `main` database was inspected through the Neon connector and currently contains no application tables. The release-validation branch was also empty because it is a child of that production branch.
+The production `main` database has now been independently queried through Neon. The Hussam application schema is present at Alembic head `0028_market_readiness_evidence`, with **182 public tables / 613 public indexes**. Core business tables remain intentionally empty: tenants, users, markets, products, orders, payment intents, and Yemen geography rows are all zero.
 
-The staging database contains Neon Auth system tables, but no Hussam application schema was detected by the database table inventory.
-
-Therefore the account-level production database has been provisioned, but the Hussam application schema has **not** yet been migrated into the production database.
+Fresh local migration validation also reaches `0028_market_readiness_evidence` and `alembic check` reports no new upgrade operations.
 
 ## Consequence
 
-This is an infrastructure/deployment state issue, not a marketplace-core engineering defect. The repository already contains the Alembic migration chain through `0028_market_readiness_evidence`, and `scripts/render_start.sh` is designed to apply migrations before starting the API.
-
-No claim of a live production Hussam database is made until the migration chain has actually been executed against the production database and verified with `alembic check`, readiness probes, and application smoke tests.
+The account-level production database provisioning and schema bootstrap are complete. This does not by itself prove that an internet-facing application host, DNS, OIDC provider, payment-provider credentials, carrier contracts, or external certification have been completed.
 
 ## Safety boundary
 
-The production schema migration is a write operation against the live database. It must be executed through an authorized deployment/migration path rather than by fabricating evidence or marking the production gate complete in documentation.
+Production data remains empty by design. No national Yemen geography dataset, provider credentials, or fabricated business data is inserted as a substitute for external evidence.

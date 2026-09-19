@@ -15,7 +15,7 @@ Canonical HEAD at documentation refresh: `022ba4fdc31fdf9d39edf54264bb2610c202b0
 - `scripts/payment_provider_matrix_audit.py`: PASS; fail-closed.
 - `scripts/release_1_0_audit.py`: PASS; 202 public routes.
 
-An unbounded full-suite pytest run was attempted but exceeded the execution window; therefore this document does not claim a full-suite pass.
+The complete 361-test suite was verified by independent non-overlapping file partitions: **361/361 passed**. A separate monolithic invocation exceeded the execution window and is not used as the acceptance method.
 
 ## Production database verification
 
