@@ -17,9 +17,9 @@ The following checks were executed against the current canonical working tree:
 - Unified Platform 1.0 release-surface audit: **PASS; 202 public routes**.
 - Python `compileall`: **PASS**.
 - `git diff --check`: **PASS**.
-- Working tree: **clean**.
+- Working tree: **clean before this documentation refresh**.
 
-A full unbounded test-suite invocation was started but exceeded the execution window before completion; it is therefore **not** represented as a full-suite pass. The targeted 55-test regression set completed successfully.
+A full unbounded test-suite invocation was started but exceeded the execution window before completion; it is therefore **not** represented as a full-suite pass. Targeted regression batches completed successfully, and the current production database was independently re-queried through Neon with the expected canonical head and empty business-data counts.
 
 ## Yemen geography disposition
 

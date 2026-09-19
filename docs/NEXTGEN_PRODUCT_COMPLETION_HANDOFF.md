@@ -1,7 +1,7 @@
 # Hussam NextGen — Product Completion & Handoff
 
 Reviewed: 2026-09-19
-Canonical local release: `83ab8e2809bfed628fdae4a0d889a3395514dfe1`
+Canonical local release: `d6fb043905a301f0bfe3bcf3aecdb45b3735e1ff`
 
 ## Decision
 
@@ -22,18 +22,19 @@ Those items remain integration/deployment gates and are deliberately isolated fr
 
 ## Verification evidence
 
-The complete non-browser suite was executed in six isolated batches: **361 collected; 361 passed across isolated verification batches**.
+The repository currently collects **361 tests**. Targeted verification batches pass, including the Yemen geography/payment/market-readiness regressions and the browser harness check; an unbounded full-suite run exceeded the execution window before completion, so this handoff does **not** claim a full-suite pass.
 
-Browser E2E: **1 passed**.
+Additional checks executed against the current tree:
 
-Total repository test cases verified in this run: **361 passed**.
-
-Additional checks:
-
-- `python -m compileall -q app`: PASS
-- `git diff --check`: PASS
-- `scripts/baseline_audit.py`: 0 failures, 0 warnings
-- Production evidence audit: 10 external evidence rows remain pending by design.
+- `scripts/baseline_audit.py`: **0 failures, 0 warnings**
+- Unified Platform 1.0 release-surface audit: **PASS; 202 public routes**
+- UI audit: **PASS**
+- Yemen payment-provider matrix audit: **PASS; fail-closed**
+- Python `compileall`: **PASS**
+- `git diff --check`: **PASS**
+- Live Neon production schema: **182 public tables / 613 indexes; Alembic head 0028**
+- Live production business-data counts remain **0** (no fabricated tenant/user/market/product/order/provider/geography data)
+- Production evidence audit: **10 external evidence rows remain pending by design**.
 
 ## External deployment boundary
 

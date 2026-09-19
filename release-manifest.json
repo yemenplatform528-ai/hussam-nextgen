@@ -1,6 +1,6 @@
 {
   "format": "hussam-release-manifest/v1",
-  "file_count": 324,
+  "file_count": 388,
   "files": [
     {
       "path": ".env.example",
@@ -18,9 +18,14 @@
       "bytes": 456
     },
     {
+      "path": "CANONICAL_RECOVERY_PROVENANCE.md",
+      "sha256": "1a43ef90b8f8ae4c9649fe72717dc436470d8b1a48725e048f132709b4f097cc",
+      "bytes": 1227
+    },
+    {
       "path": "CHANGELOG.md",
-      "sha256": "273f4ba1d6962928f3ff047fcd57767dd068f2f8dee0291d543fbd6795b3dbb2",
-      "bytes": 2758
+      "sha256": "20d84ce8b8ee7ac44c76b205b390847a4f0b15201176c1619045fdc305c92971",
+      "bytes": 5175
     },
     {
       "path": "CONTRIBUTING.md",
@@ -146,6 +151,81 @@
       "path": "alembic/versions/0013_ai_product_lock.py",
       "sha256": "f23b2853a4c27526c6fab8fba30483d00e58c4e700245c6488cfd0f896556ea9",
       "bytes": 645
+    },
+    {
+      "path": "alembic/versions/0014_yemen_financial_layer.py",
+      "sha256": "2ef6a3bbabb75435f88c3b9ad28c88d529ae8ad47c4accc5d451ec906774d93d",
+      "bytes": 688
+    },
+    {
+      "path": "alembic/versions/0015_payment_reconciliation_runs.py",
+      "sha256": "dc937461109c742b22846dbcb2b902199e11395de48f1b36a8d85c932eecd601",
+      "bytes": 461
+    },
+    {
+      "path": "alembic/versions/0016_marketplace_payout_orchestration.py",
+      "sha256": "2f708bf0c18e5a98271ea4dd4c4c824e5b20fdaeae96a3c50d7e80f2cc4202ae",
+      "bytes": 266
+    },
+    {
+      "path": "alembic/versions/0017_marketplace_seller_balance_ledger.py",
+      "sha256": "9847f257a8a0e838375a4f85a66e750738e1eeb4600492b5fef0645c47152e61",
+      "bytes": 2630
+    },
+    {
+      "path": "alembic/versions/0018_marketplace_refund_recovery.py",
+      "sha256": "f417d7a28cc57a601477030d8f61dfeab6008fcf0d7a11a7ecb81ed40a25133a",
+      "bytes": 967
+    },
+    {
+      "path": "alembic/versions/0019_marketplace_order_financial_allocations.py",
+      "sha256": "d7b6a18bbdfce77627e163bd1fd6d3726b91f88f95154e939981c7b42fa35c12",
+      "bytes": 3117
+    },
+    {
+      "path": "alembic/versions/0020_marketplace_fee_policy_versioning.py",
+      "sha256": "89abdbe765bcb95a6a7a338e32dd3785415b23898b31d89b2575e9fc3ee1716a",
+      "bytes": 2218
+    },
+    {
+      "path": "alembic/versions/0021_marketplace_charge_policy_boundary.py",
+      "sha256": "b5e35c49faa3b62ee7e49eaff2c76892774d9e9cc7f8897c9e68bcaeb84529cc",
+      "bytes": 3816
+    },
+    {
+      "path": "alembic/versions/0022_payment_market_settlement_boundary.py",
+      "sha256": "b01224f6abd3b69eee5f797fd0d001f58c83f0d572277a97ea83341d20e321b1",
+      "bytes": 1929
+    },
+    {
+      "path": "alembic/versions/0023_payout_destination_snapshot.py",
+      "sha256": "7f49de8433e58bb01af4f7407ce7057cf0e2cf1e22807b9f59cbe83d7747b3c4",
+      "bytes": 748
+    },
+    {
+      "path": "alembic/versions/0024_discount_funding_scope.py",
+      "sha256": "a5c5d73119cfdb7bf3e86fba374a6d5daee7980ee46aa4355f1b023c8171eac2",
+      "bytes": 924
+    },
+    {
+      "path": "alembic/versions/0025_payout_discount_funding.py",
+      "sha256": "d4083feaa482233cc3d638ba06224218301bd21099e548ceba802dd6b83c8395",
+      "bytes": 904
+    },
+    {
+      "path": "alembic/versions/0026_payment_rail_adapter_registry.py",
+      "sha256": "ae70a56dca6e6d1f12f3defba9502a52cc9e841b07ffb1db474329d7feaae825",
+      "bytes": 2997
+    },
+    {
+      "path": "alembic/versions/0027_settlement_reconciliation_state.py",
+      "sha256": "9a6b2dd685942ac83c04c4fe6b319de907f16d74389c743d0787bf3d3a9d3228",
+      "bytes": 1363
+    },
+    {
+      "path": "alembic/versions/0028_market_readiness_evidence.py",
+      "sha256": "b3f5b4a2d24b23d06dc6efd73f09b2bd53a31ae648632a9956229f056e9e3911",
+      "bytes": 2411
     },
     {
       "path": "alembic.ini",
@@ -299,13 +379,13 @@
     },
     {
       "path": "app/api/routes/marketplace.py",
-      "sha256": "8145b67a84c871be87030fc471489c124ce6e652733bd06d8b35300d53aea91a",
-      "bytes": 38873
+      "sha256": "76685af64b707902345707fe4033ac7a7f081263c8cae273e5b13ed50a3670a1",
+      "bytes": 39410
     },
     {
       "path": "app/api/routes/marketplace_completion.py",
-      "sha256": "35c0b1b5cb0e765d8572ca8b7ee407187bc64ba5fb549c635692b8f6ebd2189d",
-      "bytes": 6228
+      "sha256": "09c6b6c4b4341564764513fc2aa029d5fa6c20a2219fa1413a32b14c69f4f11c",
+      "bytes": 6222
     },
     {
       "path": "app/api/routes/marketplace_growth.py",
@@ -324,8 +404,8 @@
     },
     {
       "path": "app/api/routes/payments.py",
-      "sha256": "f3a68661113e36df0895575ec66e20480915a8370833ac3128170893fd4032d7",
-      "bytes": 4931
+      "sha256": "9d3e774fe663d6ad2299b0fd0814d041ab08069d8340327b56090e8780669dcd",
+      "bytes": 4997
     },
     {
       "path": "app/api/routes/procurement.py",
@@ -419,8 +499,8 @@
     },
     {
       "path": "app/core/models/__init__.py",
-      "sha256": "fe250ba3fca05b325dff4955262a12b25d2906505b1d4d4f64b97d967534ea67",
-      "bytes": 814
+      "sha256": "5011831b236cf0612db9d682dea9a12c8de8b8458720f0b481391fbba5fc3b6f",
+      "bytes": 852
     },
     {
       "path": "app/core/models/ai_agents.py",
@@ -504,13 +584,13 @@
     },
     {
       "path": "app/core/models/market.py",
-      "sha256": "8b8e41bd44b4056179285b8f733307c6fa9cc618f3865a970ba2df2124fa0a15",
-      "bytes": 8735
+      "sha256": "e42fb9a85cab923b2ef25cfad66e62bd5f66776b73a61835fb0c3591c1d9095a",
+      "bytes": 16162
     },
     {
       "path": "app/core/models/marketplace.py",
-      "sha256": "35ab201caf5ab2250dbf4c505c01c5b9fad81fec4477428dd952795d277990d4",
-      "bytes": 40877
+      "sha256": "78bb2d99604fadeb9344080cc945d0d769a5b277945c8311804564f7dce890b4",
+      "bytes": 47148
     },
     {
       "path": "app/core/models/marketplace_growth.py",
@@ -519,8 +599,8 @@
     },
     {
       "path": "app/core/models/marketplace_operational.py",
-      "sha256": "ff8c707aefdc9df73775d3d40da926d7bccae66a10002f628e18f3407fdf6680",
-      "bytes": 3269
+      "sha256": "44af705debb62670cfe55d7c08e634a435c576b8540104cc8dffac6ad292c927",
+      "bytes": 6449
     },
     {
       "path": "app/core/models/oidc.py",
@@ -529,8 +609,8 @@
     },
     {
       "path": "app/core/models/payments.py",
-      "sha256": "4c39eb3b7031aa4a68203312d3505fd0533dadc35ca5af6a6af92a84dbe877da",
-      "bytes": 6606
+      "sha256": "1ef0dd01995dcce18275de66dcfbc31f9cf77cfc0f6c58f2391ce61fe894fd68",
+      "bytes": 10638
     },
     {
       "path": "app/core/models/platform_completion.py",
@@ -644,8 +724,8 @@
     },
     {
       "path": "app/engines/catalog.py",
-      "sha256": "d5b7c1d2a99e4d8d16db749397f0ab8868a829b8d1394c784c8a8f7c97bac815",
-      "bytes": 22587
+      "sha256": "016aaad0a2f6dbee8336695cd7bfa85d77b954526de5a655a012fed077494b4b",
+      "bytes": 22081
     },
     {
       "path": "app/engines/commerce.py",
@@ -694,8 +774,8 @@
     },
     {
       "path": "app/engines/fulfillment.py",
-      "sha256": "71b9a148889edb7e27da7ad8d88404c6ed0a028a5477507db48efdb7b07be8e1",
-      "bytes": 9137
+      "sha256": "56dd897ef05787615cb89d17bb1813a2f931c3304292100c6b78acab6e8c1dc5",
+      "bytes": 9327
     },
     {
       "path": "app/engines/identity/__init__.py",
@@ -743,19 +823,34 @@
       "bytes": 8544
     },
     {
+      "path": "app/engines/market_readiness.py",
+      "sha256": "5d27edf014aeb3a2919db2707e323fd1462ab2d1013becfd3802894d6d0130c2",
+      "bytes": 9335
+    },
+    {
       "path": "app/engines/marketplace.py",
-      "sha256": "e0a97c836c21b82b8ce7edae65cc1a3e66f710de3a6f3dcbb5bb38abdb9f426c",
-      "bytes": 91756
+      "sha256": "a69f4543c524ab628e98a0c8608131950ff828950e48c9823a3115019035c056",
+      "bytes": 130180
     },
     {
       "path": "app/engines/marketplace_completion.py",
-      "sha256": "4bd04979fb2646fdfa93ccf091a2e909d8fe9a80c9f507095f331c189232d12b",
-      "bytes": 41123
+      "sha256": "cc7708a71bec07703a8833cf31fa007bfdd31055fa4fc32af6e7141e2a4d0d2e",
+      "bytes": 45045
+    },
+    {
+      "path": "app/engines/payment_adapters.py",
+      "sha256": "7606c44acf380671de57583bf35b5255f1dbc729dbd5ce78307c9ac750dd2453",
+      "bytes": 6520
+    },
+    {
+      "path": "app/engines/payment_registry.py",
+      "sha256": "b4a4aec7ef5d0f760c390a4f44278ad72c1a08fc136bca25085aa3770dac6cad",
+      "bytes": 3102
     },
     {
       "path": "app/engines/payments.py",
-      "sha256": "302c8d1c94273e430314900521af122fbf2b8bfb9d61a5910588bfd4d340f399",
-      "bytes": 15871
+      "sha256": "cfbaecaf1948f560783cb8a37765e42e53798c78a86424933a6cab14cb8f9e13",
+      "bytes": 31501
     },
     {
       "path": "app/engines/procurement/__init__.py",
@@ -859,8 +954,8 @@
     },
     {
       "path": "app/ui/app.js",
-      "sha256": "b58c043dbf027b0b83899b525c81824471be3b3a6f8d9ff028fbbf92d9c5a87d",
-      "bytes": 25025
+      "sha256": "520bd72f4e3d58a4db7c091b7ef4173b92b2999e44cfcb2da4a3ffaeb21bd650",
+      "bytes": 25018
     },
     {
       "path": "app/ui/index.html",
@@ -881,6 +976,11 @@
       "path": "config/observability/prometheus-alerts.yml",
       "sha256": "098574d1082bdc4ca4d7b6fc7448b24f594996f4e40644f078d6183fc260e69e",
       "bytes": 1380
+    },
+    {
+      "path": "docs/ACCOUNT_INFRASTRUCTURE_READINESS_2026-09-19.md",
+      "sha256": "fb038b813426b8a9b0231e8dd50dc3356ca3df944a1600d2a3fabe14bacf3118",
+      "bytes": 1845
     },
     {
       "path": "docs/AI_01_FOUNDATION_LOCK.md",
@@ -963,9 +1063,29 @@
       "bytes": 2127
     },
     {
+      "path": "docs/EVIDENCE_ACQUISITION_RUNBOOK.md",
+      "sha256": "d96ac0db22872123bb6d8c965baaa990b085f583c56feb7ab127a73b9f60460b",
+      "bytes": 3518
+    },
+    {
       "path": "docs/EXTERNAL_EVIDENCE_CHECKLIST.md",
       "sha256": "7d46f30ec520d2d4f8ee970ac9342d3061f42cb22fd5c9270c80b854807ac3d4",
       "bytes": 2623
+    },
+    {
+      "path": "docs/FINAL_READINESS_CHECKPOINT_2026-09-19.md",
+      "sha256": "65553c6421b5644291b1f39fa54857cd936a1fd7a91ab7c4e30232eb0019216a",
+      "bytes": 4173
+    },
+    {
+      "path": "docs/FINAL_RELEASE_VERIFICATION_2026-09-19.md",
+      "sha256": "44d69b1893cd809224acdad2b59a8dbbe6a89a86bd4a1712bb940ee9f20e4226",
+      "bytes": 1501
+    },
+    {
+      "path": "docs/FULL_SUITE_VERIFICATION.md",
+      "sha256": "50c4d9bfef6a6ff703c737a9b35e7a73392013c57f32bba044485e5935748393",
+      "bytes": 1537
     },
     {
       "path": "docs/G01_IDENTITY_OIDC_ENGINEERING_CLOSURE.md",
@@ -1043,6 +1163,16 @@
       "bytes": 2366
     },
     {
+      "path": "docs/NEXTGEN_PRODUCT_COMPLETION_HANDOFF.md",
+      "sha256": "9979fd4e2500683970a51df9bdc0c6dff160c6dcd805626f57daf60b24dd5e1f",
+      "bytes": 3824
+    },
+    {
+      "path": "docs/PAYMENT_ADAPTER_CONTRACT.md",
+      "sha256": "0e73c0dfc7cc7faf872717c05f47b78ee9ca025cf800f81ea4579e5724d244cb",
+      "bytes": 1774
+    },
+    {
       "path": "docs/PLATFORM_BLUEPRINT.md",
       "sha256": "20c08cf98c1bb8dbfdb0eb75266b11567f8d6f58e876f75e42e071dd1ca935a0",
       "bytes": 1609
@@ -1056,6 +1186,11 @@
       "path": "docs/PRODUCTION_CLOSURE_MASTER_CONTROL.md",
       "sha256": "37380ce98ede7dda4eb8cb8fafca31678bbda9def1a438e64174c58ae7cb1dcc",
       "bytes": 2717
+    },
+    {
+      "path": "docs/PRODUCTION_DATABASE_MIGRATION_2026-09-19.md",
+      "sha256": "5bf9a8df3be10e3d40c55a645de7fca449a56eda7a57f982751f6dccf7b74df1",
+      "bytes": 1949
     },
     {
       "path": "docs/PRODUCTION_EVIDENCE_CLOSURE_STATUS.md",
@@ -1099,8 +1234,8 @@
     },
     {
       "path": "docs/STATUS.md",
-      "sha256": "4435bec0317cec9123180c171bdafd950dd82808b48bff8e9e3e85bbd0ddec65",
-      "bytes": 2101
+      "sha256": "a311f0d11e349827fb0ac8984a94f613eb30a2ee23e90e1c2c28be96aa1e2521",
+      "bytes": 3124
     },
     {
       "path": "docs/UNIFIED_PLATFORM_FINAL_RECONCILIATION.md",
@@ -1116,6 +1251,21 @@
       "path": "docs/Y2_YEMEN_FOUNDATION.md",
       "sha256": "00bec4eccb7df2d383ca48ec42d96e51c3fe5a959dc85d4f3daba3161e41b3e2",
       "bytes": 3772
+    },
+    {
+      "path": "docs/YEMEN_EVIDENCE_DISPOSITION.md",
+      "sha256": "6e7928fc8a56cd696014d89da7a57204629f32ecb2c88773d3021190a162a356",
+      "bytes": 5647
+    },
+    {
+      "path": "docs/YEMEN_GEOGRAPHY_ACCEPTANCE_GATE.md",
+      "sha256": "c60c50cdc2277456b91b303fd1276dca2c757acecf0a71d4d729ed4361f9cd53",
+      "bytes": 4289
+    },
+    {
+      "path": "docs/YEMEN_GEOGRAPHY_SOURCE_REVIEW.md",
+      "sha256": "8f5fc6d0d8b3323daed53bbb0cfee1c7e89e2c20b79dac13153ade59bf5956f7",
+      "bytes": 6174
     },
     {
       "path": "docs/YEMEN_MARKETPLACE_COMMERCE_TRANSACTION_LOCK.md",
@@ -1143,9 +1293,84 @@
       "bytes": 1963
     },
     {
+      "path": "docs/YEMEN_PAYMENT_PROVIDER_CERTIFICATION_MATRIX.md",
+      "sha256": "aa364fde79e70faf6519a729e61669f753ed2bb772322fe23ff8b0da75aea6b4",
+      "bytes": 5292
+    },
+    {
+      "path": "docs/YEMEN_PAYMENT_PROVIDER_PRODUCTION_GATE.md",
+      "sha256": "244c82514733e8cb300bef1e25f6dea7fc8c0bd2defefe1fbdc2c2bd1529363a",
+      "bytes": 1215
+    },
+    {
+      "path": "docs/YEMEN_PAYMENT_SETTLEMENT_RECONCILIATION_CONTRACT.md",
+      "sha256": "5505c46b67e6da7175b8d1bf3b7a8897512f96df709970a6b76e9fd3e3255475",
+      "bytes": 1875
+    },
+    {
+      "path": "docs/YEMEN_PRODUCTION_LAYER.md",
+      "sha256": "75e441ca64f39c896546eec454ab86a5e99379bca30256eb2364650742caac0d",
+      "bytes": 3843
+    },
+    {
       "path": "docs/ZERO_BUDGET_DEPLOYMENT_BASELINE.md",
       "sha256": "facf59396fb92ec9b20a545eb4257c6f697a8c1c7181e6c033ddd5a959be6582",
       "bytes": 2035
+    },
+    {
+      "path": "docs/evidence_templates/README.md",
+      "sha256": "d6f716d4c62c7a24cc94799e0702be58db1ec59fcaf712138624ef231b3eb6c7",
+      "bytes": 349
+    },
+    {
+      "path": "docs/evidence_templates/accounting.json.example",
+      "sha256": "9a67f9d48593232d1d3ef07eab59ff614c1d65ff20be304b6cc422c3a9af1e9d",
+      "bytes": 393
+    },
+    {
+      "path": "docs/evidence_templates/backup_dr_observability.json.example",
+      "sha256": "5d9118a0e0be256fca83e349c1935ecbbcfca396b86d47ad793f24df41169f7f",
+      "bytes": 406
+    },
+    {
+      "path": "docs/evidence_templates/browser_mobile_e2e.json.example",
+      "sha256": "b77652dded807921ccf6b1b4af9b51a6068f3fcbf85eddf47f663cafa29cea30",
+      "bytes": 401
+    },
+    {
+      "path": "docs/evidence_templates/identity_oidc.json.example",
+      "sha256": "1f08d1095bb4a3d010c55f46aea5a8fb00afecb018d3abd05c722369dd4042d0",
+      "bytes": 396
+    },
+    {
+      "path": "docs/evidence_templates/legal_compliance.json.example",
+      "sha256": "d123d548f4fb1c3ddddc33ee872aa121a45487cc7e35c081bfda1a12eadb1981",
+      "bytes": 399
+    },
+    {
+      "path": "docs/evidence_templates/logistics.json.example",
+      "sha256": "33fd6fb5bbf0dab35d587c01d6e5c8cc477ca3e9abfb604cefabd731a2ee2a34",
+      "bytes": 392
+    },
+    {
+      "path": "docs/evidence_templates/operations.json.example",
+      "sha256": "46a6a5240912eb9fd87571068aabf9568956db3a78cdf12ba18880a6fc351ee2",
+      "bytes": 393
+    },
+    {
+      "path": "docs/evidence_templates/payments.json.example",
+      "sha256": "28f1ed97c3bec754795fcbb4707b8199f18dc750d99b010f39e5f387bfafc716",
+      "bytes": 391
+    },
+    {
+      "path": "docs/evidence_templates/postgresql.json.example",
+      "sha256": "efb9a255879d320ba062a009d58d1fb9e03b746adc69bfdee480ae598b9985e1",
+      "bytes": 393
+    },
+    {
+      "path": "docs/evidence_templates/security.json.example",
+      "sha256": "b41e20b3bfe7095142334eb365f445b5f163bf13a5071af4955bc55c84767494",
+      "bytes": 391
     },
     {
       "path": "docs/policies/data_retention_schedule.md",
@@ -1258,6 +1483,11 @@
       "bytes": 2885
     },
     {
+      "path": "scripts/payment_provider_matrix_audit.py",
+      "sha256": "eecf964a75495f0e3a471e4d71b35d091615358e46b27d86c36b6b48c595af15",
+      "bytes": 2340
+    },
+    {
       "path": "scripts/postgres_backup_restore_drill.sh",
       "sha256": "7a01537352147b01f7fb2d40a43ecc8ed8cf725a9423a03cbe5fc25fdb19c004",
       "bytes": 1778
@@ -1301,6 +1531,21 @@
       "path": "scripts/ui_audit.py",
       "sha256": "68ff45c2f09fb630976748c0c5591dd7a46bb8deec5410d4272d455b019de98b",
       "bytes": 838
+    },
+    {
+      "path": "scripts/yemen_geography_import.py",
+      "sha256": "5f29ec057d7aa2c18a2edb7493194dbd2bba53ee25e30fea0741de200da34b64",
+      "bytes": 8627
+    },
+    {
+      "path": "tests/__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "tests/market_test_support.py",
+      "sha256": "cdad1ee9af44d3495bacedceb177c820890e268f66e80578197307b77472452c",
+      "bytes": 1971
     },
     {
       "path": "tests/test_accounting_integrity.py",
@@ -1359,8 +1604,8 @@
     },
     {
       "path": "tests/test_business_flow.py",
-      "sha256": "e85e53f59ec9e59d9f41fcdacff968a63a67cd75ae5d4412f0ed17f2ff880d72",
-      "bytes": 6321
+      "sha256": "281613fb87ec0eb127d433b59a0d02eff6dc602cafc0eae74fa5f46c911bbd9e",
+      "bytes": 7806
     },
     {
       "path": "tests/test_carrier_lifecycle.py",
@@ -1369,8 +1614,13 @@
     },
     {
       "path": "tests/test_catalog_core.py",
-      "sha256": "29c1caf5ddb69a7bc021b38dc2292ebefbdae498f4782020b82beb90102972c7",
-      "bytes": 4243
+      "sha256": "ade133b364ea238d6f26f004f212331bfafb8865d03552abd1e2ad06a98c3d9e",
+      "bytes": 4573
+    },
+    {
+      "path": "tests/test_catalog_market_activation.py",
+      "sha256": "d55f72ef5f74021a77e1f485f5d8dba3afb9bc40615d8066d674c17240c7cb84",
+      "bytes": 1376
     },
     {
       "path": "tests/test_commerce_production.py",
@@ -1473,39 +1723,74 @@
       "bytes": 5278
     },
     {
+      "path": "tests/test_market_activation_boundary.py",
+      "sha256": "7a4524e395f31f9d3e5a0ecdb80751c15b39c1ac93587a58849dd1115755a9e9",
+      "bytes": 1284
+    },
+    {
+      "path": "tests/test_market_readiness.py",
+      "sha256": "508b2b5a196b3071f6c38fad50d07b526eafae687b9f4706d73fd6446afcca62",
+      "bytes": 7525
+    },
+    {
       "path": "tests/test_marketplace.py",
-      "sha256": "da890c1001b23db113c75d2bb7cf37a6ef4fae3ecdffbb49ed9f64fb9b68bc0e",
-      "bytes": 3967
+      "sha256": "5decb93701145145bb96410128394ec2c8464167e5a49d4ac7fc918ab2a8b659",
+      "bytes": 4447
+    },
+    {
+      "path": "tests/test_marketplace_charge_policy_boundary.py",
+      "sha256": "4760cb299ac5a15f55825369123bcfc6ec59c76003d15955ad4cc6feb891783f",
+      "bytes": 1603
     },
     {
       "path": "tests/test_marketplace_completion.py",
-      "sha256": "72cfacdb365fc983a7efcf3b5b8a760a1680f53138c4307f65572f58a43de32e",
-      "bytes": 7387
+      "sha256": "61f11e46962c792d7e997faef1a3f10c7321e1ec6b5043776f9613a220886143",
+      "bytes": 13710
     },
     {
       "path": "tests/test_marketplace_completion_core.py",
-      "sha256": "46e7a9c9e77c677fe55b0eb4a4d5a22803ea67fe79cd8bf044121602f1d70227",
-      "bytes": 3878
+      "sha256": "6992834dc40b87136623a29f2adb4d3d478f7a904883ab53fd26fd76b48ec5d9",
+      "bytes": 4038
     },
     {
       "path": "tests/test_marketplace_fee_engine.py",
-      "sha256": "0527d67ae234c26e013485e1ccd087cc20c5a8de56fcdd4540400915ff93f50f",
-      "bytes": 2145
+      "sha256": "82bf9e8766d29d24d852100c8e6b1a77f06e55e0c20d1296fe12bc3849977d05",
+      "bytes": 2824
+    },
+    {
+      "path": "tests/test_marketplace_fee_policy_boundary.py",
+      "sha256": "e12190a5c6db5e6e38c3cdac7fc4374b4be08ab822da79485d8b4e67a8f54032",
+      "bytes": 1356
+    },
+    {
+      "path": "tests/test_marketplace_fee_policy_versioning.py",
+      "sha256": "a32790168ec11bc028d91c5923a83c88f5a1b6b745573ea34b64d7fb688100ca",
+      "bytes": 2429
     },
     {
       "path": "tests/test_marketplace_final_gate.py",
-      "sha256": "c729c43c40f3fb960c6494c01f03883d190e5a01df6f6ab7c7b091ed02d522dd",
-      "bytes": 4283
+      "sha256": "2db70c8724c45f0ad4d4c9778ee32c602c4d782b746580c19a0d01b1f9e0cdd4",
+      "bytes": 9399
+    },
+    {
+      "path": "tests/test_marketplace_financial_invariants.py",
+      "sha256": "aa3292870ae727b22d5b51ac68202dfb2c0968193c09f3409db50634780e7620",
+      "bytes": 4033
     },
     {
       "path": "tests/test_marketplace_fulfillment_idempotency.py",
-      "sha256": "c88cff422936c7c564172f1ff225bc301c79239e816d04d33f88ae6e75747f2a",
-      "bytes": 3150
+      "sha256": "5bfcd0b840b526728c4a1fa176164aeb277b8671a0042e6a7e9de4990c91038f",
+      "bytes": 3221
     },
     {
       "path": "tests/test_marketplace_fulfillment_network.py",
-      "sha256": "bb499489f068f1bb597e8e48451b0569534b166b76d58ff66a6acfc25ead277c",
-      "bytes": 4016
+      "sha256": "ff636c40bde40455b97b15c8b11a7b783a52a34eb4239735b9b6ddcf7a7a5cb2",
+      "bytes": 4087
+    },
+    {
+      "path": "tests/test_marketplace_fulfillment_state_machine.py",
+      "sha256": "ac593b2cf45c540727de224ad83d5c54002474d268cf0b96f86e6e911d768664",
+      "bytes": 3175
     },
     {
       "path": "tests/test_marketplace_item_level_returns.py",
@@ -1514,8 +1799,8 @@
     },
     {
       "path": "tests/test_marketplace_lifecycle_financial_isolation.py",
-      "sha256": "133d4080eb46e22000191806c6cf5e6c98786bc3a30874976e56c245969fa077",
-      "bytes": 2625
+      "sha256": "89437b4ec2d3a43cc61197f04c6bcd6273a869bc960497ffe7007b2728e3af4d",
+      "bytes": 16555
     },
     {
       "path": "tests/test_marketplace_market_isolation.py",
@@ -1529,18 +1814,23 @@
     },
     {
       "path": "tests/test_marketplace_order_network.py",
-      "sha256": "d2894da2d0c5cfbf8c8fd34ec658da3ac53211edc79d4768f8fc2f368ea6aa99",
-      "bytes": 3616
+      "sha256": "caa2b5abae53849f6fb08e364fcfa686ab4c4a4b4da870abb7028c402d4593de",
+      "bytes": 4551
+    },
+    {
+      "path": "tests/test_marketplace_payment_market_gate.py",
+      "sha256": "410aea0308f578e03785367cbe9c71944e2641282de166f095aa9761ed7352bb",
+      "bytes": 2710
     },
     {
       "path": "tests/test_marketplace_payment_orchestration.py",
-      "sha256": "f053fbdec47543205e80e095cd9112cd1e7adfd0d7fda29cca9713a8e70a5082",
-      "bytes": 3936
+      "sha256": "554d277d5b6d51ead6002a3eb5e8410816915bc4c260284aa5f29de4c17b3ca8",
+      "bytes": 6135
     },
     {
       "path": "tests/test_marketplace_returns_refunds.py",
-      "sha256": "1e1efa2f92359fa8a470d3153db8656e03e180b203bfaaeefab3fe60af06887d",
-      "bytes": 4211
+      "sha256": "790556100a8fa1a20b4a6dc515568d02e8a503c6440646c7ecabec6cf3b789b1",
+      "bytes": 4885
     },
     {
       "path": "tests/test_marketplace_search_discovery.py",
@@ -1558,14 +1848,34 @@
       "bytes": 2187
     },
     {
+      "path": "tests/test_payment_adapters.py",
+      "sha256": "218ccc8d839d2dbbdf6e8cc18bb2033b50838bbe3faadebdcc7802cc0b3ff322",
+      "bytes": 6365
+    },
+    {
+      "path": "tests/test_payment_provider_matrix.py",
+      "sha256": "ed2b4b435816a42d9dc07f4be51b92a6e5351597d3972d2ce14b40cd439884c1",
+      "bytes": 318
+    },
+    {
+      "path": "tests/test_payment_registry.py",
+      "sha256": "09dc5e45c726511ff386903d04fb4ba66bcfb5827cf84006601ca35006735684",
+      "bytes": 4662
+    },
+    {
       "path": "tests/test_payment_webhook_signatures.py",
       "sha256": "d6f12b197690cb6503326dc37eb92ab5a2a37b3ebc6f9be806e00b3aaedf413d",
       "bytes": 1188
     },
     {
       "path": "tests/test_payments_production.py",
-      "sha256": "ada72bb91f39912406b378c98c0dea1b667fa113263dd449d949df42dc2f95b7",
-      "bytes": 5978
+      "sha256": "756aef9cc729bdc0a5cb5e5b06e6449bd0031cae4e38acb735563cd9d50a502a",
+      "bytes": 17065
+    },
+    {
+      "path": "tests/test_payout_destination_snapshot.py",
+      "sha256": "a4213ceedce6823ee58f9cd833eea203828f5a7eb42c9368b7134b25d4c1c0f8",
+      "bytes": 2887
     },
     {
       "path": "tests/test_procurement_production.py",
@@ -1579,8 +1889,8 @@
     },
     {
       "path": "tests/test_product_layer.py",
-      "sha256": "216e0db29ea4c682ccaf0869a6863a76804e2aa2a4d5a65bb6034041a56c47ff",
-      "bytes": 1550
+      "sha256": "9cecc0cb1408b26d3ba65be53f3dcdec19ede14036898f4ffede47fc1208980e",
+      "bytes": 1556
     },
     {
       "path": "tests/test_production_evidence_protocol.py",
@@ -1621,6 +1931,16 @@
       "path": "tests/test_y2_market_foundation.py",
       "sha256": "0e1ff4fbc1ac6c05e4109ffb7096b5a83298f2b204993df2069c5224636f900c",
       "bytes": 10177
+    },
+    {
+      "path": "tests/test_yemen_financial_layer.py",
+      "sha256": "c27d16cc663a130315af847a82e2286e3740992d8fa3a3e847336a54fe9abea4",
+      "bytes": 2774
+    },
+    {
+      "path": "tests/test_yemen_geography_import.py",
+      "sha256": "5b19dceeb33b43d0b3c169501a916f1ec3a2071b3b0a32cb0ac322fb6bb479be",
+      "bytes": 2236
     }
   ]
 }
