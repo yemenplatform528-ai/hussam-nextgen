@@ -12,7 +12,11 @@ branch_labels = None
 depends_on = None
 
 def upgrade():
-    op.add_column('marketplace_payouts', sa.Column('payout_destination_reference', sa.String(length=255), nullable=True))
+    bind = op.get_bind()
+    insp = sa.inspect(bind)
+    cols = {c['name'] for c in insp.get_columns('marketplace_payouts')}
+    if 'payout_destination_reference' not in cols:
+        op.add_column('marketplace_payouts', sa.Column('payout_destination_reference', sa.String(length=255), nullable=True))
 
 def downgrade():
     op.drop_column('marketplace_payouts', 'payout_destination_reference')
