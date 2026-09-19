@@ -1,7 +1,7 @@
 # Hussam NextGen — Product Completion & Handoff
 
 Reviewed: 2026-09-19
-Canonical local release: `03958ba68bb4c5e94e8afb4163dd0e1d42272c97`
+Canonical local release: `83ab8e2809bfed628fdae4a0d889a3395514dfe1`
 
 ## Decision
 
@@ -22,7 +22,7 @@ Those items remain integration/deployment gates and are deliberately isolated fr
 
 ## Verification evidence
 
-The complete non-browser suite was executed in six isolated batches: **360 passed**.
+The complete non-browser suite was executed in six isolated batches: **361 collected; 361 passed across isolated verification batches**.
 
 Browser E2E: **1 passed**.
 
