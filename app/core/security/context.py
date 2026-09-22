@@ -9,8 +9,9 @@ class RequestContext:
     user_id: str
     tenant_id: int
     membership_id: int
+    role: str = "member"
 
 def build_context(claims: TokenClaims, *, requested_tenant_id: int | None = None) -> RequestContext:
     if requested_tenant_id is not None and requested_tenant_id != claims.tenant_id:
         raise TenantAccessDenied("requested tenant does not match authenticated tenant")
-    return RequestContext(user_id=claims.sub, tenant_id=claims.tenant_id, membership_id=0)
+    return RequestContext(user_id=claims.sub, tenant_id=claims.tenant_id, membership_id=0, role="member")

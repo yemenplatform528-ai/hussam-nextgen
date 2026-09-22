@@ -664,8 +664,8 @@
     },
     {
       "path": "app/core/security/context.py",
-      "sha256": "d68493ce82820c67ae7ec79b62e01698b3f47b009f18749aed0fb7f8edcafa21",
-      "bytes": 605
+      "sha256": "31b05166c8d8ec88763383230372ffa5ed2c46dfab2513f105dca6fd73fd22eb",
+      "bytes": 645
     },
     {
       "path": "app/core/security/jwt.py",
@@ -784,8 +784,8 @@
     },
     {
       "path": "app/engines/identity/runtime.py",
-      "sha256": "fc964dddbc957fbbaf96e03ff822a0d6836da99fcc58ba3484de6025c0d8f723",
-      "bytes": 925
+      "sha256": "a9f184119d8510243b73b849f5d4f6fa09c672df2072497080f8c75fd3f8e40a",
+      "bytes": 1687
     },
     {
       "path": "app/engines/identity/service.py",
@@ -979,8 +979,8 @@
     },
     {
       "path": "docs/ACCOUNT_INFRASTRUCTURE_READINESS_2026-09-19.md",
-      "sha256": "fb038b813426b8a9b0231e8dd50dc3356ca3df944a1600d2a3fabe14bacf3118",
-      "bytes": 1845
+      "sha256": "b9350381a42c4ffba6b3200aae90ee2bdbdcfec4601f63dfa39be202e9f60f61",
+      "bytes": 1383
     },
     {
       "path": "docs/AI_01_FOUNDATION_LOCK.md",
@@ -1074,8 +1074,8 @@
     },
     {
       "path": "docs/FINAL_DELIVERY_STATUS_2026-09-19.md",
-      "sha256": "ba7c6fdc9fe7d916f8aa713204b69228b704b8987ca652dd3428563e259e38cf",
-      "bytes": 2612
+      "sha256": "01c98d1fafa2b94e817610913b138fb90bd4caceb63d13cf8a7290dd5981e7b6",
+      "bytes": 2707
     },
     {
       "path": "docs/FINAL_READINESS_CHECKPOINT_2026-09-19.md",
@@ -1084,13 +1084,13 @@
     },
     {
       "path": "docs/FINAL_RELEASE_VERIFICATION_2026-09-19.md",
-      "sha256": "84930a093916806904b48f7bf6d53d1aafc4087f692a94db32b25c55ca0afaf5",
-      "bytes": 1631
+      "sha256": "140a6bba2518b516a4d2cf7b80b9ce4a6aa9dc9e54943abe9e766280035e4d03",
+      "bytes": 1703
     },
     {
       "path": "docs/FULL_SUITE_VERIFICATION.md",
-      "sha256": "50c4d9bfef6a6ff703c737a9b35e7a73392013c57f32bba044485e5935748393",
-      "bytes": 1537
+      "sha256": "b0c1b454a02a2ac669559ae9047bacac40fa6af1c357f4cca6f248205b2b9691",
+      "bytes": 1655
     },
     {
       "path": "docs/G01_IDENTITY_OIDC_ENGINEERING_CLOSURE.md",

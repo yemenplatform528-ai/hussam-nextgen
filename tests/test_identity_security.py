@@ -42,9 +42,12 @@ def test_database_membership_is_required():
         with pytest.raises(TenantAccessDenied):
             resolve_active_context(s, str(u.id), t.id)
         m = TenantMembership(user_id=u.id, tenant_id=t.id, active=True)
-        s.add(m); s.commit()
+        seller = Role(code="admin", name="Administrator")
+        s.add_all([m, seller]); s.flush()
+        s.add(MembershipRole(membership_id=m.id, role_id=seller.id)); s.commit()
         ctx = resolve_active_context(s, str(u.id), t.id)
         assert ctx.membership_id == m.id
+        assert ctx.role == "admin"
 
 def test_rbac_is_membership_scoped():
     engine = create_engine("sqlite:///:memory:")
