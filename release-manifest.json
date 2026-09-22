@@ -1,6 +1,6 @@
 {
   "format": "hussam-release-manifest/v1",
-  "file_count": 390,
+  "file_count": 391,
   "files": [
     {
       "path": ".env.example",
@@ -1071,6 +1071,11 @@
       "path": "docs/EVIDENCE_ACQUISITION_RUNBOOK.md",
       "sha256": "d96ac0db22872123bb6d8c965baaa990b085f583c56feb7ab127a73b9f60460b",
       "bytes": 3518
+    },
+    {
+      "path": "docs/EXTERNAL_CERTIFICATION_CONTROL_2026-09-23.md",
+      "sha256": "5055f1b4d0a128d10a7b38ee8a1013d8a4a57ad1bcb029ba741b8596aff22ddc",
+      "bytes": 3680
     },
     {
       "path": "docs/EXTERNAL_EVIDENCE_CHECKLIST.md",
