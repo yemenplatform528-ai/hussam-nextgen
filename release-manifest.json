@@ -1,6 +1,6 @@
 {
   "format": "hussam-release-manifest/v1",
-  "file_count": 389,
+  "file_count": 390,
   "files": [
     {
       "path": ".env.example",
@@ -1061,6 +1061,11 @@
       "path": "docs/ENGINEERING_GAP_REGISTER.md",
       "sha256": "c681f0ff1ccc87955fbb8c076e226b97099ea00931a7febfb07c5d5be7239344",
       "bytes": 2127
+    },
+    {
+      "path": "docs/ENGINEERING_VERIFICATION_2026-09-23.md",
+      "sha256": "c4885b6fb53ccca243a91b2135645f873eb1cbb1a13ee6d655397c19a5df69bc",
+      "bytes": 3336
     },
     {
       "path": "docs/EVIDENCE_ACQUISITION_RUNBOOK.md",
