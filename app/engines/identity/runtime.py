@@ -23,6 +23,6 @@ def resolve_active_context(session, user_id: str, tenant_id: int) -> RequestCont
     # known platform/seller role when a membership has multiple roles.
     role = next((code for code in role_codes if code == "platform_admin"), None)
     role = role or next((code for code in role_codes if code in {"owner", "admin"}), None)
-    role = role or (role_codes[0] if role_codes else "member")
+    role = role or (role_codes[0] if role_codes else (membership.role or "member"))
     return RequestContext(user_id=str(user_id), tenant_id=tenant_id,
                           membership_id=membership.id, role=role)

@@ -49,6 +49,15 @@ def test_database_membership_is_required():
         assert ctx.membership_id == m.id
         assert ctx.role == "admin"
 
+        # Legacy memberships remain compatible when no normalized role row exists.
+        # The uniqueness rule prevents a second membership for the same tenant;
+        # verify the fallback on the existing membership after removing role links.
+        s.query(MembershipRole).filter(MembershipRole.membership_id == m.id).delete()
+        m.role = "owner"
+        s.commit()
+        ctx = resolve_active_context(s, str(u.id), t.id)
+        assert ctx.role == "owner"
+
 def test_rbac_is_membership_scoped():
     engine = create_engine("sqlite:///:memory:")
     Base.metadata.create_all(engine)
