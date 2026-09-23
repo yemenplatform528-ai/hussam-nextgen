@@ -248,9 +248,25 @@ def test_market_context_service_composes_governed_runtime_context():
         category="connectivity", name="Connectivity-aware operation",
         market_scope=["YEM"], config_schema={}, status="active",
     )
+    document_capability = PlatformCapability(
+        id="yem_arabic_documents", code="yem_arabic_documents",
+        category="documents", name="Arabic document templates",
+        market_scope=["YEM"], config_schema={}, status="active",
+    )
+    notification_capability = PlatformCapability(
+        id="yem_notification_channels", code="yem_notification_channels",
+        category="notifications", name="Yemen notification channels",
+        market_scope=["YEM"], config_schema={}, status="active",
+    )
+    ai_hus_capability = PlatformCapability(
+        id="yem_ai_hus_context", code="yem_ai_hus_context",
+        category="ai", name="Yemen AI/HUS context",
+        market_scope=["YEM"], config_schema={}, status="active",
+    )
     db.add_all([
         market, country, geography, currency, money_unit, payment_method,
         capability, delivery_capability, connectivity_capability,
+        document_capability, notification_capability, ai_hus_capability,
     ])
     db.flush()
     db.add(MarketCoverage(
@@ -274,6 +290,18 @@ def test_market_context_service_composes_governed_runtime_context():
             "explicit_pending_states": True,
         },
     ))
+    db.add(MarketCapabilityActivation(
+        id="activation-documents-50", market_id=50, capability_id=document_capability.id,
+        status="active", configuration={"arabic_first": True, "templates": ["invoice", "receipt"]},
+    ))
+    db.add(MarketCapabilityActivation(
+        id="activation-notifications-50", market_id=50, capability_id=notification_capability.id,
+        status="active", configuration={"channels": ["in_app", "sms", "whatsapp"]},
+    ))
+    db.add(MarketCapabilityActivation(
+        id="activation-ai-hus-50", market_id=50, capability_id=ai_hus_capability.id,
+        status="active", configuration={"arabic_terminology": True, "local_market_context": True},
+    ))
     db.commit()
 
     runtime = MarketContextService(db).runtime_context(market)
@@ -288,6 +316,15 @@ def test_market_context_service_composes_governed_runtime_context():
     ]
     assert runtime["connectivity"]["configuration"]["offline_drafts"] is True
     assert runtime["connectivity"]["configuration"]["idempotent_mutations"] is True
+    assert runtime["documents"]["configuration"]["arabic_first"] is True
+    assert runtime["documents"]["versioned"] is True
+    assert runtime["documents"]["immutable_versions"] is True
+    assert runtime["notifications"]["channels"] == ["in_app", "sms", "whatsapp"]
+    assert runtime["notifications"]["tenant_scoped"] is True
+    assert runtime["ai_hus"]["configuration"]["local_market_context"] is True
+    assert runtime["ai_hus"]["market_context"]["market_code"] == "YEM"
+    assert runtime["ai_hus"]["governance"]["ai_proposes_not_authorizes"] is True
+    assert runtime["ai_hus"]["governance"]["hus_uses_domain_contracts"] is True
     capability_context = {item["code"]: item for item in runtime["capabilities"]}
     assert capability_context["yem_money_presentation_runtime"]["configuration"] == {"show_unit": True}
     assert capability_context["yem_delivery_modes"]["configuration"]["modes"] == ["pickup", "local_delivery", "inter_city_delivery"]
