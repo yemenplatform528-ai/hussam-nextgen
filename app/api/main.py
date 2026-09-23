@@ -9,7 +9,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from app.domains.registry import DOMAINS
-from app.api.routes import ai_foundation, inventory, commerce, procurement, payments, documents, finance, logistics, workflow, session, dashboard, operations, retail, ai_hus, marketplace, marketplace_growth, marketplace_completion, oidc, carriers, ai_commerce, ai_agents, ai_product
+from app.api.routes import ai_foundation, inventory, commerce, procurement, payments, documents, finance, logistics, workflow, session, dashboard, operations, retail, ai_hus, marketplace, marketplace_growth, marketplace_completion, oidc, carriers, ai_commerce, ai_agents, ai_product, developer_platform
 
 VERSION="1.0.0"
 configure_logging()
