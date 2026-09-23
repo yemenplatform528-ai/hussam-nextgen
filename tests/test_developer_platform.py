@@ -5,7 +5,7 @@ from sqlalchemy.orm import sessionmaker
 from app.api.routes.developer_platform import validate_manifest
 from app.core.models.core import Tenant, User, TenantMembership
 from app.core.models.developer_platform import DeveloperExtension, DeveloperExtensionVersion
-from app.core.models.market import MarketContext
+from app.core.models.market import MarketContext, MarketCoverage, MarketCurrency, MarketGeography, MarketMoneyUnit
 from app.core.models.yemen_capability import MarketCapabilityActivation, PlatformCapability
 from app.core.persistence import Base
 
@@ -195,6 +195,55 @@ def test_capability_service_reads_market_activation_state():
     activation.status = "suspended"
     db.commit()
     assert service.is_active_for_market(market, "yem_connectivity_policy") is False
+
+def test_market_context_service_composes_governed_runtime_context():
+    from app.core.services.market_context import MarketContextService
+
+    e = create_engine("sqlite+pysqlite:///:memory:", future=True)
+    Base.metadata.create_all(e)
+    db = sessionmaker(e, expire_on_commit=False)()
+
+    market = MarketContext(
+        id=50, code="YEM", country_code="YE", name="Yemen", locale="ar-YE",
+        timezone="Asia/Aden", default_currency="YER",
+        status="active", configuration_json='{"buyer_ui":"ar"}',
+    )
+    geography = MarketGeography(
+        id=501, market_id=50, code="YE-TA", level="governorate",
+        name="Taiz", name_ar="تعز", status="active",
+    )
+    currency = MarketCurrency(
+        id=502, market_id=50, currency="YER", is_default=True,
+        cash_supported=True, electronic_supported=True,
+    )
+    money_unit = MarketMoneyUnit(
+        id=503, market_id=50, code="YER_CURRENT", currency="YER",
+        variant="current", name="Yemeni rial", name_ar="ريال يمني",
+        status="active", metadata_json='{"display":"rial"}',
+    )
+    capability = PlatformCapability(
+        id="yem_money_presentation_runtime", code="yem_money_presentation_runtime",
+        category="money", name="Runtime money presentation",
+        market_scope=["YEM"], config_schema={}, status="active",
+    )
+    db.add_all([market, geography, currency, money_unit, capability])
+    db.flush()
+    db.add(MarketCoverage(
+        id=504, market_id=50, geography_id=501, status="available",
+    ))
+    db.add(MarketCapabilityActivation(
+        id="activation-50", market_id=50, capability_id=capability.id,
+        status="active", configuration={"show_unit": True},
+    ))
+    db.commit()
+
+    runtime = MarketContextService(db).runtime_context(market)
+    assert runtime["market"]["code"] == "YEM"
+    assert runtime["money"]["currencies"][0]["currency"] == "YER"
+    assert runtime["money"]["money_units"][0]["code"] == "YER_CURRENT"
+    assert runtime["geography"]["coverage"][0]["code"] == "YE-TA"
+    assert runtime["capabilities"][0]["configuration"] == {"show_unit": True}
+
 
 def test_capability_service_returns_active_configuration_only():
     from app.core.services.capabilities import CapabilityService
