@@ -96,3 +96,16 @@ The project is not production-ready until all applicable external gates have rea
 - Added executable coverage for pickup/local/inter-city delivery modes and offline-draft/idempotent-mutation/pending-state policy metadata.
 - Latest implementation commit: `d083a58f58daafb2612abb970332ae8b7851d7d9`; latest test commit: `67d5916f917fc29a8ad49f0c04161ae93cf5327e`.
 - CI for `da4db46d56de1c5780123e69e75631c49dcbedb4` was observed queued; the latest `67d5916f917fc29a8ad49f0c04161ae93cf5327e` workflow runs had not yet appeared when this checkpoint was written. No green claim is made until runs are observed.
+
+
+## 2026-09-24 Full-System Runtime Context — Documents / Notifications / AI-HUS
+
+- Extended MarketContextService without creating parallel engines.
+- Documents now receive governed market configuration plus the existing immutable/versioned business-document lifecycle metadata.
+- Notifications now receive governed market channel configuration while remaining tenant-scoped and owned by the existing notification domain.
+- AI/HUS now receive a reusable Yemen market context envelope (market, country, locale, timezone, default currency) plus governed policy metadata; this does not grant AI execution authority and does not replace HUS/domain contracts.
+- Added executable coverage for Arabic-first document configuration, SMS/WhatsApp/in-app channel configuration, and Yemen AI/HUS context/governance metadata.
+- Implementation commit: `fda59b421942ba57086a42f4ff322d7597d8b33e`.
+- Test commit: `f5a923642e229ca9258eaa0d6433355f5de1c5b8`.
+- GitHub workflow evidence for `bdb21ddebb74e8c0950b741cd872621ce44a2c05` is currently empty through the connected workflow-run query; therefore no green CI claim is made for this branch yet.
+- Next controlled slice: expose this runtime context through deterministic client-facing response contracts, then verify CI before considering promotion toward `main`.
