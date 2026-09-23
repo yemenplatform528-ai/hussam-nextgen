@@ -7,7 +7,7 @@ This document is the execution-control companion to the canonical engineering ba
 ### Current source of truth
 - Repository: `yemenplatform528-ai/hussam-nextgen`
 - Default branch: `main`
-- Current `main`: `71e1a1e6f28395e73c5a51d8d02ecb47455d0f26`
+- Current `main`: `8491053e924b7b6743084c2e9661c14798d27821`
 - Canonical engineering baseline remains: `473cb7785bf2853e884a3ed28ea17f18d5085efa`
 - The certification-control delta remains limited to deployment/CI configuration, dependency/security maintenance, PostgreSQL migration hardening, and external verification workflow.
 - Marketplace, AI, HUS, and sovereign-core business behavior remain protected by the certification boundary.
@@ -71,7 +71,7 @@ Core engineering CI remains the repository quality gate. External runtime/readin
 6. Execute G01 against a real OIDC provider.
 7. Close G02 and then execute G03–G10 with artifact-backed evidence, allowing preparation in parallel where it does not weaken gate order.
 8. Final release/audit lock.
-9. Continue BUILD Phase 1 preparation now as additive work; keep G01–G10 certification as a separate external release-control boundary. Yemenization work may be built, tested and documented without falsely closing certification.
+9. Continue BUILD Phase 1 preparation now as additive work; keep G01–G10 certification as a separate external release-control boundary. Yemenization and Developer Platform work may be built/tested without falsely closing certification.
 
 ### Yemenization boundary
 Yemenization is now an active cross-system BUILD track. It must make the existing Sovereign Core, Shared Engines, Marketplace, AI and HUS operate naturally in Yemen without creating a Yemen-only fork. Certification remains a separate release-control boundary.
@@ -94,7 +94,7 @@ Prefer free capabilities. No paid subscription, trial, credit purchase, or paid 
 
 ### Current execution position
 - Yemenization BUILD track: ACTIVE PREPARATION — cross-system, not marketplace-only.
-- Developer Platform: PRODUCT CONTRACT DEFINED — implementation to proceed additively over HUS/AI/shared capability contracts.
+- Developer Platform: FOUNDATION IMPLEMENTED — extension models, versioning, audit and API surface added additively over HUS/AI/shared capability contracts; runtime tests/CI evidence still required.
 - Engineering CI: latest independently verified SUCCESS is run `35920819845`; current head is documentation/research-only and its new run result is not independently exposed through the connected GitHub workflow view.
 - Public runtime smoke: GREEN.
 - FastAPI Cloud staging: ACTIVE.
