@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from app.api.dependencies import get_context, get_session
+from app.core.models.yemen_capability import PlatformCapability
 from app.core.models.developer_platform import (
     DeveloperExtension,
     DeveloperExtensionVersion,
@@ -34,7 +35,7 @@ def developer_guard(ctx):
     if ctx.role not in {"owner", "admin"}:
         raise HTTPException(status_code=403, detail="developer platform requires owner or admin role")
 
-def validate_manifest(extension: DeveloperExtension, manifest: dict):
+def validate_manifest(extension: DeveloperExtension, manifest: dict, registered_codes: set[str] | None = None):
     unknown = sorted(set(manifest) - ALLOWED_MANIFEST_KEYS)
     if unknown:
         raise HTTPException(status_code=400, detail={"unknown_manifest_keys": unknown})
@@ -57,6 +58,12 @@ def validate_manifest(extension: DeveloperExtension, manifest: dict):
     if extension.market_scope and not set(market_scope).issubset(set(extension.market_scope)):
         raise HTTPException(status_code=400, detail="manifest market scope exceeds extension declaration")
 
+    if registered_codes is not None:
+        declared_yemen = {x for x in capabilities if x.startswith("yem_")}
+        unknown_yemen = sorted(declared_yemen - registered_codes)
+        if unknown_yemen:
+            raise HTTPException(status_code=400, detail={"unregistered_yemen_capabilities": unknown_yemen})
+
     hus_source = manifest.get("hus_source")
     if hus_source is not None and not isinstance(hus_source, str):
         raise HTTPException(status_code=400, detail="hus_source must be text when provided")
@@ -77,6 +84,12 @@ class VersionIn(BaseModel):
     compatibility: dict = Field(default_factory=dict)
     test_status: str = "pending"
     rollback_version: str | None = None
+
+@router.get("/capabilities")
+def list_capabilities(ctx=Depends(get_context), db=Depends(get_session)):
+    developer_guard(ctx)
+    rows = db.scalars(select(PlatformCapability).where(PlatformCapability.status == "active").order_by(PlatformCapability.category, PlatformCapability.code)).all()
+    return {"items": [{"code": x.code, "category": x.category, "name": x.name, "description": x.description, "market_scope": x.market_scope, "config_schema": x.config_schema} for x in rows]}
 
 @router.get("/extensions")
 def list_extensions(ctx=Depends(get_context), db=Depends(get_session)):
@@ -150,7 +163,8 @@ def create_version(extension_id: str, body: VersionIn, ctx=Depends(get_context),
         raise HTTPException(status_code=404, detail="extension not found")
     if body.test_status not in ALLOWED_TEST_STATUS:
         raise HTTPException(status_code=400, detail="invalid test_status")
-    validate_manifest(x, body.manifest)
+    registered = set(db.scalars(select(PlatformCapability.code).where(PlatformCapability.status == "active")).all())
+    validate_manifest(x, body.manifest, registered_codes=registered)
 
     existing = db.scalar(
         select(DeveloperExtensionVersion).where(
