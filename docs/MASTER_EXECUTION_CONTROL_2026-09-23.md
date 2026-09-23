@@ -7,7 +7,7 @@ This document is the execution-control companion to the canonical engineering ba
 ### Current source of truth
 - Repository: `yemenplatform528-ai/hussam-nextgen`
 - Default branch: `main`
-- Current `main`: `4b231f93bbb295b4745d08438f17f5899105ca4c`
+- Current `main`: `67d5916f917fc29a8ad49f0c04161ae93cf5327e`
 - Canonical engineering baseline remains: `473cb7785bf2853e884a3ed28ea17f18d5085efa`
 - Certification-control delta remains separate from additive Yemenization/Developer Platform BUILD work.
 - Marketplace, AI, HUS, finance and sovereign-core business behavior remain protected; Yemenization is implemented as governed compatibility/configuration layers rather than a parallel core.
@@ -85,3 +85,14 @@ The project is not production-ready until all applicable external gates have rea
 - Baseline audit and compileall remained clean; 370 tests passed and 1 failed.
 - Corrected the fixture in `c07e107db0b63da479d4df7a781f19f429497b23`.
 - The failure was test-only and did not indicate a production-domain defect.
+
+
+## 2026-09-24 Governed Delivery + Connectivity Context Checkpoint
+
+- The latest CI correction exposed a second fixture issue: the market-geography integrity contract requires every non-country geography node to have a parent. The test fixture now creates a Yemen country node and makes Taiz governorate a child of it.
+- Correction commit: `da4db46d56de1c5780123e69e75631c49dcbedb4`.
+- Added governed delivery and connectivity runtime sections to MarketContextService using existing capability activations only; no duplicate logistics or connectivity engine was introduced.
+- Delivery configuration is sourced from active `yem_delivery_modes`; connectivity policy is sourced from active `yem_connectivity_policy`. Suspended or absent capabilities produce an empty configuration rather than silently enabling behavior.
+- Added executable coverage for pickup/local/inter-city delivery modes and offline-draft/idempotent-mutation/pending-state policy metadata.
+- Latest implementation commit: `d083a58f58daafb2612abb970332ae8b7851d7d9`; latest test commit: `67d5916f917fc29a8ad49f0c04161ae93cf5327e`.
+- CI for `da4db46d56de1c5780123e69e75631c49dcbedb4` was observed queued; the latest `67d5916f917fc29a8ad49f0c04161ae93cf5327e` workflow runs had not yet appeared when this checkpoint was written. No green claim is made until runs are observed.
