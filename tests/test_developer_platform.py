@@ -160,3 +160,38 @@ def test_capability_service_validates_registration_and_market_scope():
     capability.market_scope = ["SA"]
     with pytest.raises(ValueError, match="not scoped"):
         service.validate_market_scope(market, capability)
+
+
+def test_capability_service_reads_market_activation_state():
+    from app.core.services.capabilities import CapabilityService
+
+    e = create_engine("sqlite+pysqlite:///:memory:", future=True)
+    Base.metadata.create_all(e)
+    db = sessionmaker(e, expire_on_commit=False)()
+    market = MarketContext(
+        id=30, code="YEM", country_code="YE", name="Yemen", locale="ar-YE",
+        timezone="Asia/Aden", default_currency="YER", status="active",
+    )
+    capability = PlatformCapability(
+        id="yem_connectivity_policy", code="yem_connectivity_policy",
+        category="connectivity", name="Yemen connectivity policy",
+        market_scope=["YEM"], config_schema={}, status="active",
+    )
+    db.add_all([market, capability])
+    db.flush()
+    db.add(MarketCapabilityActivation(
+        id="activation-30", market_id=30, capability_id="yem_connectivity_policy",
+        status="active", configuration={"offline_safe": True},
+    ))
+    db.commit()
+
+    service = CapabilityService(db)
+    assert service.is_active_for_market(market, "yem_connectivity_policy") is True
+    rows = service.list_market_activations(market)
+    assert len(rows) == 1
+    assert rows[0][1].code == "yem_connectivity_policy"
+
+    activation = rows[0][0]
+    activation.status = "suspended"
+    db.commit()
+    assert service.is_active_for_market(market, "yem_connectivity_policy") is False
