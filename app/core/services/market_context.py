@@ -76,6 +76,10 @@ class MarketContextService:
             .order_by(MarketGeography.level, MarketGeography.code)
         ).all()
         activations = self.capabilities.list_market_activations(market)
+        activation_by_code = {
+            capability.code: activation
+            for activation, capability in activations
+        }
 
         return {
             "market": {
@@ -132,6 +136,22 @@ class MarketContextService:
                     }
                     for coverage_row, geography in coverage
                 ],
+            },
+            "delivery": {
+                "configuration": (
+                    activation_by_code["yem_delivery_modes"].configuration
+                    if "yem_delivery_modes" in activation_by_code
+                    and activation_by_code["yem_delivery_modes"].status == "active"
+                    else {}
+                ),
+            },
+            "connectivity": {
+                "configuration": (
+                    activation_by_code["yem_connectivity_policy"].configuration
+                    if "yem_connectivity_policy" in activation_by_code
+                    and activation_by_code["yem_connectivity_policy"].status == "active"
+                    else {}
+                ),
             },
             "capabilities": [
                 {
