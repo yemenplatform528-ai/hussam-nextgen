@@ -7,7 +7,7 @@ This document is the execution-control companion to the canonical engineering ba
 ### Current source of truth
 - Repository: `yemenplatform528-ai/hussam-nextgen`
 - Default branch: `main`
-- Current `main`: `24e920917be944e3a9bc4b37d5010c41c4c147ce`
+- Current `main`: `53c278662c9dc1dfcdef59f5bf24154225ee7078`
 - Canonical engineering baseline remains: `473cb7785bf2853e884a3ed28ea17f18d5085efa`
 - Certification-control delta remains separate from additive Yemenization/Developer Platform BUILD work.
 - Marketplace, AI, HUS, finance and sovereign-core business behavior remain protected; Yemenization is implemented as governed compatibility/configuration layers rather than a parallel core.
@@ -34,8 +34,8 @@ Current implemented control-plane sequence:
 1. Developer Platform extension lifecycle and rollback.
 2. Governed Yemen capability registry.
 3. Migration chain repaired so the repository has one Alembic head.
-4. Next: capability service/market activation bridge.
-5. Then: wire activated capabilities into existing money, geography, payments, logistics, connectivity, documents, notifications, AI/HUS and UI response boundaries without duplicating authoritative engines.
+4. Capability service/market activation bridge is now implemented and covered by service tests.
+5. Next: wire activated capabilities into existing money, geography, payments, logistics, connectivity, documents, notifications, AI/HUS and UI response boundaries without duplicating authoritative engines.
 6. Keep G01–G10 certification independent.
 
 ### Free-first constraint
@@ -47,9 +47,9 @@ The project is not production-ready until all applicable external gates have rea
 
 ## 2026-09-24 Capability Service Layer Checkpoint
 
-- Current main head advanced through the governed capability service extraction.
-- Added `app/core/services/capabilities.py` as the application boundary for capability discovery, registration validation, and market-scope invariants.
-- Developer Platform capability routes now delegate active capability discovery and market-scope checks to the service layer; domain systems remain authoritative.
-- Added service-level tests for registration and market-scope invariants.
-- Current head at this checkpoint: `cabdcbba8dc4294c3949b2f97d8fd1ed507c369d`.
-- CI for the immediately preceding route refactor commit was queued at observation time; no green claim is made until the latest commit's workflow completes.
+- Added `app/core/services/capabilities.py` as the application boundary for capability discovery, registration validation, market-scope invariants, market activation lookup, and active-for-market checks.
+- Developer Platform market-capability listing now delegates activation queries to the service layer; the activation endpoint already delegates capability discovery and scope validation to the same service.
+- Added service-level coverage for registration, market scope, activation state, and market activation listing.
+- The migration fix at `5f67986a456d106d82dde23952fe7e6e92138455` made `0032_market_capability_activation` idempotent after CI observed the activation table already present during migration.
+- Subsequent implementation commits: `1be87feca44662e1dafe60e363a056bb343e7e9b`, `1d67cdbdff3bd01a76adf2c471921524bb303125`, `53c278662c9dc1dfcdef59f5bf24154225ee7078`.
+- The latest commit is intentionally treated as unverified until its GitHub Actions result is observed; no green CI claim is made here.
