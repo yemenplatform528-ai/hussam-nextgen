@@ -23,6 +23,7 @@ import app.core.models.marketplace
 import app.core.models.catalog
 import app.core.models.marketplace_growth
 import app.core.models.market
+import app.core.models.developer_platform
 
 config = context.config
 if config.config_file_name:
