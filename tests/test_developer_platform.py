@@ -361,3 +361,50 @@ def test_capability_service_returns_active_configuration_only():
     activation.status = "suspended"
     db.commit()
     assert service.active_configuration(market, capability.code) == {}
+
+def test_developer_version_requires_real_test_evidence_when_marked_passed():
+    e = create_engine("sqlite+pysqlite:///:memory:", future=True)
+    Base.metadata.create_all(e)
+    db = sessionmaker(e, expire_on_commit=False)()
+    db.add(Tenant(id=2, name="Evidence", status="active"))
+    db.add(DeveloperExtension(
+        id="evidence-ext", tenant_id=2, code="evidence.module", name="Evidence",
+        created_by="u1",
+    ))
+    db.flush()
+    invalid = DeveloperExtensionVersion(
+        id="evidence-v1", extension_id="evidence-ext", version="1.0.0",
+        source_hash="b" * 64, test_status="passed", created_by="u1",
+    )
+    db.add(invalid)
+    with pytest.raises(Exception):
+        db.commit()
+    db.rollback()
+
+def test_developer_version_can_record_immutable_test_evidence():
+    e = create_engine("sqlite+pysqlite:///:memory:", future=True)
+    Base.metadata.create_all(e)
+    db = sessionmaker(e, expire_on_commit=False)()
+    db.add(Tenant(id=3, name="Evidence", status="active"))
+    db.add(DeveloperExtension(
+        id="evidence-ext-2", tenant_id=3, code="evidence.module", name="Evidence",
+        created_by="u1",
+    ))
+    db.flush()
+    version = DeveloperExtensionVersion(
+        id="evidence-v2", extension_id="evidence-ext-2", version="1.0.0",
+        source_hash="c" * 64, created_by="u1",
+    )
+    db.add(version)
+    db.commit()
+    version.test_status = "passed"
+    version.test_evidence_hash = "d" * 64
+    version.test_run_id = "ci-run-108"
+    from datetime import datetime, timezone
+    version.tested_at = datetime.now(timezone.utc)
+    db.commit()
+    row = db.query(DeveloperExtensionVersion).one()
+    assert row.test_status == "passed"
+    assert row.test_evidence_hash == "d" * 64
+    assert row.test_run_id == "ci-run-108"
+    assert row.tested_at is not None
