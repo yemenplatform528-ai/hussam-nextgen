@@ -47,4 +47,4 @@ jobs:
           git -C /tmp/canonical remote add github "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
           git -C /tmp/canonical fetch github main
           test "$(git -C /tmp/canonical rev-parse github/main)" = '7f988306ee64aab714960a24b6d4ecdcdc54b152'
-          git -C /tmp/canonical push github '473cb7785bf2853e884a3ed28ea17f18d5085efa:refs/heads/main'
+          git -C /tmp/canonical push --force-with-lease=refs/heads/main:7f988306ee64aab714960a24b6d4ecdcdc54b152 github '473cb7785bf2853e884a3ed28ea17f18d5085efa:refs/heads/main'
