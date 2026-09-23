@@ -77,7 +77,10 @@ jobs:
       - name: PostgreSQL schema drift
         env:
           DATABASE_URL: postgresql+psycopg://hussam:ci-pass@127.0.0.1:5432/hussam
-        run: alembic check
+        run: |
+          alembic current
+          alembic heads
+          alembic check
       - name: PostgreSQL integration tests
         env:
           DATABASE_URL: postgresql+psycopg://hussam:ci-pass@127.0.0.1:5432/hussam
