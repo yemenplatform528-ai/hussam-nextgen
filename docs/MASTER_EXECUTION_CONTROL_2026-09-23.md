@@ -7,7 +7,7 @@ This document is the execution-control companion to the canonical engineering ba
 ### Current source of truth
 - Repository: `yemenplatform528-ai/hussam-nextgen`
 - Default branch: `main`
-- Current `main`: `53c278662c9dc1dfcdef59f5bf24154225ee7078`
+- Current `main`: `e82d8364c4452d42d78cc488f3fa5b99ba8e8a16`
 - Canonical engineering baseline remains: `473cb7785bf2853e884a3ed28ea17f18d5085efa`
 - Certification-control delta remains separate from additive Yemenization/Developer Platform BUILD work.
 - Marketplace, AI, HUS, finance and sovereign-core business behavior remain protected; Yemenization is implemented as governed compatibility/configuration layers rather than a parallel core.
@@ -52,4 +52,20 @@ The project is not production-ready until all applicable external gates have rea
 - Added service-level coverage for registration, market scope, activation state, and market activation listing.
 - The migration fix at `5f67986a456d106d82dde23952fe7e6e92138455` made `0032_market_capability_activation` idempotent after CI observed the activation table already present during migration.
 - Subsequent implementation commits: `1be87feca44662e1dafe60e363a056bb343e7e9b`, `1d67cdbdff3bd01a76adf2c471921524bb303125`, `53c278662c9dc1dfcdef59f5bf24154225ee7078`.
-- The latest commit is intentionally treated as unverified until its GitHub Actions result is observed; no green CI claim is made here.
+- CI for `fbcd93224e981c4a965fdc4ef56a715ba61c3dba` is verified green: repository CI run `35929150853`, External Runtime Smoke `35929150800`, and External Readiness Certification `35929150899` all completed successfully.
+- The runtime-context commits after that verified checkpoint are `706baaae51f8cae6acaa8be8b6a52d37cd4aaa46`, `e41ef77f1fa48044711928551e6dc527b3010c6d`, `92d26d7c51fd622288f6bfb80a39ac3176d845af`, and `e82d8364c4452d42d78cc488f3fa5b99ba8e8a16`; their workflow results remain to be observed.
+
+
+## 2026-09-24 Market Runtime Context Checkpoint
+
+- Added `MarketContextService` as the composition boundary for one governed market runtime context.
+- The runtime context now composes existing authoritative data for:
+  - market identity and configuration;
+  - market currencies and cash/electronic support;
+  - active market money units;
+  - operational geography coverage;
+  - active governed Yemen capability configurations.
+- Extended `GET /api/v1/developer/market-context/{market_code}` to use this service instead of assembling capability-only data inside the route.
+- Added persistence coverage for the complete runtime-context composition.
+- No new financial engine, FX engine, geography engine, payment provider, or logistics engine was introduced.
+- This is the first concrete wiring layer from the capability control plane into existing market/money/geography boundaries.
