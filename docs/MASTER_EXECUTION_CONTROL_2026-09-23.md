@@ -7,14 +7,14 @@ This document is the execution-control companion to the canonical engineering ba
 ### Current source of truth
 - Repository: `yemenplatform528-ai/hussam-nextgen`
 - Default branch: `main`
-- Current `main`: `42e6f634116701f26963bc117cba5e29aaaf9311`
+- Current `main`: `176692eae7125ff4d2199b5ccb60c07523731f7e`
 - Canonical engineering baseline remains: `473cb7785bf2853e884a3ed28ea17f18d5085efa`
 - The certification-control delta remains limited to deployment/CI configuration, dependency/security maintenance, PostgreSQL migration hardening, and external verification workflow.
 - Marketplace, AI, HUS, and sovereign-core business behavior remain protected by the certification boundary.
 
 ### Verified engineering boundary
 Latest verified engineering CI:
-- Run: `35920162975`
+- Run: `35920819845`
 - Conclusion: SUCCESS
 - Baseline job: SUCCESS
 - PostgreSQL integration job: SUCCESS
@@ -22,7 +22,7 @@ Latest verified engineering CI:
 - The run covered locked dependency installation, package installation, repository audit, compileall, tests, fresh SQLite migration, Alembic drift, release manifest, dependency consistency, dependency vulnerability audit, PostgreSQL migration/schema/integration, Docker build, and HIGH/CRITICAL container scan.
 
 Latest public runtime smoke:
-- Run: `35920162985`
+- Run: `35920819812`
 - Conclusion: SUCCESS
 - Verified public staging endpoints: `/health`, `/openapi.json`, `/docs`
 - This proves public runtime smoke only; it does not prove database-backed readiness or production readiness.
@@ -31,7 +31,7 @@ Latest public runtime smoke:
 - FastAPI Cloud staging: `https://hussam-nextgen.fastapicloud.dev/`
 - Neon staging resource: `hussam-nextgen-staging` — user-confirmed attached to the FastAPI Cloud app.
 - Repository-owned readiness workflow: `.github/workflows/external-readiness.yml`
-- Latest readiness workflow: `35920163005`
+- Latest readiness workflow: `35920819802`
 - The workflow completed and uploaded sanitized evidence, but the public `/ready` probe was blocked by Cloudflare Error 1010 / browser-signature access control.
 - This is an external access-control result, not evidence that PostgreSQL is unavailable.
 - Cloudflare documents Error 1010 as an owner-configured browser-signature block and directs the site owner to adjust the relevant security setting. No bypass/spoofing is permitted in this certification process.
@@ -63,7 +63,7 @@ No gate may be promoted by mocks, screenshots alone, local tests, generated evid
 Core engineering CI remains the repository quality gate. External runtime/readiness workflows remain separate so external hosting failures cannot be misclassified as source regressions.
 
 ### Execution order
-1. Engineering CI — CLOSED/GREEN for `42e6f634116701f26963bc117cba5e29aaaf9311`.
+1. Engineering CI — CLOSED/GREEN for `176692eae7125ff4d2199b5ccb60c07523731f7e` (documentation-only synchronization commit; application behavior unchanged).
 2. Public runtime smoke — CLOSED/GREEN for the current staging deployment.
 3. Real Neon staging attachment — user-confirmed; platform evidence still required.
 4. Database-backed `/ready` — NEXT EXTERNAL GATE; currently blocked by Cloudflare 1010 access control.
