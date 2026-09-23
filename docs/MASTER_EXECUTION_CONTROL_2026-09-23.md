@@ -7,7 +7,7 @@ This document is the execution-control companion to the canonical engineering ba
 ### Current source of truth
 - Repository: `yemenplatform528-ai/hussam-nextgen`
 - Default branch: `main`
-- Current `main`: `2b015294332406d2b82180d215ec75f001c57f92` — browser E2E cold-start timeout adjustment only.
+- Current `main`: `afd1928965e9d06f839e4cbd79810e1d456f40b0` — merge of PR #9 adding external runtime smoke certification.
 - Canonical engineering baseline remains: `473cb7785bf2853e884a3ed28ea17f18d5085efa`
 - Current delta remains limited to deployment configuration, CI/dependency/security maintenance, PostgreSQL migration hardening, and browser-test reliability.
 - No Marketplace, AI, HUS, or external-gate business behavior was intentionally changed.
@@ -24,7 +24,7 @@ The repository's latest recorded engineering verification states:
 - migration verification through 0028: PASS
 - 361/361 tests executed successfully in bounded partitions
 - external certification remains pending
-- CI run `35916704955` for current `main` completed with all three jobs successful: baseline, PostgreSQL integration, and container-security.
+- CI run `35917953266` for current `main` completed successfully with all three jobs: baseline, PostgreSQL integration, and container-security.
 - The PostgreSQL migration gate exposed and closed two real blockers: long Alembic revision IDs on PostgreSQL and a non-idempotent shipping constraint migration.
 
 These repository gates are verified; external certification is still separate.
@@ -33,8 +33,8 @@ These repository gates are verified; external certification is still separate.
 - FastAPI Cloud staging app: `https://hussam-nextgen.fastapicloud.dev/`
 - The app was provisionally marked Live/Ready by FastAPI Cloud for deployment `6f4fe32f-7027-4380-bd98-f825744ee60d`, commit `80af87f70127872ef6fcfe730b2e6c015bfb722b`.
 - Direct runtime access from this execution environment is unavailable, so that dashboard state is not being treated as endpoint-level evidence.
-- A repository-owned external smoke workflow is now part of the certification path. It verifies `/health`, `/openapi.json`, and `/docs` from a GitHub-hosted runner after every `main` push and can also be dispatched manually.
-- `/ready` is intentionally not part of the public smoke success criterion until a real PostgreSQL staging database is attached. In staging, deep readiness must be backed by a reachable PostgreSQL database.
+- A repository-owned external smoke workflow is now part of the certification path. Run `35917953300` completed successfully on GitHub-hosted infrastructure and verified `/health`, `/openapi.json`, and `/docs` against the public staging host.
+- `/ready` is intentionally not part of the public smoke success criterion. It must now be verified separately against the real PostgreSQL staging resource that the user confirmed attached. Deep readiness must be backed by a reachable PostgreSQL database and the expected Alembic state.
 - No deployment platform is considered production-active until database-backed runtime evidence exists.
 
 ### External gate register
@@ -53,10 +53,10 @@ No gate may be promoted by configuration, mocks, screenshots alone, local tests,
 
 ### Infrastructure decision
 - `render.yaml` remains the free Docker fallback and defines `/ready` as the health check.
-- Render signup remains blocked by its CAPTCHA surface.
-- FastAPI Cloud remains the first staging candidate because it supports GitHub-triggered deployments and environment secrets. Its documentation confirms that only default-branch pushes trigger GitHub deployments and that secrets can be stored encrypted. 
+- Render signup remains blocked by its CAPTCHA surface and is not being pursued while FastAPI Cloud staging is viable.
+- FastAPI Cloud remains the active staging surface because the deployed public runtime smoke is green and the Neon staging resource has now been attached by the user. Its documentation confirms that only default-branch pushes trigger GitHub deployments and that secrets can be stored encrypted. 
 - The application intentionally reports `/ready` as not ready until `DATABASE_URL` exists and, in staging, until PostgreSQL is reachable. This is fail-closed behavior.
-- The next required external action is therefore database attachment, not another application-code rewrite.
+- The user has confirmed that the FastAPI Cloud Neon integration now has the `hussam-nextgen-staging` resource attached. The next required external verification is therefore database-backed readiness (`/ready`), not another application-code rewrite.
 
 ### GitHub CI decision
 The required repository CI remains:
@@ -86,9 +86,9 @@ The new external runtime smoke workflow is intentionally separate from the core 
 | Local/Codespace | Real git push previously verified | Fallback execution surface, not the canonical control plane |
 
 ### Execution order
-1. Verify FastAPI Cloud public runtime through the new GitHub-hosted smoke workflow.
-2. Attach a real PostgreSQL staging database and configure `DATABASE_URL` as a FastAPI Cloud secret.
-3. Verify `/ready` against that database and record evidence.
+1. Verify FastAPI Cloud public runtime through the successful GitHub-hosted smoke workflow. **CLOSED for the current staging deployment.**
+2. Attach a real PostgreSQL staging database and configure `DATABASE_URL` as a FastAPI Cloud secret. **User-confirmed completed; platform-side evidence still to be captured.**
+3. Verify `/ready` against that database and record evidence. **NEXT GATE.**
 4. Establish/verify HTTPS callback behavior.
 5. Execute G01 against a real OIDC provider.
 6. Produce artifact-backed evidence for G02–G10 in order.
@@ -109,6 +109,14 @@ The Yemen layer will be implemented as explicit market configuration/adapters fo
 
 ### Free-first constraint
 No paid subscription, trial, credit purchase, or paid infrastructure is required as a prerequisite for the next engineering step. Free options are preferred, and trial activation is avoided unless a concrete blocker cannot be solved otherwise.
+
+### Current execution position
+- Engineering CI: GREEN on `afd1928965e9d06f839e4cbd79810e1d456f40b0`.
+- External public runtime smoke: GREEN (`35917953300`).
+- FastAPI Cloud staging: deployed and publicly reachable for the smoke endpoints.
+- Neon staging attachment: user-confirmed; do not expose or copy `DATABASE_URL` into chat or repository.
+- `/ready` + real PostgreSQL evidence: **NEXT**.
+- G01–G10: remain pending until artifact-backed evidence exists.
 
 ### Stop conditions
 Stop and escalate to the user only when an external account, credential, human approval, or real-world contract is strictly required and cannot be executed through connected tools. Ask for one narrowly scoped action, then resume ownership of the remaining work.
