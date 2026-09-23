@@ -9,7 +9,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from app.domains.registry import DOMAINS
-from app.api.routes import ai_foundation, inventory, commerce, procurement, payments, documents, finance, logistics, workflow, session, dashboard, operations, retail, ai_hus, marketplace, marketplace_growth, marketplace_completion, oidc, carriers, ai_commerce, ai_agents, ai_product, developer_platform
+from app.api.routes import ai_foundation, inventory, commerce, procurement, payments, documents, finance, logistics, workflow, session, dashboard, operations, retail, ai_hus, marketplace, marketplace_growth, marketplace_completion, oidc, carriers, ai_commerce, ai_agents, ai_product, developer_platform, platform
 
 VERSION="1.0.0"
 configure_logging()
@@ -84,6 +84,7 @@ app.include_router(ai_commerce.router,prefix="/api/v1")
 app.include_router(ai_agents.router,prefix="/api/v1")
 app.include_router(ai_product.router,prefix="/api/v1")
 app.include_router(developer_platform.router,prefix="/api/v1")
+app.include_router(platform.router,prefix="/api/v1")
 app.include_router(marketplace.router,prefix="/api/v1")
 app.include_router(marketplace_growth.router,prefix="/api/v1")
 app.include_router(marketplace_completion.router,prefix="/api/v1")
