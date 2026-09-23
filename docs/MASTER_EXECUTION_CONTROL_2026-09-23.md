@@ -124,3 +124,12 @@ The project is not production-ready until all applicable external gates have rea
 - API registration commit: `252b9702dbe8664af8b71a830dc2d6c659e82ac4`.
 - Client contract tests commit: `001464ee72a85300b1be00294337512fb02ea32f`.
 - Next gate is CI verification on the resulting branch head before any promotion or merge decision.
+
+
+## 2026-09-24 execution checkpoint — Developer evidence hardening
+- Client market-context projection was hardened to an allow-listed contract; raw control-plane configuration and provider/internal metadata are excluded.
+- Added executable secret-boundary coverage for the client runtime context.
+- Developer Platform version creation now keeps test status server-controlled at `pending`; `passed` requires immutable test evidence fields: evidence hash, test-run identifier and timestamp.
+- Added migration `0033_developer_test_evidence` and executable persistence coverage.
+- CI run #108 for the preceding Yemen runtime-context slice completed successfully: baseline audit, compile, PostgreSQL migration/schema drift/integration and container-security all passed; the full baseline test job completed successfully in that run.
+- The latest evidence-hardening commits are on PR #22 and require a fresh CI execution before merge. No production certification claim is made.
