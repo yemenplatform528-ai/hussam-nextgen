@@ -77,3 +77,11 @@ The project is not production-ready until all applicable external gates have rea
 - Payment methods are exposed as market configuration metadata only; provider execution, payment state transitions, settlement, and ledger behavior remain owned by the existing payment/finance domains.
 - Added test coverage for a provider-free COD method in the composed market context.
 - Latest engineering commit: `4b231f93bbb295b4745d08438f17f5899105ca4c`.
+
+
+## 2026-09-24 CI Correction
+
+- CI run `35929605196` exposed one test-fixture regression: the new market payment-context test referenced `payment_method` before defining it.
+- Baseline audit and compileall remained clean; 370 tests passed and 1 failed.
+- Corrected the fixture in `c07e107db0b63da479d4df7a781f19f429497b23`.
+- The failure was test-only and did not indicate a production-domain defect.
