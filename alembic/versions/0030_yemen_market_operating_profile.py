@@ -21,7 +21,7 @@ def upgrade():
     for code,default in [('YER',True),('USD',False),('SAR',False)]:
         if bind.execute(sa.select(currencies.c.market_id).where(currencies.c.market_id==market_id,currencies.c.currency==code)).first() is None:
             bind.execute(currencies.insert().values(market_id=market_id,currency=code,is_default=default,cash_supported=True,electronic_supported=(code=='YER')))
-    methods=sa.table('payment_method_catalog',sa.column('market_id',sa.Integer),sa.column('code',sa.String),sa.column('name',sa.String),sa.column('method_type',sa.String),sa.column('requires_provider',sa.Boolean),sa.column('active',sa.Boolean))
+    methods=sa.table('payment_method_catalog',sa.column('id',sa.Integer),sa.column('market_id',sa.Integer),sa.column('code',sa.String),sa.column('name',sa.String),sa.column('method_type',sa.String),sa.column('requires_provider',sa.Boolean),sa.column('active',sa.Boolean))
     for code,name,kind,provider in [
         ('cod','Cash on Delivery','cod',False),
         ('cash_pickup','Cash at Pickup','cash',False),
