@@ -225,6 +225,10 @@ def test_market_context_service_composes_governed_runtime_context():
         variant="current", name="Yemeni rial", name_ar="ريال يمني",
         status="active", metadata_json='{"display":"rial"}',
     )
+    payment_method = PaymentMethodCatalogEntry(
+        id=505, market_id=50, code="cod", name="Cash on delivery",
+        method_type="cod", requires_provider=False, active=True,
+    )
     capability = PlatformCapability(
         id="yem_money_presentation_runtime", code="yem_money_presentation_runtime",
         category="money", name="Runtime money presentation",
