@@ -1,0 +1,18 @@
+name: Hussam NextGen External Runtime Smoke
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fastapi-cloud-runtime:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify public staging runtime
+        run: python scripts/external_runtime_smoke.py --attempts 20 --delay 15
