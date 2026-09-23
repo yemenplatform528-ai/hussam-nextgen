@@ -35,3 +35,5 @@ from .ai_product import *
 from app.core.models.market import *
 
 from app.core.models.developer_platform import *
+
+from app.core.models.yemen_capability import *
