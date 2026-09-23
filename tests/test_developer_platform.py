@@ -123,3 +123,40 @@ def test_yemen_capability_must_be_registered():
     )
     with pytest.raises(Exception, match="unregistered_yemen_capabilities"):
         validate_manifest(extension, {"capabilities": ["yem_not_registered"]}, registered_codes={"yem_delivery_modes"})
+
+
+def test_capability_service_validates_registration_and_market_scope():
+    from app.core.services.capabilities import CapabilityService
+
+    e = create_engine("sqlite+pysqlite:///:memory:", future=True)
+    Base.metadata.create_all(e)
+    db = sessionmaker(e, expire_on_commit=False)()
+    market = MarketContext(
+        id=20, code="YEM", country_code="YE", name="Yemen", locale="ar-YE",
+        timezone="Asia/Aden", default_currency="YER", status="active",
+    )
+    capability = PlatformCapability(
+        id="yem_money_presentation", code="yem_money_presentation",
+        category="money", name="Yemen money presentation",
+        market_scope=["YEM"], config_schema={}, status="active",
+    )
+    db.add_all([market, capability])
+    db.flush()
+
+    service = CapabilityService(db)
+    assert service.active_codes() == {"yem_money_presentation"}
+    assert service.get_active("yem_money_presentation").code == "yem_money_presentation"
+    service.validate_registered(["yem_money_presentation"])
+    service.validate_market_scope(market, capability)
+
+    with pytest.raises(ValueError, match="unregistered_capabilities"):
+        service.validate_registered(["yem_missing"])
+
+    market.status = "suspended"
+    with pytest.raises(ValueError, match="market must be active"):
+        service.validate_market_scope(market, capability)
+
+    market.status = "active"
+    capability.market_scope = ["SA"]
+    with pytest.raises(ValueError, match="not scoped"):
+        service.validate_market_scope(market, capability)
