@@ -1,15 +1,15 @@
-# Baseline lock snapshot used for reproducible v1.30 CI/local validation.
-# Refresh deliberately during dependency maintenance; do not edit casually.
+# Baseline lock snapshot used for reproducible CI/local validation.
+# Refresh deliberately during dependency maintenance; keep versions pinned to audited releases.
 alembic==1.18.4
-fastapi==0.128.2
+fastapi==0.141.1
 httpx==0.28.1
 pydantic==2.13.4
-pytest==9.0.2
+pytest==9.1.1
 SQLAlchemy==2.0.50
 uvicorn==0.48.0
 # psycopg[binary] is intentionally installed from pyproject in CI because the
 # binary subdependency is platform-specific.
 PyJWT==2.13.0
-cryptography==46.0.4
+cryptography==50.0.1
 
 redis==6.4.0
