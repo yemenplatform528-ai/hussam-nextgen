@@ -43,3 +43,13 @@ Prefer free capabilities. No paid subscription, trial, credit purchase, or paid 
 
 ### Release discipline
 The project is not production-ready until all applicable external gates have real evidence envelopes, artifact hashes match, rollback is prepared, and the final release/audit lock is explicitly recorded.
+
+
+## 2026-09-24 Capability Service Layer Checkpoint
+
+- Current main head advanced through the governed capability service extraction.
+- Added `app/core/services/capabilities.py` as the application boundary for capability discovery, registration validation, and market-scope invariants.
+- Developer Platform capability routes now delegate active capability discovery and market-scope checks to the service layer; domain systems remain authoritative.
+- Added service-level tests for registration and market-scope invariants.
+- Current head at this checkpoint: `cabdcbba8dc4294c3949b2f97d8fd1ed507c369d`.
+- CI for the immediately preceding route refactor commit was queued at observation time; no green claim is made until the latest commit's workflow completes.
