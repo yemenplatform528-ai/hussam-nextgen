@@ -1,0 +1,90 @@
+name: Hussam NextGen External Readiness Certification
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  readiness:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Probe public staging readiness
+        env:
+          READINESS_URL: https://hussam-nextgen.fastapicloud.dev/ready
+        run: |
+          set -eu
+          mkdir -p evidence/external-readiness
+          python - <<'PY'
+          import json
+          import os
+          import time
+          import urllib.request
+          import urllib.error
+          from datetime import datetime, timezone
+
+          url = os.environ["READINESS_URL"]
+          req = urllib.request.Request(url, headers={"Accept": "application/json"})
+          started = time.time()
+          status = None
+          body = ""
+          error = None
+          try:
+              with urllib.request.urlopen(req, timeout=30) as response:
+                  status = response.status
+                  body = response.read().decode("utf-8", errors="replace")
+          except urllib.error.HTTPError as exc:
+              status = exc.code
+              body = exc.read().decode("utf-8", errors="replace")
+          except Exception as exc:
+              error = type(exc).__name__
+
+          try:
+              payload = json.loads(body) if body else {}
+          except Exception:
+              payload = {"_non_json_response": True}
+
+          sanitized = {
+              "timestamp_utc": datetime.now(timezone.utc).isoformat(),
+              "url": url,
+              "http_status": status,
+              "elapsed_seconds": round(time.time() - started, 3),
+              "response": payload,
+              "transport_error": error,
+          }
+
+          # Never persist arbitrary response text; only the JSON object returned by /ready.
+          with open("evidence/external-readiness/readiness.json", "w", encoding="utf-8") as f:
+              json.dump(sanitized, f, indent=2, sort_keys=True)
+
+          ready = (
+              status == 200
+              and isinstance(payload, dict)
+              and payload.get("status") == "ready"
+              and payload.get("database_configured") is True
+              and payload.get("database_reachable") is True
+              and payload.get("environment") == "staging"
+          )
+
+          print(json.dumps(sanitized, indent=2, sort_keys=True))
+          if not ready:
+              raise SystemExit("External readiness certification failed or is incomplete.")
+          PY
+
+      - name: Hash sanitized readiness evidence
+        run: |
+          sha256sum evidence/external-readiness/readiness.json | tee evidence/external-readiness/SHA256SUMS.txt
+
+      - name: Upload readiness evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: external-readiness-evidence
+          path: evidence/external-readiness/
+          if-no-files-found: error
+          retention-days: 14
