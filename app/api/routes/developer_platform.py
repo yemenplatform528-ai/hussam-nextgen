@@ -3,7 +3,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from app.api.dependencies import get_context, get_session
-from app.core.models.yemen_capability import PlatformCapability
+from app.core.models.yemen_capability import MarketCapabilityActivation, PlatformCapability
+from app.core.models.market import MarketContext
 from app.core.models.developer_platform import (
     DeveloperExtension,
     DeveloperExtensionVersion,
@@ -77,6 +78,9 @@ class ExtensionIn(BaseModel):
     capabilities: list[str] = Field(default_factory=list)
     permissions: list[str] = Field(default_factory=list)
 
+class CapabilityActivationIn(BaseModel):
+    configuration: dict = Field(default_factory=dict)
+
 class VersionIn(BaseModel):
     version: str = Field(min_length=1, max_length=40)
     manifest: dict = Field(default_factory=dict)
@@ -90,6 +94,73 @@ def list_capabilities(ctx=Depends(get_context), db=Depends(get_session)):
     developer_guard(ctx)
     rows = db.scalars(select(PlatformCapability).where(PlatformCapability.status == "active").order_by(PlatformCapability.category, PlatformCapability.code)).all()
     return {"items": [{"code": x.code, "category": x.category, "name": x.name, "description": x.description, "market_scope": x.market_scope, "config_schema": x.config_schema} for x in rows]}
+
+@router.get("/market-capabilities/{market_code}")
+def list_market_capabilities(market_code: str, ctx=Depends(get_context), db=Depends(get_session)):
+    developer_guard(ctx)
+    market = db.scalar(select(MarketContext).where(MarketContext.code == market_code.upper()))
+    if not market:
+        raise HTTPException(status_code=404, detail="market not found")
+    rows = db.execute(
+        select(MarketCapabilityActivation, PlatformCapability)
+        .join(PlatformCapability, PlatformCapability.id == MarketCapabilityActivation.capability_id)
+        .where(MarketCapabilityActivation.market_id == market.id)
+        .order_by(PlatformCapability.category, PlatformCapability.code)
+    ).all()
+    return {"market": market.code, "items": [
+        {"code": capability.code, "category": capability.category, "name": capability.name,
+         "status": activation.status, "configuration": activation.configuration,
+         "market_scope": capability.market_scope}
+        for activation, capability in rows
+    ]}
+
+@router.post("/market-capabilities/{market_code}/{capability_code}/activate", status_code=201)
+def activate_market_capability(market_code: str, capability_code: str, body: CapabilityActivationIn, ctx=Depends(get_context), db=Depends(get_session)):
+    developer_guard(ctx)
+    market = db.scalar(select(MarketContext).where(MarketContext.code == market_code.upper()))
+    if not market:
+        raise HTTPException(status_code=404, detail="market not found")
+    if market.status != "active":
+        raise HTTPException(status_code=409, detail="market must be active before capability activation")
+    capability = db.scalar(select(PlatformCapability).where(PlatformCapability.code == capability_code, PlatformCapability.status == "active"))
+    if not capability:
+        raise HTTPException(status_code=404, detail="active capability not found")
+    if capability.market_scope and market.code not in set(capability.market_scope):
+        raise HTTPException(status_code=409, detail="capability is not scoped to this market")
+    activation = db.scalar(select(MarketCapabilityActivation).where(
+        MarketCapabilityActivation.market_id == market.id,
+        MarketCapabilityActivation.capability_id == capability.id,
+    ))
+    if activation:
+        activation.status = "active"
+        activation.configuration = body.configuration
+        activation.activated_by = ctx.user_id
+    else:
+        activation = MarketCapabilityActivation(
+            id=uuid4().hex,
+            market_id=market.id,
+            capability_id=capability.id,
+            status="active",
+            configuration=body.configuration,
+            activated_by=ctx.user_id,
+        )
+        db.add(activation)
+    db.commit()
+    return {"market": market.code, "capability": capability.code, "status": activation.status, "configuration": activation.configuration}
+
+@router.post("/market-capabilities/{market_code}/{capability_code}/suspend")
+def suspend_market_capability(market_code: str, capability_code: str, ctx=Depends(get_context), db=Depends(get_session)):
+    developer_guard(ctx)
+    activation = db.scalar(
+        select(MarketCapabilityActivation).join(PlatformCapability, PlatformCapability.id == MarketCapabilityActivation.capability_id).join(MarketContext, MarketContext.id == MarketCapabilityActivation.market_id).where(
+            MarketContext.code == market_code.upper(), PlatformCapability.code == capability_code
+        )
+    )
+    if not activation:
+        raise HTTPException(status_code=404, detail="market capability activation not found")
+    activation.status = "suspended"
+    db.commit()
+    return {"market": market_code.upper(), "capability": capability_code, "status": activation.status}
 
 @router.get("/extensions")
 def list_extensions(ctx=Depends(get_context), db=Depends(get_session)):
