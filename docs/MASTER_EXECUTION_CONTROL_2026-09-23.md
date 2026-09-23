@@ -7,7 +7,7 @@ This document is the execution-control companion to the canonical engineering ba
 ### Current source of truth
 - Repository: `yemenplatform528-ai/hussam-nextgen`
 - Default branch: `main`
-- Current `main`: `adaf854c59f9259f3d263373a86c6489d4d8915a`
+- Current `main`: `0dc99e6022454a3d85e4f18c3e9e6739fa0372e2`
 - Canonical engineering baseline remains: `473cb7785bf2853e884a3ed28ea17f18d5085efa`
 - The certification-control delta remains limited to deployment/CI configuration, dependency/security maintenance, PostgreSQL migration hardening, and external verification workflow.
 - Marketplace, AI, HUS, and sovereign-core business behavior remain protected by the certification boundary.
@@ -63,7 +63,7 @@ No gate may be promoted by mocks, screenshots alone, local tests, generated evid
 Core engineering CI remains the repository quality gate. External runtime/readiness workflows remain separate so external hosting failures cannot be misclassified as source regressions.
 
 ### Execution order
-1. Engineering CI — last verified GREEN baseline is the immediate ancestor; current commit `adaf854c59f9259f3d263373a86c6489d4d8915a` adds only external-readiness evidence sanitization and awaits its own CI result.
+1. Engineering CI — latest independently verified SUCCESS remains run `35920819845`; the current head is documentation/research-only after the readiness-evidence hardening and Yemenization planning additions, and its connector-visible run result is not yet independently exposed.
 2. Public runtime smoke — CLOSED/GREEN for the current staging deployment.
 3. Real Neon staging attachment — user-confirmed; platform evidence still required.
 4. Database-backed `/ready` — NEXT EXTERNAL GATE; currently blocked by Cloudflare 1010 access control.
@@ -89,7 +89,7 @@ The future Yemen layer will use explicit adapters/configuration for:
 Prefer free capabilities. No paid subscription, trial, credit purchase, or paid infrastructure is a prerequisite for the next engineering step unless a concrete external certification requirement makes it unavoidable.
 
 ### Current execution position
-- Engineering CI: inherited GREEN on the last verified application/documentation baseline; current workflow-hardening commit is awaiting its own CI result.
+- Engineering CI: latest independently verified SUCCESS is run `35920819845`; current head is documentation/research-only and its new run result is not independently exposed through the connected GitHub workflow view.
 - Public runtime smoke: GREEN.
 - FastAPI Cloud staging: ACTIVE.
 - Neon staging attachment: USER-CONFIRMED.
@@ -108,3 +108,8 @@ The project is not production-ready until all applicable external gates have rea
 - Added `docs/YEMENIZATION_PHASE1_MARKET_FINDINGS_2026-09-24.md` as a research-only market baseline.
 - It does not close any certification gate and does not authorize production implementation.
 - It records current marketplace/payment/locality signals and preserves Marketplace, AI, HUS and provider-neutral payment architecture.
+
+### Yemenization execution map
+- Added `docs/YEMENIZATION_PHASE1_EXECUTION_MAP_2026-09-24.md`.
+- Repository review confirms that the core Y2 Yemen Foundation, geography ingestion lock, market-scoped money/FX model, provider/rail registries, readiness evidence model, and provider-neutral payment boundary already exist.
+- Therefore Phase 1 does **not** require another foundation rewrite. The remaining path is controlled source admission, capability activation, localization UX, connectivity-aware behavior, and external certification evidence after the release boundary.
