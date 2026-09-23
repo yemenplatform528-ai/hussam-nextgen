@@ -123,3 +123,38 @@ The project is not production-ready until all applicable external gates have rea
 - Therefore Phase 1 does **not** require another foundation rewrite. The remaining path is controlled source admission, capability activation, localization UX, connectivity-aware behavior, and external certification evidence after the release boundary.
 
 - Yemen payment research was refreshed from current Central Bank of Yemen material on 2026-09-24; it reinforces provider-neutral capability/adapters and does not certify any provider or payment rail.
+
+
+## 2026-09-24 — Developer Platform hardening checkpoint
+
+The internal Developer Platform foundation is now treated as an executable control-plane boundary, not only documentation.
+
+Implemented on `main`:
+- developer platform models are registered in the shared model package;
+- tenant-scoped extension CRUD/versioning remains in place;
+- manifest validation now rejects undeclared capabilities, permissions, market scope, and unknown manifest surfaces;
+- source hashes are constrained to 64-character hexadecimal SHA-256 format;
+- duplicate extension versions are rejected;
+- lifecycle is guarded: test pass is required before publish, publish is required before activation;
+- activation replaces any prior active version deterministically and records the replacement;
+- explicit suspension is available;
+- rollback selects a recorded rollback target and records an audit event;
+- developer audit entries remain part of every lifecycle transition;
+- focused tests cover persistence and manifest-boundary enforcement.
+
+Current implementation commits:
+- model registration: `d5e38e2266029bcd3bc6cc05b55b7fa3d34d097e`
+- lifecycle hardening: `4f32327537c4caa1bffbcef74afed308426933ae`
+- focused tests: `52c93320a1b69f8e7766d2ad801a40b885ea4d81`
+
+Validation boundary:
+- GitHub reports no combined status yet for the latest commit at the time of this checkpoint; CI must be allowed to execute before any green-status claim.
+- Local workspace execution is not available in the current ChatGPT runtime, so no local test result is claimed here.
+- Production certification gates G01-G10 remain separate and are not closed by this BUILD work.
+
+Next execution boundary:
+1. complete developer extension sandbox/test contract;
+2. add a Yemen capability registry consumed by the Developer Platform;
+3. expose controlled configuration for geography, money presentation, payment methods, delivery/service areas, connectivity policies, Arabic/local documents and local verticals;
+4. wire those capabilities into existing authoritative engines without creating parallel commerce, finance, payment or logistics cores;
+5. continue certification evidence independently.
