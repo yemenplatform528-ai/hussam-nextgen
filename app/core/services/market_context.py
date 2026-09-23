@@ -7,6 +7,7 @@ from app.core.models.market import (
     MarketCurrency,
     MarketGeography,
     MarketMoneyUnit,
+    PaymentMethodCatalogEntry,
 )
 from app.core.services.capabilities import CapabilityService
 
@@ -52,6 +53,14 @@ class MarketContextService:
                 MarketMoneyUnit.status == "active",
             )
             .order_by(MarketMoneyUnit.code)
+        ).all()
+        payment_methods = self.db.scalars(
+            select(PaymentMethodCatalogEntry)
+            .where(
+                PaymentMethodCatalogEntry.market_id == market.id,
+                PaymentMethodCatalogEntry.active.is_(True),
+            )
+            .order_by(PaymentMethodCatalogEntry.code)
         ).all()
         coverage = self.db.execute(
             select(MarketCoverage, MarketGeography)
@@ -99,6 +108,17 @@ class MarketContextService:
                         "metadata": self._json_object(x.metadata_json),
                     }
                     for x in money_units
+                ],
+            },
+            "payments": {
+                "methods": [
+                    {
+                        "code": x.code,
+                        "name": x.name,
+                        "method_type": x.method_type,
+                        "requires_provider": x.requires_provider,
+                    }
+                    for x in payment_methods
                 ],
             },
             "geography": {
