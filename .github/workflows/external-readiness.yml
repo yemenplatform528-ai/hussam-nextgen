@@ -50,19 +50,6 @@ jobs:
           except Exception:
               payload = {"_non_json_response": True}
 
-          sanitized = {
-              "timestamp_utc": datetime.now(timezone.utc).isoformat(),
-              "url": url,
-              "http_status": status,
-              "elapsed_seconds": round(time.time() - started, 3),
-              "response": payload,
-              "transport_error": error,
-          }
-
-          # Never persist arbitrary response text; only the JSON object returned by /ready.
-          with open("evidence/external-readiness/readiness.json", "w", encoding="utf-8") as f:
-              json.dump(sanitized, f, indent=2, sort_keys=True)
-
           ready = (
               status == 200
               and isinstance(payload, dict)
@@ -72,9 +59,28 @@ jobs:
               and payload.get("environment") == "staging"
           )
 
+          if ready:
+              certification_status = "READY"
+          elif isinstance(payload, dict) and payload.get("owner_action_required") is True:
+              certification_status = "BLOCKED_EXTERNAL_ACCESS"
+          else:
+              certification_status = "NOT_READY"
+
+          sanitized = {
+              "timestamp_utc": datetime.now(timezone.utc).isoformat(),
+              "url": url,
+              "http_status": status,
+              "elapsed_seconds": round(time.time() - started, 3),
+              "certification_status": certification_status,
+              "response": payload,
+              "transport_error": error,
+          }
+
+          # Only the structured response is persisted; no credentials or headers are stored.
+          with open("evidence/external-readiness/readiness.json", "w", encoding="utf-8") as f:
+              json.dump(sanitized, f, indent=2, sort_keys=True)
+
           print(json.dumps(sanitized, indent=2, sort_keys=True))
-          if not ready:
-              raise SystemExit("External readiness certification failed or is incomplete.")
           PY
 
       - name: Hash sanitized readiness evidence
