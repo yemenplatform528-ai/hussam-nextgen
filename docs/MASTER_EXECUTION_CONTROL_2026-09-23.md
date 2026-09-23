@@ -7,7 +7,7 @@ This document is the execution-control companion to the canonical engineering ba
 ### Current source of truth
 - Repository: `yemenplatform528-ai/hussam-nextgen`
 - Default branch: `main`
-- Current main commit: `1c3991b63c779e54fe13eddf6cd9dec5559bd9aa`
+- Control record is maintained on `main`; its parent at creation was `1c3991b63c779e54fe13eddf6cd9dec5559bd9aa`.
 - Canonical engineering commit: `473cb7785bf2853e884a3ed28ea17f18d5085efa`
 - Delta from canonical: packaging/CI discovery fix only.
 - No Marketplace, AI, HUS, database, or external-gate behavior was intentionally changed by the delta.
@@ -46,7 +46,8 @@ The application is structurally prepared for Git-backed Docker deployment:
 - `render.yaml` defines a free staging web service and `/ready` health check.
 - `scripts/render_start.sh` applies migrations before starting Uvicorn.
 - Render supports GitHub-backed Docker web services, HTTPS/TLS, and a free web-service tier; its free tier is explicitly for testing/preview rather than production.
-- FastAPI Cloud currently advertises a free Hobby plan with no credit card required and GitHub-triggered deployment. It is an alternative staging path worth testing if Render account access remains blocked.
+- FastAPI Cloud currently advertises a free Hobby plan with no credit card required and GitHub-triggered deployment.
+- **Current deployment choice: FastAPI Cloud is the first staging candidate** because it avoids the current Render signup CAPTCHA blocker while remaining free-first. Render remains the fallback.
 - No deployment platform is considered active until a real deployed URL and runtime evidence exist.
 
 ### GitHub CI decision
@@ -63,21 +64,21 @@ The CI workflow is present and includes:
 10. PostgreSQL migration/schema/integration tests
 11. Docker build and HIGH/CRITICAL Trivy scan
 
-The connector currently exposes no verified green push-run result for `main`. Therefore CI status is **UNVERIFIED**, not PASS and not FAIL.
+The connected GitHub surface currently exposes no verified green push-run result for `main`. Therefore CI status is **UNVERIFIED**, not PASS and not FAIL.
 
 ### Connection capability matrix
 | Surface | Capability | Project decision |
 |---|---|---|
 | GitHub | Read/write repository, branches, commits, PRs, workflow inspection | Primary execution surface |
 | GitLab | Operational account/project/CI access | Secondary only; no migration |
-| Render | Free Git/Docker staging | Primary deployment candidate; account CAPTCHA is external |
+| Render | Free Git/Docker staging | Fallback deployment candidate; current signup CAPTCHA blocks progress |
 | Neon | PostgreSQL suitable for staging | Use only after connector/project access is actually verified |
 | Auth0 | Suitable free OIDC provider | Use for G01 only when real account/application can be created |
-| FastAPI Cloud | Free Hobby, GitHub deployment | Secondary deployment candidate if Render remains blocked |
+| FastAPI Cloud | Free Hobby, GitHub deployment | First staging candidate |
 | Local/Codespace | Real git push previously verified | Fallback execution surface, not the canonical control plane |
 
 ### Execution order
-1. Resolve the first real staging deployment without changing the application architecture.
+1. Establish FastAPI Cloud staging from `main`.
 2. Attach a real PostgreSQL staging database.
 3. Establish HTTPS.
 4. Execute G01 against a real OIDC provider.
