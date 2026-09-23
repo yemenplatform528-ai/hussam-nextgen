@@ -195,3 +195,34 @@ def test_capability_service_reads_market_activation_state():
     activation.status = "suspended"
     db.commit()
     assert service.is_active_for_market(market, "yem_connectivity_policy") is False
+
+def test_capability_service_returns_active_configuration_only():
+    from app.core.services.capabilities import CapabilityService
+
+    e = create_engine("sqlite+pysqlite:///:memory:", future=True)
+    Base.metadata.create_all(e)
+    db = sessionmaker(e, expire_on_commit=False)()
+    market = MarketContext(
+        id=40, code="YEM", country_code="YE", name="Yemen", locale="ar-YE",
+        timezone="Asia/Aden", default_currency="YER", status="active",
+    )
+    capability = PlatformCapability(
+        id="yem_money_presentation", code="yem_money_presentation",
+        category="money", name="Yemen money presentation",
+        market_scope=["YEM"], config_schema={}, status="active",
+    )
+    db.add_all([market, capability])
+    db.flush()
+    db.add(MarketCapabilityActivation(
+        id="activation-40", market_id=40, capability_id=capability.id,
+        status="active", configuration={"show_unit": True},
+    ))
+    db.commit()
+
+    service = CapabilityService(db)
+    assert service.active_configuration(market, capability.code) == {"show_unit": True}
+
+    activation = db.query(MarketCapabilityActivation).one()
+    activation.status = "suspended"
+    db.commit()
+    assert service.active_configuration(market, capability.code) == {}
