@@ -102,12 +102,7 @@ def list_market_capabilities(market_code: str, ctx=Depends(get_context), db=Depe
     market = db.scalar(select(MarketContext).where(MarketContext.code == market_code.upper()))
     if not market:
         raise HTTPException(status_code=404, detail="market not found")
-    rows = db.execute(
-        select(MarketCapabilityActivation, PlatformCapability)
-        .join(PlatformCapability, PlatformCapability.id == MarketCapabilityActivation.capability_id)
-        .where(MarketCapabilityActivation.market_id == market.id)
-        .order_by(PlatformCapability.category, PlatformCapability.code)
-    ).all()
+    rows = CapabilityService(db).list_market_activations(market)
     return {"market": market.code, "items": [
         {"code": capability.code, "category": capability.category, "name": capability.name,
          "status": activation.status, "configuration": activation.configuration,
