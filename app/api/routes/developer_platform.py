@@ -5,6 +5,7 @@ from sqlalchemy import select
 from app.api.dependencies import get_context, get_session
 from app.core.models.yemen_capability import MarketCapabilityActivation, PlatformCapability
 from app.core.models.market import MarketContext
+from app.core.services.capabilities import CapabilityService
 from app.core.models.developer_platform import (
     DeveloperExtension,
     DeveloperExtensionVersion,
@@ -92,7 +93,7 @@ class VersionIn(BaseModel):
 @router.get("/capabilities")
 def list_capabilities(ctx=Depends(get_context), db=Depends(get_session)):
     developer_guard(ctx)
-    rows = db.scalars(select(PlatformCapability).where(PlatformCapability.status == "active").order_by(PlatformCapability.category, PlatformCapability.code)).all()
+    rows = CapabilityService(db).list_active()
     return {"items": [{"code": x.code, "category": x.category, "name": x.name, "description": x.description, "market_scope": x.market_scope, "config_schema": x.config_schema} for x in rows]}
 
 @router.get("/market-capabilities/{market_code}")
@@ -122,12 +123,15 @@ def activate_market_capability(market_code: str, capability_code: str, body: Cap
         raise HTTPException(status_code=404, detail="market not found")
     if market.status != "active":
         raise HTTPException(status_code=409, detail="market must be active before capability activation")
-    capability = db.scalar(select(PlatformCapability).where(PlatformCapability.code == capability_code, PlatformCapability.status == "active"))
+    service = CapabilityService(db)
+    capability = service.get_active(capability_code)
     if not capability:
         raise HTTPException(status_code=404, detail="active capability not found")
-    if capability.market_scope and market.code not in set(capability.market_scope):
-        raise HTTPException(status_code=409, detail="capability is not scoped to this market")
-    activation = db.scalar(select(MarketCapabilityActivation).where(
+    try:
+        service.validate_market_scope(market, capability)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    activation = service.db.scalar(select(MarketCapabilityActivation).where(
         MarketCapabilityActivation.market_id == market.id,
         MarketCapabilityActivation.capability_id == capability.id,
     ))
