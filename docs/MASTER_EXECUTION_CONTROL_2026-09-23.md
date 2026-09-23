@@ -113,3 +113,5 @@ The project is not production-ready until all applicable external gates have rea
 - Added `docs/YEMENIZATION_PHASE1_EXECUTION_MAP_2026-09-24.md`.
 - Repository review confirms that the core Y2 Yemen Foundation, geography ingestion lock, market-scoped money/FX model, provider/rail registries, readiness evidence model, and provider-neutral payment boundary already exist.
 - Therefore Phase 1 does **not** require another foundation rewrite. The remaining path is controlled source admission, capability activation, localization UX, connectivity-aware behavior, and external certification evidence after the release boundary.
+
+- Yemen payment research was refreshed from current Central Bank of Yemen material on 2026-09-24; it reinforces provider-neutral capability/adapters and does not certify any provider or payment rail.
