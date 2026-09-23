@@ -92,7 +92,7 @@ jobs:
       - name: Build release container
         run: docker build -t hussam-nextgen:ci .
       - name: Scan release container
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: hussam-nextgen:ci
           format: table
