@@ -1,4 +1,5 @@
 from uuid import uuid4
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import select
@@ -90,6 +91,11 @@ class VersionIn(BaseModel):
     compatibility: dict = Field(default_factory=dict)
     test_status: str = "pending"
     rollback_version: str | None = None
+
+class TestEvidenceIn(BaseModel):
+    evidence_hash: str = Field(min_length=64, max_length=64, pattern=r"^[0-9a-fA-F]{64}$")
+    run_id: str = Field(min_length=1, max_length=120)
+    status: str = Field(default="passed", pattern=r"^(passed|failed)$")
 
 @router.get("/capabilities")
 def list_capabilities(ctx=Depends(get_context), db=Depends(get_session)):
@@ -241,8 +247,8 @@ def create_version(extension_id: str, body: VersionIn, ctx=Depends(get_context),
     )
     if not x:
         raise HTTPException(status_code=404, detail="extension not found")
-    if body.test_status not in ALLOWED_TEST_STATUS:
-        raise HTTPException(status_code=400, detail="invalid test_status")
+    if body.test_status != "pending":
+        raise HTTPException(status_code=400, detail="test_status is server-controlled; submit test evidence after an actual test run")
     registered = set(db.scalars(select(PlatformCapability.code).where(PlatformCapability.status == "active")).all())
     validate_manifest(x, body.manifest, registered_codes=registered)
 
@@ -283,6 +289,28 @@ def create_version(extension_id: str, body: VersionIn, ctx=Depends(get_context),
         "status": v.release_status,
         "source_hash": v.source_hash,
     }
+
+@router.post("/extensions/{extension_id}/versions/{version}/test-evidence")
+def record_test_evidence(extension_id: str, version: str, body: TestEvidenceIn, ctx=Depends(get_context), db=Depends(get_session)):
+    developer_guard(ctx)
+    x, v = _get_version(db, ctx.tenant_id, extension_id, version)
+    if not v:
+        raise HTTPException(status_code=404, detail="extension version not found")
+    if v.test_status == "passed" and v.test_evidence_hash:
+        raise HTTPException(status_code=409, detail="test evidence is immutable once recorded")
+    v.test_status = body.status
+    v.test_evidence_hash = body.evidence_hash.lower()
+    v.test_run_id = body.run_id
+    v.tested_at = datetime.now(timezone.utc)
+    db.add(DeveloperExtensionAudit(
+        extension_id=x.id,
+        actor_id=ctx.user_id,
+        action="test_evidence_recorded",
+        version=version,
+        details={"status": v.test_status, "evidence_hash": v.test_evidence_hash, "run_id": v.test_run_id},
+    ))
+    db.commit()
+    return {"id": v.id, "extension_id": x.id, "version": v.version, "test_status": v.test_status, "test_evidence_hash": v.test_evidence_hash, "test_run_id": v.test_run_id}
 
 @router.post("/extensions/{extension_id}/versions/{version}/publish")
 def publish_version(extension_id: str, version: str, ctx=Depends(get_context), db=Depends(get_session)):
@@ -451,6 +479,9 @@ def extension_manifest(extension_id: str, ctx=Depends(get_context), db=Depends(g
                 "version": v.version,
                 "status": v.release_status,
                 "test_status": v.test_status,
+                "test_evidence_hash": v.test_evidence_hash,
+                "test_run_id": v.test_run_id,
+                "tested_at": v.tested_at.isoformat() if v.tested_at else None,
                 "source_hash": v.source_hash,
                 "compatibility": v.compatibility,
                 "manifest": v.manifest,
