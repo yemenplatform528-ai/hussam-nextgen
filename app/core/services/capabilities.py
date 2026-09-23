@@ -93,3 +93,14 @@ class CapabilityService:
             and activation.status == "active"
             and self.get_active(capability_code) is not None
         )
+
+    def active_configuration(
+        self, market: MarketContext, capability_code: str
+    ) -> dict:
+        activation = self.get_market_activation(market.code, capability_code)
+        if not activation or activation.status != "active":
+            return {}
+        capability = self.get_active(capability_code)
+        if capability is None:
+            return {}
+        return dict(activation.configuration or {})
