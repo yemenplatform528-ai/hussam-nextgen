@@ -288,7 +288,10 @@ def test_market_context_service_composes_governed_runtime_context():
     ]
     assert runtime["connectivity"]["configuration"]["offline_drafts"] is True
     assert runtime["connectivity"]["configuration"]["idempotent_mutations"] is True
-    assert runtime["capabilities"][0]["configuration"] == {"show_unit": True}
+    capability_context = {item["code"]: item for item in runtime["capabilities"]}
+    assert capability_context["yem_money_presentation_runtime"]["configuration"] == {"show_unit": True}
+    assert capability_context["yem_delivery_modes"]["configuration"]["modes"] == ["pickup", "local_delivery", "inter_city_delivery"]
+    assert capability_context["yem_connectivity_policy"]["configuration"]["offline_drafts"] is True
 
 
 def test_capability_service_returns_active_configuration_only():
