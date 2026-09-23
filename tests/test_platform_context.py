@@ -29,6 +29,7 @@ def test_client_market_context_is_stable_and_hides_control_plane_configuration()
     unit = MarketMoneyUnit(
         id=3, market_id=1, code="YER_CURRENT", currency="YER",
         variant="current", name="Yemeni rial", name_ar="ريال يمني", status="active",
+        metadata_json='{"internal_adapter_secret":"must-not-leak"}',
     )
     cod = PaymentMethodCatalogEntry(
         id=4, market_id=1, code="cod", name="Cash on delivery",
@@ -43,7 +44,12 @@ def test_client_market_context_is_stable_and_hides_control_plane_configuration()
     db.flush()
     db.add(MarketCapabilityActivation(
         id="a1", market_id=1, capability_id=capability.id, status="active",
-        configuration={"offline_drafts": True, "internal_adapter_secret": "hidden"},
+        configuration={
+            "offline_drafts": True,
+            "idempotent_mutations": True,
+            "explicit_pending_states": True,
+            "internal_adapter_secret": "hidden",
+        },
     ))
     db.commit()
 
@@ -52,13 +58,19 @@ def test_client_market_context_is_stable_and_hides_control_plane_configuration()
     assert result["schema_version"] == "1.0"
     assert result["market"]["code"] == "YEM"
     assert result["money"]["money_units"][0]["code"] == "YER_CURRENT"
+    assert "metadata" not in result["money"]["money_units"][0]
     assert result["payments"]["methods"][0]["code"] == "cod"
-    assert result["connectivity"]["configuration"]["offline_drafts"] is True
+    assert result["connectivity"] == {
+        "offline_drafts": True,
+        "idempotent_mutations": True,
+        "explicit_pending_states": True,
+    }
     assert result["capabilities"] == [
         {"code": "yem_connectivity_policy", "category": "connectivity", "status": "active"}
     ]
-    assert "internal_secret" not in result["market"]["configuration"]
-    assert "internal_adapter_secret" not in result["capabilities"][0]
+    assert "configuration" not in result["market"]
+    assert "internal_secret" not in result["market"]
+    assert "internal_adapter_secret" not in str(result)
 
 
 def test_client_market_context_rejects_inactive_market():
