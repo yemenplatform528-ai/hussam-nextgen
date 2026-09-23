@@ -7,7 +7,7 @@ This document is the execution-control companion to the canonical engineering ba
 ### Current source of truth
 - Repository: `yemenplatform528-ai/hussam-nextgen`
 - Default branch: `main`
-- Current `main`: `8491053e924b7b6743084c2e9661c14798d27821`
+- Current `main`: `56c36d25c32612ae38beb01d0fa11d5dd75fcf73`
 - Canonical engineering baseline remains: `473cb7785bf2853e884a3ed28ea17f18d5085efa`
 - The certification-control delta remains limited to deployment/CI configuration, dependency/security maintenance, PostgreSQL migration hardening, and external verification workflow.
 - Marketplace, AI, HUS, and sovereign-core business behavior remain protected by the certification boundary.
@@ -94,7 +94,7 @@ Prefer free capabilities. No paid subscription, trial, credit purchase, or paid 
 
 ### Current execution position
 - Yemenization BUILD track: ACTIVE PREPARATION — cross-system, not marketplace-only.
-- Developer Platform: FOUNDATION IMPLEMENTED — extension models, versioning, audit and API surface added additively over HUS/AI/shared capability contracts; runtime tests/CI evidence still required.
+- Developer Platform: FOUNDATION IMPLEMENTED — extension models, versioning, audit, migration and tenant-scoped API surface added additively over HUS/AI/shared capability contracts; CI verification is still pending for this head.
 - Engineering CI: latest independently verified SUCCESS is run `35920819845`; current head is documentation/research-only and its new run result is not independently exposed through the connected GitHub workflow view.
 - Public runtime smoke: GREEN.
 - FastAPI Cloud staging: ACTIVE.
