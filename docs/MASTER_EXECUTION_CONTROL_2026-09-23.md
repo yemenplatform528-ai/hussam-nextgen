@@ -7,7 +7,7 @@ This document is the execution-control companion to the canonical engineering ba
 ### Current source of truth
 - Repository: `yemenplatform528-ai/hussam-nextgen`
 - Default branch: `main`
-- Current `main`: `064b17a7c1ba932ad6078e5bf6266442c6877cd3`
+- Current `main`: `71e1a1e6f28395e73c5a51d8d02ecb47455d0f26`
 - Canonical engineering baseline remains: `473cb7785bf2853e884a3ed28ea17f18d5085efa`
 - The certification-control delta remains limited to deployment/CI configuration, dependency/security maintenance, PostgreSQL migration hardening, and external verification workflow.
 - Marketplace, AI, HUS, and sovereign-core business behavior remain protected by the certification boundary.
@@ -71,10 +71,14 @@ Core engineering CI remains the repository quality gate. External runtime/readin
 6. Execute G01 against a real OIDC provider.
 7. Close G02 and then execute G03–G10 with artifact-backed evidence, allowing preparation in parallel where it does not weaken gate order.
 8. Final release/audit lock.
-9. Only after certification/release lock, enter Yemen production and BUILD Phase 1 of Yemenization.
+9. Continue BUILD Phase 1 preparation now as additive work; keep G01–G10 certification as a separate external release-control boundary. Yemenization work may be built, tested and documented without falsely closing certification.
 
 ### Yemenization boundary
-Yemenization is intentionally downstream of certification. It must not mutate the frozen Sovereign Core, Marketplace, AI, or HUS without an approved architecture change.
+Yemenization is now an active cross-system BUILD track. It must make the existing Sovereign Core, Shared Engines, Marketplace, AI and HUS operate naturally in Yemen without creating a Yemen-only fork. Certification remains a separate release-control boundary.
+
+The full-system contract is recorded in `docs/YEMEN_PLATFORM_SYSTEM_ALIGNMENT_2026-09-24.md`.
+
+The internal extension path is recorded in `docs/DEVELOPER_PLATFORM_PRODUCT_CONTRACT_2026-09-24.md`.
 
 The future Yemen layer will use explicit adapters/configuration for:
 - geography and address hierarchy
@@ -89,6 +93,8 @@ The future Yemen layer will use explicit adapters/configuration for:
 Prefer free capabilities. No paid subscription, trial, credit purchase, or paid infrastructure is a prerequisite for the next engineering step unless a concrete external certification requirement makes it unavoidable.
 
 ### Current execution position
+- Yemenization BUILD track: ACTIVE PREPARATION — cross-system, not marketplace-only.
+- Developer Platform: PRODUCT CONTRACT DEFINED — implementation to proceed additively over HUS/AI/shared capability contracts.
 - Engineering CI: latest independently verified SUCCESS is run `35920819845`; current head is documentation/research-only and its new run result is not independently exposed through the connected GitHub workflow view.
 - Public runtime smoke: GREEN.
 - FastAPI Cloud staging: ACTIVE.
@@ -111,6 +117,8 @@ The project is not production-ready until all applicable external gates have rea
 
 ### Yemenization execution map
 - Added `docs/YEMENIZATION_PHASE1_EXECUTION_MAP_2026-09-24.md`.
+- Added `docs/YEMEN_PLATFORM_SYSTEM_ALIGNMENT_2026-09-24.md` for full-system Yemenization.
+- Added `docs/DEVELOPER_PLATFORM_PRODUCT_CONTRACT_2026-09-24.md` for the internal developer/extension control plane.
 - Repository review confirms that the core Y2 Yemen Foundation, geography ingestion lock, market-scoped money/FX model, provider/rail registries, readiness evidence model, and provider-neutral payment boundary already exist.
 - Therefore Phase 1 does **not** require another foundation rewrite. The remaining path is controlled source admission, capability activation, localization UX, connectivity-aware behavior, and external certification evidence after the release boundary.
 
