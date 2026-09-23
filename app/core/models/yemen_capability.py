@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from sqlalchemy import CheckConstraint, DateTime, JSON, String, Text, UniqueConstraint
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, JSON, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 from app.core.persistence import Base
 
@@ -21,4 +21,21 @@ class PlatformCapability(Base):
     __table_args__ = (
         UniqueConstraint("category", "code", name="uq_platform_capability_category_code"),
         CheckConstraint("status IN ('active','draft','deprecated','suspended')", name="ck_platform_capability_status"),
+    )
+
+
+class MarketCapabilityActivation(Base):
+    """Market-scoped activation of a governed platform capability."""
+    __tablename__ = "market_capability_activations"
+    id: Mapped[str] = mapped_column(String(120), primary_key=True)
+    market_id: Mapped[int] = mapped_column(ForeignKey("market_contexts.id", ondelete="CASCADE"), nullable=False)
+    capability_id: Mapped[str] = mapped_column(ForeignKey("platform_capabilities.id", ondelete="RESTRICT"), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="active")
+    configuration: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    activated_by: Mapped[int | None] = mapped_column(nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, nullable=False)
+    __table_args__ = (
+        UniqueConstraint("market_id", "capability_id", name="uq_market_capability_activation"),
+        CheckConstraint("status IN ('active','suspended')", name="ck_market_capability_activation_status"),
     )
