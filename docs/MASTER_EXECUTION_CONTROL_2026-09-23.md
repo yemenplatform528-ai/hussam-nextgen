@@ -7,7 +7,7 @@ This document is the execution-control companion to the canonical engineering ba
 ### Current source of truth
 - Repository: `yemenplatform528-ai/hussam-nextgen`
 - Default branch: `main`
-- Current `main`: `e82d8364c4452d42d78cc488f3fa5b99ba8e8a16`
+- Current `main`: `4b231f93bbb295b4745d08438f17f5899105ca4c`
 - Canonical engineering baseline remains: `473cb7785bf2853e884a3ed28ea17f18d5085efa`
 - Certification-control delta remains separate from additive Yemenization/Developer Platform BUILD work.
 - Marketplace, AI, HUS, finance and sovereign-core business behavior remain protected; Yemenization is implemented as governed compatibility/configuration layers rather than a parallel core.
@@ -69,3 +69,11 @@ The project is not production-ready until all applicable external gates have rea
 - Added persistence coverage for the complete runtime-context composition.
 - No new financial engine, FX engine, geography engine, payment provider, or logistics engine was introduced.
 - This is the first concrete wiring layer from the capability control plane into existing market/money/geography boundaries.
+
+
+## 2026-09-24 Market Runtime Context — Payment Boundary
+
+- Extended the governed runtime context with active market payment-method catalog entries.
+- Payment methods are exposed as market configuration metadata only; provider execution, payment state transitions, settlement, and ledger behavior remain owned by the existing payment/finance domains.
+- Added test coverage for a provider-free COD method in the composed market context.
+- Latest engineering commit: `4b231f93bbb295b4745d08438f17f5899105ca4c`.
