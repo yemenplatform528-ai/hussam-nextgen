@@ -158,3 +158,24 @@ Next execution boundary:
 3. expose controlled configuration for geography, money presentation, payment methods, delivery/service areas, connectivity policies, Arabic/local documents and local verticals;
 4. wire those capabilities into existing authoritative engines without creating parallel commerce, finance, payment or logistics cores;
 5. continue certification evidence independently.
+
+
+## 2026-09-24 — Yemen Capability Registry checkpoint
+
+The Developer Platform now has a governed capability catalog for Yemenization.
+
+Implemented:
+- `platform_capabilities` model and migration `0030_platform_capability_registry`;
+- seeded capability definitions for money presentation, geography/service areas, payment methods, delivery modes, connectivity, Arabic documents, notifications, local pricing, business verticals, branch/warehouse networks, local reporting, and AI/HUS context;
+- Developer Platform exposes the active capability catalog;
+- Yemen-specific extension capabilities using the `yem_` namespace must resolve to an active registered capability before a version can be created;
+- capability metadata remains declarative and does not bypass authoritative commerce, finance, payment, logistics, AI or HUS engines.
+
+Implementation commits:
+- `764e4fe9c17e2af2f750d388648e6202b7202338` — capability model
+- `2fcedd383827ae08005735094e03476ae21d347f` — registry migration + seed
+- `634344acd11b433393eba2eb3515b90033d41742` — model registration
+- `ae473e008dad7f7c79f82cf9de55b84c8a6d567f` — migration metadata registration
+- `1fed28a249e6aca5b970ee582ee6796f2fe0a535` — Developer Platform integration
+
+The repository's automated external smoke/readiness workflows on the preceding control-plane hardening head completed successfully. The new registry commits are now queued through the same GitHub validation path; no new green claim is made until their runs complete.
