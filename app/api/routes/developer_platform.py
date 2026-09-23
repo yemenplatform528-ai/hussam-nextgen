@@ -96,6 +96,35 @@ def list_capabilities(ctx=Depends(get_context), db=Depends(get_session)):
     rows = CapabilityService(db).list_active()
     return {"items": [{"code": x.code, "category": x.category, "name": x.name, "description": x.description, "market_scope": x.market_scope, "config_schema": x.config_schema} for x in rows]}
 
+@router.get("/market-context/{market_code}")
+def market_context(market_code: str, ctx=Depends(get_context), db=Depends(get_session)):
+    developer_guard(ctx)
+    market = db.scalar(select(MarketContext).where(MarketContext.code == market_code.upper()))
+    if not market:
+        raise HTTPException(status_code=404, detail="market not found")
+    service = CapabilityService(db)
+    activations = service.list_market_activations(market)
+    return {
+        "market": {
+            "code": market.code,
+            "country_code": market.country_code,
+            "name": market.name,
+            "locale": market.locale,
+            "timezone": market.timezone,
+            "default_currency": market.default_currency,
+            "status": market.status,
+        },
+        "capabilities": [
+            {
+                "code": capability.code,
+                "category": capability.category,
+                "status": activation.status,
+                "configuration": activation.configuration,
+            }
+            for activation, capability in activations
+        ],
+    }
+
 @router.get("/market-capabilities/{market_code}")
 def list_market_capabilities(market_code: str, ctx=Depends(get_context), db=Depends(get_session)):
     developer_guard(ctx)
