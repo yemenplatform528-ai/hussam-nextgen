@@ -1,6 +1,6 @@
 from logging.config import fileConfig
 from alembic import context
-from sqlalchemy import engine_from_config, pool
+from sqlalchemy import Column, MetaData, String, Table, engine_from_config, inspect, pool, text
 import os
 
 from app.core.persistence import Base
@@ -30,12 +30,42 @@ if config.config_file_name:
 
 target_metadata = Base.metadata
 
+
+def _prepare_alembic_version_table(connection):
+    """Allow descriptive revision ids longer than Alembic's historical 32-char default."""
+    inspector = inspect(connection)
+    if "alembic_version" not in inspector.get_table_names():
+        Table(
+            "alembic_version",
+            MetaData(),
+            Column("version_num", String(255), primary_key=True),
+        ).create(connection)
+        return
+
+    if connection.dialect.name != "postgresql":
+        return
+
+    column = next(
+        (c for c in inspector.get_columns("alembic_version") if c["name"] == "version_num"),
+        None,
+    )
+    length = getattr(column.get("type"), "length", None) if column else None
+    if length is not None and length < 255:
+        connection.execute(
+            text(
+                "ALTER TABLE alembic_version "
+                "ALTER COLUMN version_num TYPE VARCHAR(255)"
+            )
+        )
+
+
 def run_migrations_offline():
     url = config.get_main_option("sqlalchemy.url")
     context.configure(url=url, target_metadata=target_metadata,
                       literal_binds=True, compare_type=True)
     with context.begin_transaction():
         context.run_migrations()
+
 
 def run_migrations_online():
     if not config.get_main_option("sqlalchemy.url"):
@@ -48,10 +78,12 @@ def run_migrations_online():
         poolclass=pool.NullPool,
     )
     with connectable.connect() as connection:
+        _prepare_alembic_version_table(connection)
         context.configure(connection=connection, target_metadata=target_metadata,
                           compare_type=True)
         with context.begin_transaction():
             context.run_migrations()
+
 
 if context.is_offline_mode():
     run_migrations_offline()
