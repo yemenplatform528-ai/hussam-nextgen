@@ -8,6 +8,9 @@ branch_labels = None
 depends_on = None
 
 def upgrade():
+    bind = op.get_bind()
+    if "market_capability_activations" in sa.inspect(bind).get_table_names():
+        return
     op.create_table(
         "market_capability_activations",
         sa.Column("id", sa.String(120), primary_key=True),
