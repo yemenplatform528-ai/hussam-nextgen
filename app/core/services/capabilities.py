@@ -70,3 +70,26 @@ class CapabilityService:
                 PlatformCapability.code == capability_code,
             )
         )
+
+    def list_market_activations(
+        self, market: MarketContext
+    ) -> list[tuple[MarketCapabilityActivation, PlatformCapability]]:
+        return self.db.execute(
+            select(MarketCapabilityActivation, PlatformCapability)
+            .join(
+                PlatformCapability,
+                PlatformCapability.id == MarketCapabilityActivation.capability_id,
+            )
+            .where(MarketCapabilityActivation.market_id == market.id)
+            .order_by(PlatformCapability.category, PlatformCapability.code)
+        ).all()
+
+    def is_active_for_market(
+        self, market: MarketContext, capability_code: str
+    ) -> bool:
+        activation = self.get_market_activation(market.code, capability_code)
+        return bool(
+            activation
+            and activation.status == "active"
+            and self.get_active(capability_code) is not None
+        )
