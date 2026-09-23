@@ -238,7 +238,20 @@ def test_market_context_service_composes_governed_runtime_context():
         category="money", name="Runtime money presentation",
         market_scope=["YEM"], config_schema={}, status="active",
     )
-    db.add_all([market, geography, currency, money_unit, payment_method, capability])
+    delivery_capability = PlatformCapability(
+        id="yem_delivery_modes", code="yem_delivery_modes",
+        category="logistics", name="Yemen delivery modes",
+        market_scope=["YEM"], config_schema={}, status="active",
+    )
+    connectivity_capability = PlatformCapability(
+        id="yem_connectivity_policy", code="yem_connectivity_policy",
+        category="connectivity", name="Connectivity-aware operation",
+        market_scope=["YEM"], config_schema={}, status="active",
+    )
+    db.add_all([
+        market, country, geography, currency, money_unit, payment_method,
+        capability, delivery_capability, connectivity_capability,
+    ])
     db.flush()
     db.add(MarketCoverage(
         id=504, market_id=50, geography_id=501, status="available",
@@ -246,6 +259,20 @@ def test_market_context_service_composes_governed_runtime_context():
     db.add(MarketCapabilityActivation(
         id="activation-50", market_id=50, capability_id=capability.id,
         status="active", configuration={"show_unit": True},
+    ))
+    db.add(MarketCapabilityActivation(
+        id="activation-delivery-50", market_id=50, capability_id=delivery_capability.id,
+        status="active", configuration={
+            "modes": ["pickup", "local_delivery", "inter_city_delivery"],
+        },
+    ))
+    db.add(MarketCapabilityActivation(
+        id="activation-connectivity-50", market_id=50, capability_id=connectivity_capability.id,
+        status="active", configuration={
+            "offline_drafts": True,
+            "idempotent_mutations": True,
+            "explicit_pending_states": True,
+        },
     ))
     db.commit()
 
@@ -256,6 +283,11 @@ def test_market_context_service_composes_governed_runtime_context():
     assert runtime["payments"]["methods"][0]["code"] == "cod"
     assert runtime["payments"]["methods"][0]["requires_provider"] is False
     assert runtime["geography"]["coverage"][0]["code"] == "YE-TA"
+    assert runtime["delivery"]["configuration"]["modes"] == [
+        "pickup", "local_delivery", "inter_city_delivery",
+    ]
+    assert runtime["connectivity"]["configuration"]["offline_drafts"] is True
+    assert runtime["connectivity"]["configuration"]["idempotent_mutations"] is True
     assert runtime["capabilities"][0]["configuration"] == {"show_unit": True}
 
 
