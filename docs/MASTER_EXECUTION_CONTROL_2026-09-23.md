@@ -102,3 +102,9 @@ Escalate only when an external account, credential, human approval, or real-worl
 
 ### Release discipline
 The project is not production-ready until all applicable external gates have real evidence envelopes, artifact hashes match, rollback is prepared, and the final release/audit lock is explicitly recorded.
+
+
+### Non-blocking Yemenization preparation
+- Added `docs/YEMENIZATION_PHASE1_MARKET_FINDINGS_2026-09-24.md` as a research-only market baseline.
+- It does not close any certification gate and does not authorize production implementation.
+- It records current marketplace/payment/locality signals and preserves Marketplace, AI, HUS and provider-neutral payment architecture.
