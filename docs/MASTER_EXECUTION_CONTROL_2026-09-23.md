@@ -7,7 +7,7 @@ This document is the execution-control companion to the canonical engineering ba
 ### Current source of truth
 - Repository: `yemenplatform528-ai/hussam-nextgen`
 - Default branch: `main`
-- Current `main`: `0dc99e6022454a3d85e4f18c3e9e6739fa0372e2`
+- Current `main`: `064b17a7c1ba932ad6078e5bf6266442c6877cd3`
 - Canonical engineering baseline remains: `473cb7785bf2853e884a3ed28ea17f18d5085efa`
 - The certification-control delta remains limited to deployment/CI configuration, dependency/security maintenance, PostgreSQL migration hardening, and external verification workflow.
 - Marketplace, AI, HUS, and sovereign-core business behavior remain protected by the certification boundary.
