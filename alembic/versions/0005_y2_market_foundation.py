@@ -32,6 +32,12 @@ def _has_index(bind, table, name):
 
 def upgrade():
     bind = op.get_bind()
+    if bind.dialect.name == "postgresql":
+        op.execute(
+            "ALTER TABLE alembic_version "
+            "ALTER COLUMN version_num TYPE VARCHAR(255)"
+        )
+    bind = op.get_bind()
     insp = inspect(bind)
     tables = set(insp.get_table_names())
 

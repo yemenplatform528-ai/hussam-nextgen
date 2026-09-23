@@ -61,13 +61,20 @@ def upgrade():
                 op.add_column("marketplace_shipping_rates", sa.Column("locality_id", sa.Integer(), nullable=True))
             if has_legacy_shipping_unique:
                 op.drop_constraint("uq_market_shipping_rate", "marketplace_shipping_rates", type_="unique")
-            op.create_unique_constraint("uq_market_shipping_rate_market_geo", "marketplace_shipping_rates", ["seller_tenant_id", "market_id", "governorate_id", "district_id", "locality_id", "currency"])
-            op.create_index("ix_marketplace_shipping_rates_governorate_id", "marketplace_shipping_rates", ["governorate_id"])
-            op.create_index("ix_marketplace_shipping_rates_district_id", "marketplace_shipping_rates", ["district_id"])
-            op.create_index("ix_marketplace_shipping_rates_locality_id", "marketplace_shipping_rates", ["locality_id"])
-            op.create_foreign_key("fk_market_shipping_rate_governorate_market", "marketplace_shipping_rates", "market_geographies", ["market_id", "governorate_id"], ["market_id", "id"], ondelete="SET NULL")
-            op.create_foreign_key("fk_market_shipping_rate_district_market", "marketplace_shipping_rates", "market_geographies", ["market_id", "district_id"], ["market_id", "id"], ondelete="SET NULL")
-            op.create_foreign_key("fk_market_shipping_rate_locality_market", "marketplace_shipping_rates", "market_geographies", ["market_id", "locality_id"], ["market_id", "id"], ondelete="SET NULL")
+            if "uq_market_shipping_rate_market_geo" not in {c["name"] for c in inspector.get_unique_constraints("marketplace_shipping_rates") if c.get("name")}:
+                op.create_unique_constraint("uq_market_shipping_rate_market_geo", "marketplace_shipping_rates", ["seller_tenant_id", "market_id", "governorate_id", "district_id", "locality_id", "currency"])
+            if "ix_marketplace_shipping_rates_governorate_id" not in existing_indexes:
+                op.create_index("ix_marketplace_shipping_rates_governorate_id", "marketplace_shipping_rates", ["governorate_id"])
+            if "ix_marketplace_shipping_rates_district_id" not in existing_indexes:
+                op.create_index("ix_marketplace_shipping_rates_district_id", "marketplace_shipping_rates", ["district_id"])
+            if "ix_marketplace_shipping_rates_locality_id" not in existing_indexes:
+                op.create_index("ix_marketplace_shipping_rates_locality_id", "marketplace_shipping_rates", ["locality_id"])
+            if "fk_market_shipping_rate_governorate_market" not in existing_fks:
+                op.create_foreign_key("fk_market_shipping_rate_governorate_market", "marketplace_shipping_rates", "market_geographies", ["market_id", "governorate_id"], ["market_id", "id"], ondelete="SET NULL")
+            if "fk_market_shipping_rate_district_market" not in existing_fks:
+                op.create_foreign_key("fk_market_shipping_rate_district_market", "marketplace_shipping_rates", "market_geographies", ["market_id", "district_id"], ["market_id", "id"], ondelete="SET NULL")
+            if "fk_market_shipping_rate_locality_market" not in existing_fks:
+                op.create_foreign_key("fk_market_shipping_rate_locality_market", "marketplace_shipping_rates", "market_geographies", ["market_id", "locality_id"], ["market_id", "id"], ondelete="SET NULL")
 
     inspector = sa.inspect(bind)
     inspector = sa.inspect(bind)
