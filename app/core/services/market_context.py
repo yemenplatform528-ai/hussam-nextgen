@@ -81,6 +81,16 @@ class MarketContextService:
             for activation, capability in activations
         }
 
+        def active_configuration(code: str) -> dict:
+            activation = activation_by_code.get(code)
+            if activation is None or activation.status != "active":
+                return {}
+            return self._json_object(activation.configuration)
+
+        document_configuration = active_configuration("yem_arabic_documents")
+        notification_configuration = active_configuration("yem_notification_channels")
+        ai_hus_configuration = active_configuration("yem_ai_hus_context")
+
         return {
             "market": {
                 "code": market.code,
@@ -152,6 +162,31 @@ class MarketContextService:
                     and activation_by_code["yem_connectivity_policy"].status == "active"
                     else {}
                 ),
+            },
+            "documents": {
+                "configuration": document_configuration,
+                "lifecycle": ["draft", "finalized", "void"],
+                "versioned": True,
+                "immutable_versions": True,
+            },
+            "notifications": {
+                "configuration": notification_configuration,
+                "channels": notification_configuration.get("channels", ["in_app"]),
+                "tenant_scoped": True,
+            },
+            "ai_hus": {
+                "configuration": ai_hus_configuration,
+                "market_context": {
+                    "market_code": market.code,
+                    "country_code": market.country_code,
+                    "locale": market.locale,
+                    "timezone": market.timezone,
+                    "default_currency": market.default_currency,
+                },
+                "governance": {
+                    "ai_proposes_not_authorizes": True,
+                    "hus_uses_domain_contracts": True,
+                },
             },
             "capabilities": [
                 {
