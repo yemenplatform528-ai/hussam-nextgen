@@ -33,3 +33,5 @@ from .ai_agents import *
 from .ai_product import *
 
 from app.core.models.market import *
+
+from app.core.models.developer_platform import *
