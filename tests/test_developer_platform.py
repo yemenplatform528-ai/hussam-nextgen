@@ -5,7 +5,7 @@ from sqlalchemy.orm import sessionmaker
 from app.api.routes.developer_platform import validate_manifest
 from app.core.models.core import Tenant, User, TenantMembership
 from app.core.models.developer_platform import DeveloperExtension, DeveloperExtensionVersion
-from app.core.models.market import MarketContext, MarketCoverage, MarketCurrency, MarketGeography, MarketMoneyUnit
+from app.core.models.market import MarketContext, MarketCoverage, MarketCurrency, MarketGeography, MarketMoneyUnit, PaymentMethodCatalogEntry
 from app.core.models.yemen_capability import MarketCapabilityActivation, PlatformCapability
 from app.core.persistence import Base
 
@@ -135,6 +135,10 @@ def test_capability_service_validates_registration_and_market_scope():
         id=20, code="YEM", country_code="YE", name="Yemen", locale="ar-YE",
         timezone="Asia/Aden", default_currency="YER", status="active",
     )
+    payment_method = PaymentMethodCatalogEntry(
+        id=505, market_id=50, code="cod", name="Cash on delivery",
+        method_type="cod", requires_provider=False, active=True,
+    )
     capability = PlatformCapability(
         id="yem_money_presentation", code="yem_money_presentation",
         category="money", name="Yemen money presentation",
@@ -226,7 +230,7 @@ def test_market_context_service_composes_governed_runtime_context():
         category="money", name="Runtime money presentation",
         market_scope=["YEM"], config_schema={}, status="active",
     )
-    db.add_all([market, geography, currency, money_unit, capability])
+    db.add_all([market, geography, currency, money_unit, payment_method, capability])
     db.flush()
     db.add(MarketCoverage(
         id=504, market_id=50, geography_id=501, status="available",
@@ -241,7 +245,8 @@ def test_market_context_service_composes_governed_runtime_context():
     assert runtime["market"]["code"] == "YEM"
     assert runtime["money"]["currencies"][0]["currency"] == "YER"
     assert runtime["money"]["money_units"][0]["code"] == "YER_CURRENT"
-    assert runtime["payments"]["methods"] == []
+    assert runtime["payments"]["methods"][0]["code"] == "cod"
+    assert runtime["payments"]["methods"][0]["requires_provider"] is False
     assert runtime["geography"]["coverage"][0]["code"] == "YE-TA"
     assert runtime["capabilities"][0]["configuration"] == {"show_unit": True}
 
