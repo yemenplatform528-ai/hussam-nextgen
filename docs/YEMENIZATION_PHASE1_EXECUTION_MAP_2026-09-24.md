@@ -174,3 +174,30 @@ This strengthens the architecture decision already made in Hussam:
 The Central Bank also reports ongoing work on RTGS/FPS infrastructure and interoperability, so the payment abstraction must remain extensible rather than assuming today's rails are the final national topology. cite-source:turn0search4turn0search9
 
 These findings are research evidence only. They do not certify any provider, rail, credential, settlement path, or production integration.
+
+
+## 8. Current regulatory architecture checkpoint — 2026-09-24
+
+Current Central Bank of Yemen publications reinforce three implementation constraints:
+
+- electronic-money and payment-system activity is subject to published regulatory instructions;
+- the regulator maintains a current list of licensed banks and licensed exchange/remittance entities;
+- 2026 regulatory work includes a national QR standard and interoperability work around electronic wallets, while the Central Bank has also published a prohibition on dealing with unlicensed electronic-payment entities/services. cite-source:turn0search0turn0search9turn0search10
+
+Accordingly, Hussam's Phase 1 payment activation contract must carry at least:
+
+- provider legal/regulatory status;
+- supported capability and market;
+- rail/standard identifier where applicable;
+- contract/onboarding status;
+- technical integration status;
+- credential/test-environment status;
+- settlement/reconciliation status;
+- evidence artifact and review reference;
+- activation/suspension timestamps.
+
+A provider cannot become production-capable merely because it appears in a public marketplace study.
+
+The current national payment direction also makes interoperability a first-class architectural requirement: the Central Bank describes the Unified Money Network as a key national payments component and is pursuing RTGS/FPS infrastructure and wallet interoperability. cite-source:turn0search5turn0search8turn0search10
+
+This checkpoint is research/control guidance only; it does not activate any provider or payment rail.
