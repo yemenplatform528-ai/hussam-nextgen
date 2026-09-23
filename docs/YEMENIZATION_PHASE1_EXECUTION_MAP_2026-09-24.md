@@ -158,3 +158,19 @@ Until the certification/release boundary is crossed:
 The repository already contains most of the structural foundation required for BUILD Phase 1. The next work is therefore **not another foundation rewrite**. It is controlled evidence acquisition, source admission, capability activation and UX integration after the external certification boundary is satisfied.
 
 This map is a planning/control artifact. It does not authorize production activation by itself.
+
+
+## 7. Research update — payment architecture boundary (2026-09-24)
+
+Current Central Bank of Yemen material confirms that Yemen's payment environment is actively evolving: the regulator publishes rules for electronic-money services and payment-system providers, and in 2026 it reported continued work around the unified money-transfer network and digital-payment infrastructure. cite-source:turn0search0turn0search2turn0search7
+
+This strengthens the architecture decision already made in Hussam:
+
+- Hussam must integrate through certified capability adapters rather than hard-code one payment provider.
+- The buyer-facing layer should expose available payment capabilities, while provider-specific routing remains behind the adapter boundary.
+- Regulatory/licensing status is a live external prerequisite, not a static software assumption.
+- The platform must preserve cash/COD as a capability where the operational market service supports it, while allowing regulated digital methods to be activated independently.
+
+The Central Bank also reports ongoing work on RTGS/FPS infrastructure and interoperability, so the payment abstraction must remain extensible rather than assuming today's rails are the final national topology. cite-source:turn0search4turn0search9
+
+These findings are research evidence only. They do not certify any provider, rail, credential, settlement path, or production integration.
