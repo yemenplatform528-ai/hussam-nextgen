@@ -212,8 +212,12 @@ def test_market_context_service_composes_governed_runtime_context():
         timezone="Asia/Aden", default_currency="YER",
         status="active", configuration_json='{"buyer_ui":"ar"}',
     )
+    country = MarketGeography(
+        id=500, market_id=50, code="YE", level="country",
+        name="Yemen", name_ar="اليمن", status="active",
+    )
     geography = MarketGeography(
-        id=501, market_id=50, code="YE-TA", level="governorate",
+        id=501, market_id=50, parent_id=500, code="YE-TA", level="governorate",
         name="Taiz", name_ar="تعز", status="active",
     )
     currency = MarketCurrency(
