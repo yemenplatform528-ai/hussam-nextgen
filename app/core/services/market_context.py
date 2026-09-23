@@ -53,7 +53,7 @@ class MarketContextService:
             )
             .order_by(MarketMoneyUnit.code)
         ).all()
-        coverage = self.db.scalars(
+        coverage = self.db.execute(
             select(MarketCoverage, MarketGeography)
             .join(
                 MarketGeography,
