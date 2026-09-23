@@ -6,6 +6,7 @@ from app.api.dependencies import get_context, get_session
 from app.core.models.yemen_capability import MarketCapabilityActivation, PlatformCapability
 from app.core.models.market import MarketContext
 from app.core.services.capabilities import CapabilityService
+from app.core.services.market_context import MarketContextService
 from app.core.models.developer_platform import (
     DeveloperExtension,
     DeveloperExtensionVersion,
@@ -99,31 +100,11 @@ def list_capabilities(ctx=Depends(get_context), db=Depends(get_session)):
 @router.get("/market-context/{market_code}")
 def market_context(market_code: str, ctx=Depends(get_context), db=Depends(get_session)):
     developer_guard(ctx)
-    market = db.scalar(select(MarketContext).where(MarketContext.code == market_code.upper()))
+    service = MarketContextService(db)
+    market = service.get_market(market_code)
     if not market:
         raise HTTPException(status_code=404, detail="market not found")
-    service = CapabilityService(db)
-    activations = service.list_market_activations(market)
-    return {
-        "market": {
-            "code": market.code,
-            "country_code": market.country_code,
-            "name": market.name,
-            "locale": market.locale,
-            "timezone": market.timezone,
-            "default_currency": market.default_currency,
-            "status": market.status,
-        },
-        "capabilities": [
-            {
-                "code": capability.code,
-                "category": capability.category,
-                "status": activation.status,
-                "configuration": activation.configuration,
-            }
-            for activation, capability in activations
-        ],
-    }
+    return service.runtime_context(market)
 
 @router.get("/market-capabilities/{market_code}")
 def list_market_capabilities(market_code: str, ctx=Depends(get_context), db=Depends(get_session)):
