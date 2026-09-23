@@ -1,7 +1,7 @@
 # BUILD Phase 1 — Yemenization Execution Map
 ## Controlled implementation map — 2026-09-24
 
-**Status:** PRE-IMPLEMENTATION / NON-BLOCKING  
+**Status:** ACTIVE BUILD PREPARATION / NON-BLOCKING CERTIFICATION  
 **Purpose:** consolidate the existing Yemen Foundation, production-layer safeguards, payment evidence boundary, and market research into one execution map without mutating the certified core.
 
 ## 1. Existing foundation already present
@@ -72,7 +72,7 @@ Market coverage and geography are already modeled. Phase 1 delivery work should 
 
 ## 3. Phase 1 target architecture
 
-The Yemen layer should converge on these controlled capabilities:
+The Yemen layer should converge on these controlled capabilities across the whole platform, not only Marketplace:
 
 1. **MarketContext** — market identity, locale, timezone, default currency and lifecycle.
 2. **YemenGeography** — reviewed administrative hierarchy and locality metadata.
@@ -85,9 +85,9 @@ The Yemen layer should converge on these controlled capabilities:
 9. **ConnectivityAwareUX** — graceful degradation for weak/intermittent connectivity.
 10. **Evidence/ProviderCertification** — every externally sourced activation remains reviewable and auditable.
 
-## 4. Implementation order after certification lock
+## 4. Implementation order
 
-The implementation sequence is intentionally narrow:
+The implementation sequence is additive and cross-system. External certification remains a separate release-control boundary; BUILD work may proceed without claiming certification closure.
 
 ### P1 — Geography admission
 - acquire exact canonical artifact;
@@ -155,7 +155,7 @@ Until the certification/release boundary is crossed:
 
 ## 6. Current decision
 
-The repository already contains most of the structural foundation required for BUILD Phase 1. The next work is therefore **not another foundation rewrite**. It is controlled evidence acquisition, source admission, capability activation and UX integration after the external certification boundary is satisfied.
+The repository already contains most of the structural foundation required for BUILD Phase 1. The next work is therefore **not another foundation rewrite**. It is full-system Yemen compatibility, capability activation, connectivity-aware UX, integration adapters and the Developer Platform that lets internal developers add future capabilities from inside Hussam.
 
 This map is a planning/control artifact. It does not authorize production activation by itself.
 
