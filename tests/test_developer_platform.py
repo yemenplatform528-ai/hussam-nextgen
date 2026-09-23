@@ -241,6 +241,7 @@ def test_market_context_service_composes_governed_runtime_context():
     assert runtime["market"]["code"] == "YEM"
     assert runtime["money"]["currencies"][0]["currency"] == "YER"
     assert runtime["money"]["money_units"][0]["code"] == "YER_CURRENT"
+    assert runtime["payments"]["methods"] == []
     assert runtime["geography"]["coverage"][0]["code"] == "YE-TA"
     assert runtime["capabilities"][0]["configuration"] == {"show_unit": True}
 
