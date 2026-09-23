@@ -2,8 +2,8 @@
 from alembic import op
 import sqlalchemy as sa
 
-revision = "0030_platform_capability_registry"
-down_revision = "0029_developer_extension_platform"
+revision = "0031_platform_capability_registry"
+down_revision = "0030_yemen_market_operating_profile"
 branch_labels = None
 depends_on = None
 
