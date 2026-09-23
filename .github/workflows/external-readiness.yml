@@ -46,13 +46,27 @@ jobs:
               error = type(exc).__name__
 
           try:
-              payload = json.loads(body) if body else {}
+              raw = json.loads(body) if body else {}
           except Exception:
-              payload = {"_non_json_response": True}
+              raw = {}
+
+          # Persist only the documented readiness contract fields. Never copy an
+          # arbitrary external response into the certification artifact.
+          allowed = (
+              "status",
+              "database_configured",
+              "database_reachable",
+              "environment",
+              "owner_action_required",
+          )
+          payload = {
+              key: raw[key]
+              for key in allowed
+              if isinstance(raw, dict) and key in raw
+          }
 
           ready = (
               status == 200
-              and isinstance(payload, dict)
               and payload.get("status") == "ready"
               and payload.get("database_configured") is True
               and payload.get("database_reachable") is True
@@ -61,7 +75,7 @@ jobs:
 
           if ready:
               certification_status = "READY"
-          elif isinstance(payload, dict) and payload.get("owner_action_required") is True:
+          elif payload.get("owner_action_required") is True:
               certification_status = "BLOCKED_EXTERNAL_ACCESS"
           else:
               certification_status = "NOT_READY"
@@ -76,7 +90,6 @@ jobs:
               "transport_error": error,
           }
 
-          # Only the structured response is persisted; no credentials or headers are stored.
           with open("evidence/external-readiness/readiness.json", "w", encoding="utf-8") as f:
               json.dump(sanitized, f, indent=2, sort_keys=True)
 
