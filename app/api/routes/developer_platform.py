@@ -72,6 +72,75 @@ def validate_manifest(extension: DeveloperExtension, manifest: dict, registered_
     if hus_source is not None and not isinstance(hus_source, str):
         raise HTTPException(status_code=400, detail="hus_source must be text when provided")
 
+def validate_capability_configuration(schema: dict, configuration: dict) -> None:
+    """Validate the small JSON-schema subset used by governed capabilities.
+
+    The platform deliberately avoids a new runtime dependency: capabilities may
+    declare object properties, required keys, additionalProperties, enum and
+    primitive/array/object types. Empty schemas remain intentionally open.
+    """
+    if not schema:
+        return
+    if not isinstance(schema, dict) or schema.get("type", "object") != "object":
+        raise HTTPException(status_code=500, detail="capability config_schema must be an object schema")
+    if not isinstance(configuration, dict):
+        raise HTTPException(status_code=400, detail="capability configuration must be an object")
+
+    properties = schema.get("properties", {})
+    required = schema.get("required", [])
+    additional = schema.get("additionalProperties", True)
+    if not isinstance(properties, dict) or not isinstance(required, list):
+        raise HTTPException(status_code=500, detail="invalid capability config_schema")
+    missing = sorted(set(required) - set(configuration))
+    if missing:
+        raise HTTPException(status_code=400, detail={"missing_configuration": missing})
+    if additional is False:
+        unknown = sorted(set(configuration) - set(properties))
+        if unknown:
+            raise HTTPException(status_code=400, detail={"unknown_configuration": unknown})
+
+    def check(value, rule, path):
+        if not isinstance(rule, dict):
+            raise HTTPException(status_code=500, detail="invalid capability config_schema rule")
+        if "enum" in rule and value not in rule["enum"]:
+            raise HTTPException(status_code=400, detail=f"invalid configuration value at {path}")
+        expected = rule.get("type")
+        valid = {
+            "object": lambda x: isinstance(x, dict),
+            "array": lambda x: isinstance(x, list),
+            "string": lambda x: isinstance(x, str),
+            "boolean": lambda x: isinstance(x, bool),
+            "number": lambda x: isinstance(x, (int, float)) and not isinstance(x, bool),
+            "integer": lambda x: isinstance(x, int) and not isinstance(x, bool),
+            "null": lambda x: x is None,
+        }
+        if expected in valid and not valid[expected](value):
+            raise HTTPException(status_code=400, detail=f"invalid configuration type at {path}")
+        if expected == "object":
+            nested_properties = rule.get("properties", {})
+            nested_required = rule.get("required", [])
+            nested_additional = rule.get("additionalProperties", True)
+            if not isinstance(value, dict):
+                return
+            missing_nested = sorted(set(nested_required) - set(value))
+            if missing_nested:
+                raise HTTPException(status_code=400, detail={"missing_configuration": [f"{path}.{x}" for x in missing_nested]})
+            if nested_additional is False:
+                unknown_nested = sorted(set(value) - set(nested_properties))
+                if unknown_nested:
+                    raise HTTPException(status_code=400, detail={"unknown_configuration": [f"{path}.{x}" for x in unknown_nested]})
+            for key, child in nested_properties.items():
+                if key in value:
+                    check(value[key], child, f"{path}.{key}")
+        elif expected == "array" and "items" in rule:
+            for index, item in enumerate(value):
+                check(item, rule["items"], f"{path}[{index}]")
+
+    for key, rule in properties.items():
+        if key in configuration:
+            check(configuration[key], rule, key)
+
+
 class ExtensionIn(BaseModel):
     code: str = Field(min_length=2, max_length=120, pattern=r"^[a-zA-Z0-9][a-zA-Z0-9._-]*$")
     name: str = Field(min_length=1, max_length=200)
