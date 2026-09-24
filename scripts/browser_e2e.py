@@ -19,7 +19,11 @@ window.__e2eStorage={_:{},getItem(k){return this._[k]??null},setItem(k,v){this._
     if (url.endsWith('/session')) return json({user_id:'e2e-user', tenant_id:1, membership_id:1});
     if (url.endsWith('/marketplace/seller/center')) return json({metrics:{listings_published:1,listings_total:1,orders_actionable:0,fulfillments_actionable:0,net:0,currency:'YER'},actions:[],recent_orders:[]});
     if (url.endsWith('/marketplace/seller/catalog')) return json({items:[]});
-    if (url.endsWith('/marketplace/buyer/cart')) return json({items:[]});
+    if (url.endsWith('/marketplace/buyer/cart')) return json({id:1,status:'active',market_id:1,items:[{id:1,quantity:'1',line_total:'1500',listing}]});
+    if (url.includes('/marketplace/buyer/addresses')) return json({items:[{id:20,label:'المنزل',city:'Khor Maksar',address_line:'Main road'}]});
+    if (url.includes('/platform/market-context')) return json({items:[{id:1,code:'YEM',locale:'ar-YE'}]});
+    if (url.includes('/platform/yemen/checkout-context/YEM')) return json({schema_version:'1.0',market:{code:'YEM',locale:'ar-YE'},money:{currency:'YER',label:'ريال يمني',conversion:{automatic_conversion:false}},payments:{cod:{available:true}},delivery:{destination:{coverage:'available'}},sellers:[]});
+    if (url.endsWith('/marketplace/buyer/checkout')) return json({orders:[{id:101,reference:'YEM-E2E-001',currency:'YER',total:'1500'}]});
     return originalFetch(input, options);
   };
 })();
@@ -63,6 +67,19 @@ def run():
                     page.locator("button[data-ws='products']").click()
                     page.wait_for_timeout(250)
                     assert page.locator(".workspace-nav button[data-ws='products']").is_visible()
+                    page.locator("button[data-action='home']").click()
+                    page.wait_for_timeout(100)
+                    page.locator("button[data-action='cart']").click()
+                    page.wait_for_timeout(150)
+                    page.locator("button[data-action='checkout']").click()
+                    page.wait_for_timeout(150)
+                    assert page.locator("h1", has_text="إتمام الطلب").is_visible()
+                    assert page.locator("text=ريال يمني").is_visible()
+                    assert page.locator("text=الدفع عند الاستلام: متاح").is_visible()
+                    page.locator("select[name='shipping_address_id']").select_option("20")
+                    page.locator("#checkoutForm button").click()
+                    page.wait_for_timeout(150)
+                    assert page.locator("text=YEM-E2E-001").is_visible()
                 finally:
                     page.close()
         finally:
