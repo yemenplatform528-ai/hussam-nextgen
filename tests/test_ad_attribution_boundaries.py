@@ -17,7 +17,7 @@ def test_ad_attribution_rejects_cross_tenant_references_and_uses_order_total():
     ids.add_membership(other_user.id,other_seller.id,'owner')
     other_listing=MarketplaceListing(
         market_id=l.market_id,seller_tenant_id=other_seller.id,product_id=l.product_id,sku_id=l.sku_id,
-        offer_id=l.offer_id,item_id=l.item_id,warehouse_id=l.warehouse_id,category_id=l.category_id,
+        offer_id=None,item_id=l.item_id,warehouse_id=l.warehouse_id,category_id=l.category_id,
         slug='other-listing',title='Other Listing',description='',listing_type='product',
         currency='YER',unit_price=100,status='draft',stock_policy='managed',moderation_status='pending'
     )
