@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, Query, HTTPException, Header
 from pydantic import BaseModel, Field
 from sqlalchemy import desc, select, func
 from app.api.dependencies import get_context, get_session
+from app.core.models.core import MutationRecord
 from app.core.models.marketplace import MarketplaceSellerProfile, MarketplaceOfferCompetition, MarketplaceCategory, MarketplaceListing, MarketplaceOrder, MarketplaceOrderLine, MarketplacePayout, MarketplaceReview, MarketplaceDispute, MarketplaceAddress, MarketplaceSellerVerification, MarketplaceReturnRequest, MarketplaceReturnLine, MarketplaceFeeRule, MarketplaceCart
 from app.core.models.payments import PaymentIntent
 from app.engines.marketplace import MarketplaceService, ListingInput
@@ -179,6 +180,26 @@ def add_address(body:AddressIn,ctx=Depends(get_context),db=Depends(get_session))
 @router.get('/buyer/addresses')
 def addresses(ctx=Depends(get_context),db=Depends(get_session)):
     rows=db.scalars(select(MarketplaceAddress).where(MarketplaceAddress.user_id==ctx.user_id,MarketplaceAddress.active.is_(True)).order_by(desc(MarketplaceAddress.id))).all(); return {'items':[{'id':x.id,'label':x.label,'recipient_name':x.recipient_name,'phone':x.phone,'governorate':x.governorate,'city':x.city,'address_line':x.address_line,'landmark':x.landmark,'country_code':x.country_code,'market_id':x.market_id,'governorate_id':x.governorate_id,'district_id':x.district_id,'locality_id':x.locality_id,'neighborhood':x.neighborhood,'street':x.street,'building':x.building,'geo_lat':str(x.geo_lat) if x.geo_lat is not None else None,'geo_lng':str(x.geo_lng) if x.geo_lng is not None else None,'address_confidence':x.address_confidence,'delivery_instructions':x.delivery_instructions} for x in rows]}
+
+@router.get('/buyer/mutations/{mutation_key}')
+def mutation_status(mutation_key:str,ctx=Depends(get_context),db=Depends(get_session)):
+    record=db.scalar(select(MutationRecord).where(
+        MutationRecord.tenant_id==ctx.tenant_id,
+        MutationRecord.actor_id==ctx.user_id,
+        MutationRecord.mutation_key==mutation_key,
+    ))
+    if record is None:
+        raise HTTPException(status_code=404, detail='mutation not found')
+    return {
+        'mutation_key':record.mutation_key,
+        'operation':record.operation,
+        'state':record.state,
+        'resource_type':record.resource_type,
+        'resource_id':record.resource_id,
+        'response':json.loads(record.response_json or '{}'),
+        'created_at':record.created_at.isoformat(),
+        'updated_at':record.updated_at.isoformat(),
+    }
 
 @router.get('/buyer/cart')
 def get_cart(market_id:int|None=None,ctx=Depends(get_context),db=Depends(get_session)): return MarketplaceService(db).cart_view(ctx.user_id,market_id)
