@@ -39,6 +39,24 @@ class AuditRecord(Base):
     metadata_json: Mapped[str] = mapped_column(Text, nullable=False, default="{}")
     occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, nullable=False)
 
+class MutationRecord(Base):
+    __tablename__ = "mutation_records"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    tenant_id: Mapped[int] = mapped_column(ForeignKey("tenants.id"), nullable=False, index=True)
+    actor_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    operation: Mapped[str] = mapped_column(String(120), nullable=False)
+    mutation_key: Mapped[str] = mapped_column(String(255), nullable=False)
+    request_hash: Mapped[str] = mapped_column(String(128), nullable=False)
+    state: Mapped[str] = mapped_column(String(20), nullable=False, default="pending")
+    resource_type: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    resource_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    response_json: Mapped[str] = mapped_column(Text, nullable=False, default="{}")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, nullable=False)
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "mutation_key", name="uq_mutation_tenant_key"),
+    )
+
 class IdempotencyRecord(Base):
     __tablename__ = "idempotency_records"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
