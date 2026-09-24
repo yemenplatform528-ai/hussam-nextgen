@@ -225,3 +225,16 @@ The current controlled stream closed several boundary gaps without introducing p
 - Main checkpoint `e4db41ecdf603934fe08c55129ad88f30474f98f` passed CI run `36061437291`; trusted CI artifact digest is `sha256:a4f8356561ca6bd0b7f314c551d35769cb6caa4d6d6ae4f85203110d3a59055e`.
 - Migration head is now `0037_capability_activation_actor` after the capability activation actor correction.
 - External production gates remain separate and fail-closed.
+
+
+## 2026-09-25 Remaining Yemen Capability Composition
+
+BUILD Phase 1 runtime composition now covers the full governed Yemen capability registry without creating parallel domain engines:
+
+- `yem_local_pricing` → bounded pricing behavior metadata.
+- `yem_business_verticals` → bounded vertical availability metadata.
+- `yem_branch_warehouse_network` → bounded branch/warehouse/service-area policy metadata.
+- `yem_local_reporting` → bounded reporting-dimension metadata.
+- Migration `0038_yemen_runtime_capability_schemas` gives these capabilities explicit configuration contracts; activation validation therefore remains fail-closed.
+- Main checkpoint `45178f749ffeb36a228142cfcb6fcb4c672ea320` passed CI run `36062483140` with fresh migration, schema drift, PostgreSQL integration, browser E2E, container security, dependency checks and trusted evidence generation.
+- The runtime smoke/readiness workflows also passed for this main checkpoint. External G01–G10 certification remains separate and open.

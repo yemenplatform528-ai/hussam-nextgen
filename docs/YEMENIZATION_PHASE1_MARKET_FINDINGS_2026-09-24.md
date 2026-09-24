@@ -93,3 +93,36 @@ Before implementation:
 4. Define delivery-zone primitives for governorate/city/locality.
 5. Map connectivity-aware checkout/search behavior.
 6. Convert only approved findings into Phase 1 implementation specifications after certification lock.
+
+
+## 2026-09-25 — Payment and agent-network research refresh
+
+This refresh is public capability research only. It does not certify an integration, provider contract, credential, settlement path or regulatory approval.
+
+### Kuraimi Bank
+The official Kuraimi service material describes Kuraimi Jawal as supporting financial operations from Yemen, including operation without internet through the application or voice channel, SMS/app notifications, deposits in YER/SAR/USD, and electronic shopping payments through its Haseb service and Haseb points across Yemen. This strengthens the Phase 1 requirement for an offline-aware payment adapter and a payment-method layer that can represent bank-account, wallet and merchant-checkout rails without making any one rail authoritative.
+
+Source: https://kuraimibank.com/ar/services/12
+
+### Al-Najm network
+Al-Najm's official site currently describes a Yemen-wide remittance/agent network with more than 2,000 authorized agents, coverage across governorates, 24/7 support, money transfer/receipt and foreign-currency buy/sell services. This supports modeling agent-network collection/payout as a separate payment/remittance adapter and treating service-point coverage as operational geography, not as a payment-provider implementation detail.
+
+Sources: https://www.annajmplus.com.ye/ and https://www.annajmplus.com.ye/AboutUs
+
+### Al-Qutaibi / Shalan
+Al-Qutaibi's official materials describe Qutaibi Mobile, the Shalan electronic wallet, enterprise web services, cardless cash withdrawal, SoftPOS, local/international transfers and electronic shopping. The Shalan app listing describes electronic payments, transfers and cash withdrawal through agents/service points. This reinforces a multi-rail adapter model: bank account, wallet, card/SoftPOS, agent cash and transfer rails must remain separate capabilities behind a common payment contract.
+
+Sources: https://qtbbank.com/ and https://www.qtbbank.com/services
+
+### Engineering consequence
+The payment boundary remains provider-neutral. Provider adapters should model at least:
+- bank-account payment;
+- wallet payment;
+- merchant checkout/payment token;
+- agent cash-in/cash-out;
+- remittance collection/payout;
+- card/SoftPOS acceptance where a certified contract exists;
+- asynchronous confirmation/reconciliation;
+- provider-specific limits, fees, references and settlement metadata.
+
+No public webpage is sufficient to close G03 Payments. Production activation still requires real credentials/contracts, webhook or confirmation evidence, reconciliation/settlement proof and applicable regulatory review.

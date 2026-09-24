@@ -324,3 +324,13 @@ The project owner has explicitly selected a **main-only operational model**. The
 - Main-branch runtime smoke run `36061437419` passed and readiness run `36061437379` passed. These remain engineering/runtime evidence, not G01–G10 closure.
 - G01–G10 remain `PENDING_EXTERNAL`; no external production certification is inferred from CI or staging smoke.
 - The repository remains under the `$0` free-first constraint; public GitHub standard runners are free, while free Render Postgres is explicitly unsuitable as durable production authority.
+
+
+## 2026-09-25 Runtime Completion Checkpoint
+
+- Main checkpoint after remaining Yemen capability composition: `45178f749ffeb36a228142cfcb6fcb4c672ea320`.
+- Added migration `0038_yemen_runtime_capability_schemas` defining explicit configuration contracts for local pricing, business verticals, branch/warehouse operations and local reporting.
+- MarketContextService now composes those four governed configurations; the public client contract projects only safe, bounded fields.
+- CI run `36062483140` passed all four engineering jobs for the checkpoint. Trusted CI artifact: `hussam-trusted-ci-evidence-36062483140`, digest `sha256:86b51606517c153288abdd76ff406efabf720ada7cae63fc8bf3e918e350f1a3`.
+- Runtime smoke run `36062483120` and readiness run `36062483110` both passed. They remain staging/runtime evidence and do not close G01–G10.
+- G01–G10 remain `PENDING_EXTERNAL`.
