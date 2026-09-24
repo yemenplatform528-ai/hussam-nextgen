@@ -55,6 +55,7 @@ class LogisticsProductionService:
         if order is None: raise LogisticsError('order not found in tenant')
         if order.status != 'fulfilled': raise LogisticsError('only fulfilled orders can be shipped')
         if order.warehouse_id != origin_warehouse_id: raise LogisticsError('shipment origin must match order warehouse')
+        if currency != order.currency: raise LogisticsError('shipment currency must match order currency')
         if Decimal(str(order.total)) < amount: raise LogisticsError('COD amount cannot exceed order total')
         if self.db.scalar(select(Shipment).where(Shipment.tenant_id == tenant_id, Shipment.reference == reference)):
             raise LogisticsError('duplicate shipment reference')
