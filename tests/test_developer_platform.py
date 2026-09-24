@@ -108,7 +108,7 @@ def test_market_capability_activation_persistence():
     db.flush()
     db.add(MarketCapabilityActivation(
         id="activation-1", market_id=10, capability_id="yem_delivery_modes",
-        status="active", configuration={"modes": ["pickup", "local_delivery"]}, activated_by=1,
+        status="active", configuration={"modes": ["pickup", "local_delivery"]}, activated_by="u1",
     ))
     db.commit()
     row = db.query(MarketCapabilityActivation).one()
