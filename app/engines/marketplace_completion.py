@@ -152,6 +152,16 @@ class MarketplaceCompletionService:
         x = MarketplaceCustomerCaseMessage(case_id=case_id, sender_user_id=sender_user_id, sender_role=sender_role, body=body, internal=internal)
         self.db.add(x); case.updated_at = datetime.now(timezone.utc); self.db.commit(); self.db.refresh(x); return x
 
+    def create_customer_case(self, buyer_user_id, case_type, subject, description='', priority='normal', seller_tenant_id=None, order_id=None):
+        from app.core.models.marketplace import MarketplaceOrder
+        if order_id is not None:
+            order = self.db.scalar(select(MarketplaceOrder).where(MarketplaceOrder.id == order_id, MarketplaceOrder.buyer_user_id == buyer_user_id))
+            if not order: raise MarketplaceCompletionError('order not found for buyer')
+            if seller_tenant_id is not None and order.seller_tenant_id != seller_tenant_id:
+                raise MarketplaceCompletionError('case seller does not match order seller')
+        x = MarketplaceCustomerCase(buyer_user_id=buyer_user_id, case_type=case_type, subject=subject, description=description, priority=priority, seller_tenant_id=seller_tenant_id, order_id=order_id)
+        self.db.add(x); self.db.commit(); self.db.refresh(x); return x
+
     def health_snapshot(self, seller_tenant_id, period_start, period_end):
         orders = self.db.scalars(select(MarketplaceOrder).where(MarketplaceOrder.seller_tenant_id == seller_tenant_id, MarketplaceOrder.created_at >= period_start, MarketplaceOrder.created_at <= period_end)).all()
         disputes = self.db.scalar(select(func.count()).select_from(MarketplaceDispute).join(MarketplaceOrder, MarketplaceOrder.id == MarketplaceDispute.marketplace_order_id).where(MarketplaceOrder.seller_tenant_id == seller_tenant_id, MarketplaceDispute.created_at >= period_start, MarketplaceDispute.created_at <= period_end)) or 0

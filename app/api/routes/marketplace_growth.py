@@ -113,7 +113,12 @@ def subscription(body:SubscriptionIn,ctx=Depends(get_context),db=Depends(get_ses
 
 @router.post('/buyer/cases',status_code=201)
 def case(body:CaseIn,ctx=Depends(get_context),db=Depends(get_session)):
-    x=MarketplaceCustomerCase(buyer_user_id=ctx.user_id,**body.model_dump()); db.add(x); db.commit(); db.refresh(x); return {'id':x.id,'status':x.status,'priority':x.priority}
+    try:
+        x=MarketplaceCompletionService(db).create_customer_case(ctx.user_id, **body.model_dump())
+    except MarketplaceCompletionError as exc:
+        status = 404 if 'not found' in str(exc) else 400
+        raise HTTPException(status_code=status, detail=str(exc))
+    return {'id':x.id,'status':x.status,'priority':x.priority}
 
 @router.get('/buyer/cases')
 def cases(ctx=Depends(get_context),db=Depends(get_session)):
