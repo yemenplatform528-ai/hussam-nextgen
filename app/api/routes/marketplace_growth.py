@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import desc, select
 from app.api.dependencies import get_context, get_session
 from app.api.routes.marketplace import seller_guard
+from app.core.models.marketplace import MarketplaceListing
 from app.core.models.marketplace_growth import (
     MarketplacePricingRule, MarketplacePromotion, MarketplacePromotionItem,
     MarketplaceBrand, MarketplaceBrandStore, MarketplaceAdCampaign, MarketplaceAdGroup, MarketplaceAdTarget,
@@ -58,7 +59,9 @@ def promotion(body:PromotionIn,ctx=Depends(get_context),db=Depends(get_session))
 def promotion_item(promotion_id:int,body:PromotionItemIn,ctx=Depends(get_context),db=Depends(get_session)):
     seller_guard(ctx); p=db.scalar(select(MarketplacePromotion).where(MarketplacePromotion.id==promotion_id,MarketplacePromotion.seller_tenant_id==ctx.tenant_id));
     if not p: raise ValueError('promotion not found')
-    x=MarketplacePromotionItem(promotion_id=p.id,listing_id=body.listing_id); db.add(x); db.commit(); db.refresh(x); return {'id':x.id,'promotion_id':p.id,'listing_id':x.listing_id}
+    listing=db.scalar(select(MarketplaceListing).where(MarketplaceListing.id==body.listing_id,MarketplaceListing.seller_tenant_id==ctx.tenant_id))
+    if not listing: raise ValueError('listing not found for seller')
+    x=MarketplacePromotionItem(promotion_id=p.id,listing_id=listing.id); db.add(x); db.commit(); db.refresh(x); return {'id':x.id,'promotion_id':p.id,'listing_id':x.listing_id}
 
 @router.post('/seller/brands',status_code=201)
 def brand(body:BrandIn,ctx=Depends(get_context),db=Depends(get_session)):
@@ -66,7 +69,10 @@ def brand(body:BrandIn,ctx=Depends(get_context),db=Depends(get_session)):
 
 @router.post('/seller/brand-stores',status_code=201)
 def brand_store(body:BrandStoreIn,ctx=Depends(get_context),db=Depends(get_session)):
-    seller_guard(ctx); x=MarketplaceBrandStore(**body.model_dump()); db.add(x); db.commit(); db.refresh(x); return {'id':x.id,'brand_id':x.brand_id,'slug':x.slug,'status':x.status}
+    seller_guard(ctx)
+    brand=db.scalar(select(MarketplaceBrand).where(MarketplaceBrand.id==body.brand_id,MarketplaceBrand.owner_tenant_id==ctx.tenant_id))
+    if not brand: raise ValueError('brand not found for seller')
+    x=MarketplaceBrandStore(brand_id=brand.id,slug=body.slug,title=body.title,content_json=body.content_json,status=body.status); db.add(x); db.commit(); db.refresh(x); return {'id':x.id,'brand_id':x.brand_id,'slug':x.slug,'status':x.status}
 
 @router.post('/seller/ad-campaigns',status_code=201)
 def ad_campaign(body:AdCampaignIn,ctx=Depends(get_context),db=Depends(get_session)):
@@ -74,15 +80,24 @@ def ad_campaign(body:AdCampaignIn,ctx=Depends(get_context),db=Depends(get_sessio
 
 @router.post('/seller/ad-groups',status_code=201)
 def ad_group(body:AdGroupIn,ctx=Depends(get_context),db=Depends(get_session)):
-    seller_guard(ctx); x=MarketplaceAdGroup(**body.model_dump()); db.add(x); db.commit(); db.refresh(x); return {'id':x.id,'campaign_id':x.campaign_id,'status':x.status}
+    seller_guard(ctx)
+    campaign=db.scalar(select(MarketplaceAdCampaign).where(MarketplaceAdCampaign.id==body.campaign_id,MarketplaceAdCampaign.seller_tenant_id==ctx.tenant_id))
+    if not campaign: raise ValueError('campaign not found for seller')
+    x=MarketplaceAdGroup(campaign_id=campaign.id,name=body.name,status=body.status,config_json=body.config_json); db.add(x); db.commit(); db.refresh(x); return {'id':x.id,'campaign_id':x.campaign_id,'status':x.status}
 
 @router.post('/seller/ad-targets',status_code=201)
 def ad_target(body:AdTargetIn,ctx=Depends(get_context),db=Depends(get_session)):
-    seller_guard(ctx); x=MarketplaceAdTarget(**body.model_dump()); db.add(x); db.commit(); db.refresh(x); return {'id':x.id,'ad_group_id':x.ad_group_id,'target_type':x.target_type}
+    seller_guard(ctx)
+    group=db.scalar(select(MarketplaceAdGroup).join(MarketplaceAdCampaign,MarketplaceAdCampaign.id==MarketplaceAdGroup.campaign_id).where(MarketplaceAdGroup.id==body.ad_group_id,MarketplaceAdCampaign.seller_tenant_id==ctx.tenant_id))
+    if not group: raise ValueError('ad group not found for seller')
+    x=MarketplaceAdTarget(ad_group_id=group.id,target_type=body.target_type,config_json=body.config_json); db.add(x); db.commit(); db.refresh(x); return {'id':x.id,'ad_group_id':x.ad_group_id,'target_type':x.target_type}
 
 @router.post('/seller/b2b-prices',status_code=201)
 def b2b_price(body:B2BPriceIn,ctx=Depends(get_context),db=Depends(get_session)):
-    seller_guard(ctx); x=MarketplaceB2BPrice(seller_tenant_id=ctx.tenant_id,**body.model_dump()); db.add(x); db.commit(); db.refresh(x); return {'id':x.id,'listing_id':x.listing_id,'unit_price':str(x.unit_price),'min_quantity':str(x.min_quantity)}
+    seller_guard(ctx)
+    listing=db.scalar(select(MarketplaceListing).where(MarketplaceListing.id==body.listing_id,MarketplaceListing.seller_tenant_id==ctx.tenant_id))
+    if not listing: raise ValueError('listing not found for seller')
+    x=MarketplaceB2BPrice(seller_tenant_id=ctx.tenant_id,listing_id=listing.id,unit_price=body.unit_price,min_quantity=body.min_quantity); db.add(x); db.commit(); db.refresh(x); return {'id':x.id,'listing_id':x.listing_id,'unit_price':str(x.unit_price),'min_quantity':str(x.min_quantity)}
 
 @router.post('/seller/bundles',status_code=201)
 def bundle(body:BundleIn,ctx=Depends(get_context),db=Depends(get_session)):
@@ -90,7 +105,10 @@ def bundle(body:BundleIn,ctx=Depends(get_context),db=Depends(get_session)):
 
 @router.post('/seller/subscriptions',status_code=201)
 def subscription(body:SubscriptionIn,ctx=Depends(get_context),db=Depends(get_session)):
-    seller_guard(ctx); x=MarketplaceSubscriptionOffer(seller_tenant_id=ctx.tenant_id,**body.model_dump()); db.add(x); db.commit(); db.refresh(x); return {'id':x.id,'listing_id':x.listing_id,'interval_unit':x.interval_unit,'interval_count':x.interval_count,'discount_bps':x.discount_bps}
+    seller_guard(ctx)
+    listing=db.scalar(select(MarketplaceListing).where(MarketplaceListing.id==body.listing_id,MarketplaceListing.seller_tenant_id==ctx.tenant_id))
+    if not listing: raise ValueError('listing not found for seller')
+    x=MarketplaceSubscriptionOffer(seller_tenant_id=ctx.tenant_id,listing_id=listing.id,interval_unit=body.interval_unit,interval_count=body.interval_count,discount_bps=body.discount_bps,active=body.active); db.add(x); db.commit(); db.refresh(x); return {'id':x.id,'listing_id':x.listing_id,'interval_unit':x.interval_unit,'interval_count':x.interval_count,'discount_bps':x.discount_bps}
 
 @router.post('/buyer/cases',status_code=201)
 def case(body:CaseIn,ctx=Depends(get_context),db=Depends(get_session)):
