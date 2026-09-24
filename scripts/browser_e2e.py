@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Engineering browser UI contract run for Hussam NextGen."""
+import os
 from pathlib import Path
 from playwright.sync_api import sync_playwright
 
@@ -55,7 +56,7 @@ def build_page(browser, width, height):
 
 def run():
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True, executable_path="/usr/bin/chromium", args=["--no-sandbox"])
+        browser = p.chromium.launch(headless=True, executable_path=os.environ.get("CHROMIUM_EXECUTABLE"), args=["--no-sandbox"])
         try:
             for width, height in ((1440, 1000), (390, 844)):
                 page = build_page(browser, width, height)
