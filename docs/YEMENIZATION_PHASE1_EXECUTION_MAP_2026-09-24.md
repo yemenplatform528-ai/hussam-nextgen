@@ -255,3 +255,37 @@ No provider certification, live credentials, settlement integration, or external
 - Container security scan: passed.
 
 Next controlled capability slice: connectivity-aware mutation behavior, with special attention to offline drafts, explicit pending states, replay-safe idempotency, and prohibition of offline payment/ledger authority.
+
+
+## 11. BUILD execution checkpoint — connectivity-safe checkout mutation (2026-09-24)
+
+The next controlled connectivity slice is now implemented on branch `feat/yemen-connectivity-idempotency`:
+
+- Checkout accepts an optional HTTP `Idempotency-Key`.
+- The request hash is derived from the authenticated buyer identity plus the canonical checkout body; the same key cannot be reused for a different request.
+- The existing `IdempotencyRecord` table is used as the persistence boundary; no new schema is required for this slice.
+- Reservation and checkout order creation share one database transaction. A concurrent replay cannot create a second marketplace order.
+- A replay after a committed checkout returns the original order IDs instead of executing checkout again.
+- Failed first attempts release the reservation with the surrounding transaction, allowing a safe retry.
+- The browser checkout stores a local draft only when the request cannot safely be sent; the draft is explicitly labeled as **not an order**.
+- Offline checkout does not call the checkout API and therefore cannot create an order, payment intent, or ledger mutation.
+- A failed online submission keeps the same idempotency key so a retry remains replay-safe if the first request actually reached the server.
+- Browser E2E now verifies offline draft behavior, zero checkout calls while offline, and the presence of an idempotency key when connectivity returns.
+
+The authoritative boundary is therefore:
+
+`Offline UI draft → connectivity check → Idempotency-Key → server-authoritative checkout → immutable order snapshot`
+
+This does not make payment, ledger posting, or provider execution available offline. It also does not certify any payment provider.
+
+### Acceptance intent
+
+The slice must remain fail-closed for:
+
+1. duplicate idempotency keys with different request bodies;
+2. duplicate order creation after browser/network retry;
+3. offline API mutation;
+4. offline payment/ledger authority;
+5. client-supplied authoritative totals or fees.
+
+The next controlled work after CI verification is conflict/sync proof for broader offline-capable mutations, followed by the remaining Yemen capabilities in the execution map.
