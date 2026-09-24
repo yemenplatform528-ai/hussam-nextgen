@@ -62,7 +62,8 @@ def test_health_snapshot_and_integration_primitives():
 def test_coupon_redemption_is_bound_to_buyer_order_and_authoritative_amounts():
     db,seller,buyer,su,l=setup(); svc=MarketplaceCompletionService(db); now=datetime.now(timezone.utc)
     from app.core.models.marketplace import MarketplaceOrder
-    other=IdentityService(db).create_user('other-buyer@example.test','Other Buyer')
+    from app.engines.identity import IdentityService
+    other=IdentityService(db).create_user('other-buyer','other-buyer@example.test')
     o=MarketplaceOrder(reference='coupon-owner-check',buyer_user_id=buyer.id,seller_tenant_id=seller.id,currency='YER',subtotal=1000,shipping_fee=0,platform_fee=0,total=1000,status='pending_payment'); db.add(o); db.commit(); db.refresh(o)
     c=svc.create_coupon(seller.id,'OWNERCHECK','percentage',Decimal('10'),now-timedelta(minutes=1),now+timedelta(hours=1),currency='YER',minimum_subtotal=500,per_buyer_limit=1)
     with pytest.raises(MarketplaceCompletionError, match='does not belong to buyer'):
