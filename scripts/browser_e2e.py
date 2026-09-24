@@ -85,7 +85,7 @@ def run():
                     page.locator("#checkoutForm button").click()
                     page.wait_for_timeout(100)
                     assert page.locator("#notice").is_visible()
-                    assert "تم حفظ مسودة محلية فقط" in page.locator("#notice").text_content()
+                    assert "تم حفظ مسودة محلية فقط؛ لم يتم إنشاء أي طلب." in page.locator("#notice").text_content()
                     assert page.evaluate("Object.keys(window.__e2eStorage._).some(k => k.startsWith('hussam_checkout_draft_'))")
                     assert page.evaluate("window.__e2eCheckoutCalls") == 0
                     page.evaluate("Object.defineProperty(navigator, 'onLine', {configurable:true, get:()=>true})")
