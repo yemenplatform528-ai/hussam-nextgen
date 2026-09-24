@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, CheckConstraint, Date, DateTime, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 from app.core.persistence import Base
 
@@ -55,6 +55,7 @@ class MutationRecord(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, nullable=False)
     __table_args__ = (
         UniqueConstraint("tenant_id", "mutation_key", name="uq_mutation_tenant_key"),
+        CheckConstraint("state IN ('draft','pending','confirmed','failed','conflict')", name="ck_mutation_state"),
     )
 
 class IdempotencyRecord(Base):
