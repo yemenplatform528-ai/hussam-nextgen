@@ -310,3 +310,17 @@ The project owner has explicitly selected a **main-only operational model**. The
 - The deleted branch-consolidation audit is now historical execution evidence; its operational conclusion remains recorded here: `main` is the sole operational development source, while remaining non-main refs are historical/retirement candidates.
 - Legacy `scripts/release_check.sh` was removed; the fail-closed `scripts/final_release_gate.py` plus deterministic `scripts/artifact_manifest.py` are the current release controls.
 - This cleanup changes the release tree, so all CI/provenance evidence from earlier commits is historical and must not be reused as evidence for the new head.
+
+
+## 2026-09-25 Controlled Engineering Checkpoint
+
+- Current main at checkpoint: `e4db41ecdf603934fe08c55129ad88f30474f98f`.
+- PR #45 enforced an active marketplace seller identity before seller-specific Yemen checkout context is returned; CI run `36060696094` passed all four jobs.
+- PR #46 added executable Developer Platform role and tenant-boundary regression coverage; CI run `36060763426` passed all four jobs.
+- PR #47 hardened migration `0037_capability_activation_actor` so downgrade fails closed when non-numeric User identities would be lost; CI run `36060828528` passed all four jobs.
+- PR #48 explicitly allow-listed public geography context; corrected test coverage was verified by CI run `36061161099`, which passed all four jobs.
+- PR #49 aligned README, release-boundary and changelog documentation with the current Yemenization model; CI run `36061109920` passed all four jobs.
+- Main CI for checkpoint `e4db41ecdf603934fe08c55129ad88f30474f98f` passed as run `36061437291`; trusted artifact `hussam-trusted-ci-evidence-36061437291` has digest `sha256:a4f8356561ca6bd0b7f314c551d35769cb6caa4d6d6ae4f85203110d3a59055e`.
+- Main-branch runtime smoke run `36061437419` passed and readiness run `36061437379` passed. These remain engineering/runtime evidence, not G01–G10 closure.
+- G01–G10 remain `PENDING_EXTERNAL`; no external production certification is inferred from CI or staging smoke.
+- The repository remains under the `$0` free-first constraint; public GitHub standard runners are free, while free Render Postgres is explicitly unsuitable as durable production authority.

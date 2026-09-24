@@ -211,3 +211,17 @@ The cleanup also removed superseded dated verification/readiness snapshots, lega
 The current migration tree reaches revision `0036_mutation_records`; the previous inventory statement about 28 migrations was therefore historical and is no longer authoritative. The current repository state must be measured again by exact-head CI before any release certification claim.
 
 The project remains fail-closed: G01–G10 are not closed, exact-head CI for the post-cleanup head must be observed, and the final release manifest/artifact must be regenerated only after the candidate SHA is frozen.
+
+
+## 2026-09-25 Current Engineering Hardening Checkpoint
+
+The current controlled stream closed several boundary gaps without introducing parallel domain engines:
+
+- `0037_capability_activation_actor` now follows the string `User.id` actor contract, and its downgrade refuses lossy coercion when non-numeric user identities exist.
+- Yemen checkout context now requires an active `MarketplaceSellerProfile` before returning seller-specific context.
+- Developer Platform role and tenant-scoped extension lookup boundaries have executable regression coverage.
+- The client market-context geography response is explicitly field allow-listed rather than returning the runtime geography object wholesale.
+- README/release/changelog documentation now describes Yemenization as a governed compatibility layer over shared engines.
+- Main checkpoint `e4db41ecdf603934fe08c55129ad88f30474f98f` passed CI run `36061437291`; trusted CI artifact digest is `sha256:a4f8356561ca6bd0b7f314c551d35769cb6caa4d6d6ae4f85203110d3a59055e`.
+- Migration head is now `0037_capability_activation_actor` after the capability activation actor correction.
+- External production gates remain separate and fail-closed.
