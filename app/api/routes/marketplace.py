@@ -189,6 +189,27 @@ def remove_cart(listing_id:int,ctx=Depends(get_context),db=Depends(get_session))
 
 @router.post('/buyer/checkout',status_code=201)
 def checkout(body:CheckoutIn,ctx=Depends(get_context),db=Depends(get_session)):
+    # Yemen runtime validation is advisory to the domain checkout boundary:
+    # it validates market/address context without replacing authoritative totals,
+    # quotes, inventory, payment or order mutation in MarketplaceService.
+    if body.market_id is not None or body.shipping_address_id is not None:
+        from app.core.services.yemen_checkout_context import YemenCheckoutContextService
+        from app.core.models.market import MarketContext
+        market_code = None
+        if body.market_id is not None:
+            market = db.scalar(select(MarketContext).where(MarketContext.id == body.market_id))
+            market_code = market.code if market else None
+        if market_code is not None:
+            try:
+                context = YemenCheckoutContextService(db).build(
+                    market_code,
+                    user_id=ctx.user_id,
+                    address_id=body.shipping_address_id,
+                )
+                if body.shipping_address_id is not None and context['delivery']['destination']['coverage'] not in {'available', 'active'}:
+                    raise HTTPException(status_code=409, detail='delivery coverage is not available for this address')
+            except ValueError as exc:
+                raise HTTPException(status_code=409 if str(exc) == 'market is not active' else 404, detail=str(exc))
     orders=MarketplaceService(db).checkout(ctx.user_id,shipping_address_id=body.shipping_address_id,shipping_fee=body.shipping_fee,shipping_quote_id=body.shipping_quote_id,shipping_quote_ids=body.shipping_quote_ids,market_id=body.market_id)
     return {'orders':[{'id':o.id,'reference':o.reference,'seller_tenant_id':o.seller_tenant_id,'currency':o.currency,'subtotal':str(o.subtotal),'shipping_fee':str(o.shipping_fee),'platform_fee':str(o.platform_fee),'total':str(o.total),'status':o.status} for o in orders]}
 
