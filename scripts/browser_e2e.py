@@ -71,7 +71,7 @@ def run():
                     page.wait_for_timeout(100)
                     page.locator("button[data-action='cart']").click()
                     page.wait_for_timeout(150)
-                    page.locator("button[data-action='checkout']").click()
+                    page.locator("button[data-action='checkout']:visible").click()
                     page.wait_for_timeout(150)
                     assert page.locator("h1", has_text="إتمام الطلب").is_visible()
                     assert page.locator("text=ريال يمني").is_visible()
