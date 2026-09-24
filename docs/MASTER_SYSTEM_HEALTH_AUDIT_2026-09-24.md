@@ -22,13 +22,13 @@ No rebuild is justified. The next work must be controlled convergence, verificat
 
 Repository: yemenplatform528-ai/hussam-nextgen
 
-Current main merge commit: 3eff91dbfa3d2620144ffe5684d535dd6958107d
+Current main head: `aa33e323c63eed4bf2010285a59246979a09704e`.
 
-PR #39 is merged. There are no open pull requests at the time of this audit.
+PR #40 is merged. The latest main changes are provenance-hardening and control-document synchronization.
 
-PR #39 CI run 36019937809 completed successfully across baseline, PostgreSQL integration, container security and browser E2E.
+The connected workflow-run interface currently exposes no push-triggered CI run for this exact main head, and the combined status is empty. Therefore exact-head CI is **NOT CLAIMED GREEN**. The most recent independently observed green engineering CI remains historical evidence and is not silently promoted to this new head.
 
-The browser job verifies the existing mocked desktop/mobile contract. It is not production certification.
+G01–G10 remain `PENDING_EXTERNAL`; final release lock remains open.
 
 ## 2. Architecture health
 
@@ -100,29 +100,29 @@ This permits the final gate to bind release manifest ↔ exact commit ↔ truste
 
 ## 8. Final-release gate finding
 
-The initial final-release gate had two fail-open characteristics:
-1. trusted CI evidence was optional at invocation;
-2. the release manifest was checked for shape/files but was not cryptographically bound to the expected Git commit or trusted CI source hash.
+The final-release gate has now been hardened and merged to `main`.
 
-That did not corrupt the project, because the external evidence gate still blocks a final PASS today, but it was not strong enough for the stated final-lock protocol.
+It requires:
+- external evidence `closed=10` and `pending_external=0`;
+- a valid release manifest;
+- release-manifest source commit equal to the expected release commit;
+- a deterministic source-manifest hash;
+- mandatory trusted CI evidence;
+- trusted CI status `passed`;
+- trusted CI commit equal to the expected release commit;
+- trusted CI source-manifest hash equal to the release manifest hash.
 
-This audit hardened the gate so it now requires external evidence 10/10 closed; valid release manifest; release manifest source commit equal to expected commit; release manifest source hash present; trusted CI evidence mandatory; trusted CI status passed; trusted CI commit equal to expected commit; trusted CI source hash equal to release manifest source hash.
+Executable tests cover missing CI evidence, source-manifest mismatch and matching provenance acceptance.
 
-Executable tests were added for these conditions.
-
-Assessment: corrected on the audit branch; must pass CI and be merged before it becomes release authority.
+Assessment: **HARDENED AND MERGED / EXACT-HEAD CI STILL REQUIRED BEFORE RELEASE AUTHORITY**.
 
 ## 9. Documentation / control-plane health
 
-The documentation set is rich and mostly consistent, but there is controlled duplication and temporal drift.
+A synchronization pass has been performed after provenance hardening. The repository's latest control checkpoint records the exact current main head and the absence of an observed exact-head push CI result.
 
-For example, MASTER_SYSTEM_AUDIT_2026-09-24.md still contains older checkpoint references to commit b6b231ce... and CI #123 even though the repository has progressed through PRs #35–#39.
+Older dated checkpoints intentionally remain as historical audit evidence. They must not be interpreted as current-head status.
 
-This is not a code defect, but it is a source-of-truth hygiene defect.
-
-The project needs one final synchronization pass so that Master Execution Control, Master System Audit, Yemenization Execution Map, Trusted CI Evidence, Cross-capability E2E, Developer Platform Contract, Final Release Lock Protocol and the production evidence register all point to the same current state without obsolete current claims.
-
-Assessment: NEEDS CONSOLIDATION.
+Assessment: **CONTROLLED / HISTORICAL CHECKPOINTS RETAINED EXPLICITLY**.
 
 ## 10. Branch hygiene
 
@@ -140,23 +140,19 @@ Do not rebuild the marketplace; rewrite Finance; create a second payment engine;
 
 ## 12. Remaining controlled work
 
-### Engineering
-1. Merge and verify the final-release provenance hardening.
-2. Consolidate the master control documents.
-3. Complete remaining Yemen capability behavior wiring where runtime context is not yet consumed.
-4. Build the cross-capability Yemen E2E against production-like infrastructure.
-5. Finish Developer Platform trusted provenance integration without conflating repository and extension identities.
+### Immediate convergence
+1. Observe and verify exact-head CI for `aa33e323c63eed4bf2010285a59246979a09704e`.
+2. Preserve trusted CI evidence and source-manifest hash from that exact run.
+3. Keep the current release gate fail-closed until G01–G10 evidence is real.
+4. Execute real G01–G10 evidence collection and validation.
+5. Freeze the exact final release commit only after all release-surface changes are complete.
+6. Generate a fresh release manifest from that exact tree.
+7. Run the fail-closed final gate.
+8. Create and hash the final artifact.
+9. Record rollback/migration compatibility and the final lock decision.
 
-### Certification
-6. Collect real G01–G10 evidence.
-7. Validate every evidence envelope.
-8. Freeze exact release commit.
-9. Generate fresh release manifest.
-10. Run exact-head CI and preserve provenance.
-11. Run fail-closed final gate.
-12. Create final artifact and SHA-256.
-13. Record rollback/migration compatibility.
-14. Tag/lock the release.
+### Non-blocking preparation
+Yemenization, Developer Platform, cross-capability E2E and operating evidence may be prepared in parallel, but none may be used to bypass the certification boundary.
 
 ## 13. Final health statement
 
