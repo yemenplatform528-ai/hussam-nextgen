@@ -1,3 +1,12 @@
+## 2026-09-25 — Yemenization and governance hardening
+
+- Aligned marketplace capability activation actors with the string-based `User.id` identity contract through migration `0037_capability_activation_actor`.
+- Hardened the migration downgrade to fail closed when non-numeric user identities would be lost.
+- Enforced active seller identity before seller-specific Yemen checkout context is exposed.
+- Added executable Developer Platform role and tenant-boundary regression coverage.
+- Explicitly allow-listed the public geography market-context contract so future internal geography fields cannot leak to clients.
+- Kept all external G01–G10 gates fail-closed; these engineering changes do not constitute external production certification.
+
 ## Y2 Foundation final integrity closure
 
 - Enforced same-market geography parent relationships at the database layer.
