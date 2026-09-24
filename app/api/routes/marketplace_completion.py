@@ -19,7 +19,7 @@ class CouponRedeemIn(BaseModel): coupon_code:str; marketplace_order_id:int; subt
 class AdEventIn(BaseModel):
     campaign_id:int; event_type:str; listing_id:int|None=None; ad_group_id:int|None=None; buyer_user_id:str|None=None; currency:str; bid:Decimal|None=Field(default=None,ge=0); attribution_key:str|None=None; metadata:dict={}
 class AdConversionIn(BaseModel): campaign_id:int; order_id:int; revenue:Decimal=Field(ge=0); listing_id:int|None=None
-class CaseMessageIn(BaseModel): sender_role:str; body:str=Field(min_length=1); internal:bool=False
+class CaseMessageIn(BaseModel): body:str=Field(min_length=1); internal:bool=False
 class HealthSnapshotIn(BaseModel): period_start:datetime; period_end:datetime
 class FeedIn(BaseModel): feed_type:str; payload:dict={}
 class FeedCompleteIn(BaseModel): success:bool=True; error:str|None=None
@@ -59,7 +59,8 @@ def ad_conversion(body:AdConversionIn,ctx=Depends(get_context),db=Depends(get_se
 
 @router.post('/seller/cases/{case_id}/messages', status_code=201)
 def case_message(case_id:int,body:CaseMessageIn,ctx=Depends(get_context),db=Depends(get_session)):
-    x=MarketplaceCompletionService(db).add_case_message(case_id, ctx.user_id, body.sender_role, body.body, body.internal)
+    seller_guard(ctx)
+    x=MarketplaceCompletionService(db).add_case_message(case_id, ctx.user_id, 'seller', body.body, body.internal, seller_tenant_id=ctx.tenant_id)
     return {'id':x.id,'case_id':x.case_id,'sender_role':x.sender_role,'internal':x.internal,'created_at':x.created_at.isoformat()}
 
 @router.post('/seller/health/snapshot', status_code=201)
@@ -80,7 +81,7 @@ def complete_feed(feed_id:int,body:FeedCompleteIn,ctx=Depends(get_context),db=De
 
 @router.post('/seller/integrations/webhooks', status_code=202)
 def queue_webhook(body:WebhookIn,ctx=Depends(get_context),db=Depends(get_session)):
-    seller_guard(ctx); x=MarketplaceCompletionService(db).queue_webhook(body.integration_app_id, body.event_type, body.event_id, body.payload)
+    seller_guard(ctx); x=MarketplaceCompletionService(db).queue_webhook(body.integration_app_id, body.event_type, body.event_id, body.payload, owner_tenant_id=ctx.tenant_id)
     return {'id':x.id,'status':x.status,'event_type':x.event_type,'event_id':x.event_id}
 
 @router.post('/seller/analytics/snapshot', status_code=201)
