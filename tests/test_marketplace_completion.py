@@ -15,13 +15,13 @@ from app.engines.marketplace import MarketplaceService, ListingInput, Marketplac
 from app.engines.marketplace_completion import MarketplaceCompletionService
 
 def setup():
-    e=create_engine('sqlite+pysqlite:///:memory:',future=True); Base.metadata.create_all(e); db=sessionmaker(e,expire_on_commit=False)(); ensure_market(db, code='YEM')
+    e=create_engine('sqlite+pysqlite:///:memory:',future=True); Base.metadata.create_all(e); db=sessionmaker(e,expire_on_commit=False)(); market=ensure_market(db, code='YEM')
     ids=IdentityService(db); seller=ids.create_tenant('Seller'); buyer_t=ids.create_tenant('Buyer'); buyer=ids.create_user('buyer','buyer@example.com'); su=ids.create_user('seller','seller@example.com'); ids.add_membership(buyer.id,buyer_t.id,'owner'); ids.add_membership(su.id,seller.id,'owner')
     inv=InventoryProductionService(db); inv.create_item(seller.id,'rice','Rice','bag'); inv.create_warehouse(seller.id,'wh','Main'); inv.record(seller.id,StockMovement('rice','wh',Decimal('20'),'in','opening'))
     m=MarketplaceService(db); m.register_seller(seller.id,'seller','Seller'); m.review_seller_verification(seller.id,su.id,'approved')
     l=m.create_listing(seller.id,ListingInput('rice','Rice','product','product','YER',Decimal('1000'),'rice','wh'))
     m.moderate_listing(l.id,su.id,'approved')
-    m.publish_listing(seller.id,l.id); m.ensure_buyer(buyer.id); a=m.add_address(buyer.id,'home','Buyer','777','Aden','Aden','Street')
+    m.publish_listing(seller.id,l.id); m.ensure_buyer(buyer.id); a=m.add_address(buyer.id,'home','Buyer','777','Aden','Aden','Street',market_id=market.id)
     return db,seller,buyer,su,l,a,m
 
 def test_verification_is_required_for_activation_and_public_visibility():
