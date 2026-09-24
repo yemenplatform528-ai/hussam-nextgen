@@ -94,14 +94,12 @@ def subscription(body:SubscriptionIn,ctx=Depends(get_context),db=Depends(get_ses
 
 @router.post('/buyer/cases',status_code=201)
 def case(body:CaseIn,ctx=Depends(get_context),db=Depends(get_session)):
-    if body.order_id is not None:
-        from app.core.models.marketplace import MarketplaceOrder
-        order = db.scalar(select(MarketplaceOrder).where(MarketplaceOrder.id == body.order_id, MarketplaceOrder.buyer_user_id == ctx.user_id))
-        if not order:
-            raise HTTPException(status_code=404, detail='order not found for buyer')
-        if body.seller_tenant_id is not None and order.seller_tenant_id != body.seller_tenant_id:
-            raise HTTPException(status_code=400, detail='case seller does not match order seller')
-    x=MarketplaceCustomerCase(buyer_user_id=ctx.user_id,**body.model_dump()); db.add(x); db.commit(); db.refresh(x); return {'id':x.id,'status':x.status,'priority':x.priority}
+    try:
+        x=MarketplaceCompletionService(db).create_customer_case(ctx.user_id, **body.model_dump())
+    except MarketplaceCompletionError as exc:
+        status = 404 if 'not found' in str(exc) else 400
+        raise HTTPException(status_code=status, detail=str(exc))
+    return {'id':x.id,'status':x.status,'priority':x.priority}
 
 @router.get('/buyer/cases')
 def cases(ctx=Depends(get_context),db=Depends(get_session)):
