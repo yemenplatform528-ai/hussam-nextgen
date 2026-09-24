@@ -32,7 +32,8 @@ class MarketCapabilityActivation(Base):
     capability_id: Mapped[str] = mapped_column(ForeignKey("platform_capabilities.id", ondelete="RESTRICT"), nullable=False)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="active")
     configuration: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
-    activated_by: Mapped[int | None] = mapped_column(nullable=True)
+    # Actor identity follows the platform's User.id contract (string), not Tenant.id (integer).
+    activated_by: Mapped[str | None] = mapped_column(String(255), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, nullable=False)
     __table_args__ = (
