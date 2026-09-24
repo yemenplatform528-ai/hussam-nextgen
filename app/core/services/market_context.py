@@ -192,6 +192,10 @@ class MarketContextService:
                     "hus_uses_domain_contracts": True,
                 },
             },
+            "pricing": local_pricing_configuration,
+            "verticals": business_verticals_configuration,
+            "operations": branch_warehouse_configuration,
+            "reporting": local_reporting_configuration,
             "capabilities": [
                 {
                     "code": capability.code,
