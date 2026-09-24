@@ -289,3 +289,17 @@ The slice must remain fail-closed for:
 5. client-supplied authoritative totals or fees.
 
 The next controlled work after CI verification is conflict/sync proof for broader offline-capable mutations, followed by the remaining Yemen capabilities in the execution map.
+
+## BUILD execution checkpoint — explicit mutation lifecycle + cart replay safety (2026-09-24)
+
+The connectivity mutation foundation is now wired to a real non-financial Marketplace mutation.
+
+- MutationRecord provides tenant/actor-scoped mutation keys, canonical request-hash binding, replay detection, and explicit DRAFT/PENDING/CONFIRMED/FAILED/CONFLICT lifecycle states.
+- Migration 0036_mutation_records is baseline-safe: the canonical 0001 metadata bootstrap may already create the table, while genuinely incremental databases receive the table from 0036.
+- Marketplace cart add/remove mutations accept Idempotency-Key and use the lifecycle service without moving domain authority out of MarketplaceService.
+- A confirmed replay returns the stored cart result and does not apply the mutation twice.
+- Reuse of the same mutation key with a different request is rejected.
+- Payment, ledger, checkout authority, and provider operations remain outside the connectivity mutation lifecycle.
+- PR #30 merged after full CI success.
+- PR #31 merged after full CI success: baseline, PostgreSQL migration/schema-drift/integration, container security.
+- The next controlled slice is synchronization/conflict evidence and UI lifecycle visibility, followed by Documents/Notifications and then Search/Pricing/CRM. Financial mutations remain server-authoritative and offline payment/ledger authority remains prohibited.
