@@ -322,8 +322,8 @@ def publish_version(extension_id: str, version: str, ctx=Depends(get_context), d
     x, v = _get_version(db, ctx.tenant_id, extension_id, version)
     if not v:
         raise HTTPException(status_code=404, detail="extension version not found")
-    if v.test_status != "passed":
-        raise HTTPException(status_code=409, detail="version must pass tests before publish")
+    if v.test_status != "passed" or not v.test_evidence_hash or not v.test_run_id or not v.tested_at or v.test_source_hash != v.source_hash:
+        raise HTTPException(status_code=409, detail="version requires source-bound test evidence before publish")
     if v.release_status not in {"draft", "sandbox"}:
         raise HTTPException(status_code=409, detail="version is not publishable from its current state")
 
@@ -431,6 +431,10 @@ def rollback_extension(extension_id: str, ctx=Depends(get_context), db=Depends(g
             DeveloperExtensionVersion.extension_id == x.id,
             DeveloperExtensionVersion.version == target_version,
             DeveloperExtensionVersion.test_status == "passed",
+            DeveloperExtensionVersion.test_source_hash == DeveloperExtensionVersion.source_hash,
+            DeveloperExtensionVersion.test_evidence_hash.is_not(None),
+            DeveloperExtensionVersion.test_run_id.is_not(None),
+            DeveloperExtensionVersion.tested_at.is_not(None),
             DeveloperExtensionVersion.release_status.in_({"published", "suspended", "rolled_back"}),
         )
     )
