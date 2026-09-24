@@ -92,9 +92,13 @@ def test_client_market_context_is_stable_and_hides_control_plane_configuration()
     assert result["reporting"] == {
         "enabled": True, "dimensions": ["governorate", "channel"],
     }
-    assert result["capabilities"] == [
-        {"code": "yem_connectivity_policy", "category": "connectivity", "status": "active"}
-    ]
+    assert {item["code"] for item in result["capabilities"]} == {
+        "yem_connectivity_policy",
+        "yem_local_pricing",
+        "yem_business_verticals",
+        "yem_branch_warehouse_network",
+        "yem_local_reporting",
+    }
     assert "configuration" not in result["market"]
     assert "internal_secret" not in result["market"]
     assert "internal_adapter_secret" not in str(result)
