@@ -296,7 +296,7 @@ def record_test_evidence(extension_id: str, version: str, body: TestEvidenceIn, 
     x, v = _get_version(db, ctx.tenant_id, extension_id, version)
     if not v:
         raise HTTPException(status_code=404, detail="extension version not found")
-    if v.test_status == "passed" and v.test_evidence_hash:
+    if v.test_evidence_hash:
         raise HTTPException(status_code=409, detail="test evidence is immutable once recorded")
     v.test_status = body.status
     v.test_evidence_hash = body.evidence_hash.lower()
