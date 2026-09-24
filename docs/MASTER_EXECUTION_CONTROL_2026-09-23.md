@@ -269,7 +269,7 @@ The project remains fail-closed at the external certification boundary.
 - The old verification branch `verify/yemen-platform-developer-2026-09-24` contains only a verification marker and no production/runtime value.
 - `cert/g02-readiness-2026-09-24` is superseded by the safer readiness workflow already on main, which persists only documented contract fields and an explicit certification status.
 - Recovery and transport branches are intentionally preserved because they have no common ancestor with main and carry historical recovery/transport meaning.
-- The detailed branch-by-branch record is `docs/BRANCH_CONSOLIDATION_AUDIT_2026-09-24.md`.
+- The detailed branch-by-branch audit was completed and then removed as a superseded historical copy; its operational conclusions are retained in this control document.
 - No production certification or final release lock is implied by branch consolidation.
 - The connected GitHub write surface does not expose branch-ref deletion, so the audited retirement set is recorded as safe-to-delete rather than falsely reported as already deleted.
 
