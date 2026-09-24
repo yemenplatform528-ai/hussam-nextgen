@@ -184,10 +184,12 @@ def addresses(ctx=Depends(get_context),db=Depends(get_session)):
 def get_cart(market_id:int|None=None,ctx=Depends(get_context),db=Depends(get_session)): return MarketplaceService(db).cart_view(ctx.user_id,market_id)
 
 @router.post('/buyer/cart/items')
-def add_cart(body:CartIn,ctx=Depends(get_context),db=Depends(get_session)): MarketplaceService(db).add_to_cart(ctx.user_id,body.listing_id,body.quantity); return MarketplaceService(db).cart_view(ctx.user_id)
+def add_cart(body:CartIn,ctx=Depends(get_context),db=Depends(get_session),idempotency_key: str | None = Header(default=None, alias='Idempotency-Key')):
+    return MarketplaceService(db).add_to_cart(ctx.user_id,body.listing_id,body.quantity,mutation_key=idempotency_key,tenant_id=ctx.tenant_id)
 
 @router.delete('/buyer/cart/items/{listing_id}')
-def remove_cart(listing_id:int,ctx=Depends(get_context),db=Depends(get_session)): MarketplaceService(db).remove_from_cart(ctx.user_id,listing_id); return MarketplaceService(db).cart_view(ctx.user_id)
+def remove_cart(listing_id:int,ctx=Depends(get_context),db=Depends(get_session),idempotency_key: str | None = Header(default=None, alias='Idempotency-Key')):
+    return MarketplaceService(db).remove_from_cart(ctx.user_id,listing_id,mutation_key=idempotency_key,tenant_id=ctx.tenant_id)
 
 @router.post('/buyer/checkout',status_code=201)
 def checkout(body:CheckoutIn,ctx=Depends(get_context),db=Depends(get_session),idempotency_key: str | None = Header(default=None, alias='Idempotency-Key')):
