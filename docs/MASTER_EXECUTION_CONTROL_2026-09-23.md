@@ -289,3 +289,13 @@ The project owner has explicitly selected a **main-only operational model**. The
 - The requested end state remains main-only for operational development. Historical recovery/transport material is archival metadata, not a second development line.
 - GitHub's connected write surface currently exposes branch creation and ref movement but no branch-ref deletion operation. The automatic branch-deletion setting does not itself delete arbitrary existing branches; it normally cleans up branches associated with merged pull requests. Therefore existing historical refs cannot honestly be reported as deleted through the current tool surface.
 - The recovery archive ref was intentionally created before any deletion attempt so the historical baseline has a durable reference independent of the original recovery branch.
+
+
+## 2026-09-24 main-only operational verification
+
+- Re-queried the live repository branch refs after the consolidation checkpoint: 32 refs are currently present, with `main` as the sole operational branch.
+- No additional feature/fix/docs/test branch is being promoted into main; the prior audit found no missing production value requiring re-merge.
+- The remaining non-main refs are historical/retirement candidates, including the recovery archive. They are not part of the operational development path.
+- The connected GitHub write surface still exposes no branch-ref deletion operation. Therefore ref deletion remains an external GitHub administration action rather than an operation this control plane can truthfully mark complete.
+- This verification does not alter the release-certification boundary: G01–G10 remain external, and final release lock remains closed.
+- Next execution authority remains: stabilize main, observe exact-head CI on the final candidate, then proceed through the evidence-bound release path without changing the candidate SHA during certification.
