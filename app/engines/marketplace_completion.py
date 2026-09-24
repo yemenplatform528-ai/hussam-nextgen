@@ -3,7 +3,7 @@ from decimal import Decimal, ROUND_HALF_UP
 from uuid import uuid4
 from sqlalchemy import select, func
 
-from app.core.models.marketplace import MarketplaceListing, MarketplaceOrder, MarketplaceDispute, MarketplaceReturnRequest
+from app.core.models.marketplace import MarketplaceListing, MarketplaceOrder, MarketplaceOrderLine, MarketplaceDispute, MarketplaceReturnRequest
 from app.core.models.marketplace_operational import MarketplaceDiscountAllocation, MarketplaceRepricingJob
 from app.core.models.marketplace_growth import MarketplacePricingRule, MarketplacePromotion, MarketplacePromotionItem, MarketplaceAdCampaign, MarketplaceAdGroup, MarketplaceB2BPrice, MarketplaceCustomerCase, MarketplaceIntegrationApp
 from app.core.models.platform_completion import (
@@ -121,6 +121,12 @@ class MarketplaceCompletionService:
         campaign = self.db.scalar(select(MarketplaceAdCampaign).where(MarketplaceAdCampaign.id == campaign_id, MarketplaceAdCampaign.seller_tenant_id == seller_tenant_id))
         if not campaign: raise MarketplaceCompletionError('campaign not found for seller')
         if campaign.status not in {'active','scheduled'}: raise MarketplaceCompletionError('campaign is not active')
+        if ad_group_id is not None:
+            group = self.db.scalar(select(MarketplaceAdGroup).where(MarketplaceAdGroup.id == ad_group_id, MarketplaceAdGroup.campaign_id == campaign.id))
+            if not group: raise MarketplaceCompletionError('ad group does not belong to campaign')
+        if listing_id is not None:
+            listing = self.db.scalar(select(MarketplaceListing).where(MarketplaceListing.id == listing_id, MarketplaceListing.seller_tenant_id == seller_tenant_id))
+            if not listing: raise MarketplaceCompletionError('listing not found for seller')
         currency = (currency or '').strip().upper()
         if not currency: raise MarketplaceCompletionError('currency is required for ad charges')
         cost = Decimal('0')
@@ -138,9 +144,18 @@ class MarketplaceCompletionService:
     def attribute_ad_conversion(self, seller_tenant_id, campaign_id, order_id, revenue, listing_id=None):
         campaign = self.db.scalar(select(MarketplaceAdCampaign).where(MarketplaceAdCampaign.id == campaign_id, MarketplaceAdCampaign.seller_tenant_id == seller_tenant_id))
         if not campaign: raise MarketplaceCompletionError('campaign not found for seller')
+        order = self.db.scalar(select(MarketplaceOrder).where(MarketplaceOrder.id == order_id, MarketplaceOrder.seller_tenant_id == seller_tenant_id))
+        if not order: raise MarketplaceCompletionError('order not found for seller')
+        if listing_id is not None:
+            line = self.db.scalar(select(MarketplaceOrderLine).where(MarketplaceOrderLine.marketplace_order_id == order.id, MarketplaceOrderLine.listing_id == listing_id))
+            if not line:
+                raise MarketplaceCompletionError('listing is not part of seller order')
+            listing = self.db.scalar(select(MarketplaceListing).where(MarketplaceListing.id == listing_id, MarketplaceListing.seller_tenant_id == seller_tenant_id))
+            if not listing:
+                raise MarketplaceCompletionError('listing not found for seller')
         existing = self.db.scalar(select(MarketplaceAdAttribution).where(MarketplaceAdAttribution.campaign_id == campaign_id, MarketplaceAdAttribution.order_id == order_id))
         if existing: return existing
-        x = MarketplaceAdAttribution(campaign_id=campaign_id, order_id=order_id, listing_id=listing_id, attributed_revenue=money(revenue), attribution_model='last_touch')
+        x = MarketplaceAdAttribution(campaign_id=campaign_id, order_id=order_id, listing_id=listing_id, attributed_revenue=money(order.total), attribution_model='last_touch')
         self.db.add(x); self.db.commit(); self.db.refresh(x); return x
 
     def add_case_message(self, case_id, sender_user_id, sender_role, body, internal=False, seller_tenant_id=None):
