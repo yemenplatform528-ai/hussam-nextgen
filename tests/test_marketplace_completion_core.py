@@ -57,3 +57,17 @@ def test_health_snapshot_and_integration_primitives():
     app=MarketplaceIntegrationApp(owner_tenant_id=seller.id,name='Connect',client_id='client-complete',webhook_url='https://example.invalid/hook'); db.add(app); db.commit(); db.refresh(app)
     wh=svc.queue_webhook(app.id,'ORDER_CHANGE','evt-1',{'order_id':1}); assert wh.status=='queued'
     assert db.scalar(select(MarketplaceWebhookDelivery).where(MarketplaceWebhookDelivery.id==wh.id)) is not None
+
+
+def test_coupon_redemption_is_bound_to_buyer_order_and_authoritative_amounts():
+    db,seller,buyer,su,l=setup(); svc=MarketplaceCompletionService(db); now=datetime.now(timezone.utc)
+    from app.core.models.marketplace import MarketplaceOrder
+    other=IdentityService(db).create_user('other-buyer@example.test','Other Buyer')
+    o=MarketplaceOrder(reference='coupon-owner-check',buyer_user_id=buyer.id,seller_tenant_id=seller.id,currency='YER',subtotal=1000,shipping_fee=0,platform_fee=0,total=1000,status='pending_payment'); db.add(o); db.commit(); db.refresh(o)
+    c=svc.create_coupon(seller.id,'OWNERCHECK','percentage',Decimal('10'),now-timedelta(minutes=1),now+timedelta(hours=1),currency='YER',minimum_subtotal=500,per_buyer_limit=1)
+    with pytest.raises(MarketplaceCompletionError, match='does not belong to buyer'):
+        svc.redeem_coupon(other.id,o.id,'OWNERCHECK',Decimal('1000'),'YER')
+    with pytest.raises(MarketplaceCompletionError, match='does not match order'):
+        svc.redeem_coupon(buyer.id,o.id,'OWNERCHECK',Decimal('900'),'YER')
+    out=svc.redeem_coupon(buyer.id,o.id,'OWNERCHECK',Decimal('1000'),'YER')
+    assert out['discount']=='100.0000'
