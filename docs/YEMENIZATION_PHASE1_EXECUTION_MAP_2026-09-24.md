@@ -303,3 +303,22 @@ The connectivity mutation foundation is now wired to a real non-financial Market
 - PR #30 merged after full CI success.
 - PR #31 merged after full CI success: baseline, PostgreSQL migration/schema-drift/integration, container security.
 - The next controlled slice is synchronization/conflict evidence and UI lifecycle visibility, followed by Documents/Notifications and then Search/Pricing/CRM. Financial mutations remain server-authoritative and offline payment/ledger authority remains prohibited.
+
+## 11. BUILD execution checkpoint — cart synchronization evidence (2026-09-24)
+
+The connectivity slice now extends from server-side lifecycle primitives into the buyer UI without granting offline authority:
+
+- Cart add/remove mutations generate an explicit `Idempotency-Key`.
+- Online cart mutations send that key to the server lifecycle boundary.
+- Offline cart mutations are stored as local drafts only; they are explicitly not server-confirmed state.
+- On connectivity restoration, queued cart mutations are replayed using the same mutation key, allowing the server to return the existing result instead of double-applying the operation.
+- The UI distinguishes pending local cart changes from confirmed server cart state.
+- Durable `AuditRecord` entries are now written for mutation reservation, replay and lifecycle transition in the same database transaction boundary.
+- Conflict handling remains explicit: a mutation key cannot be reused for a different request hash, and a conflict cannot silently move back to pending.
+- Checkout/payment/ledger/provider authority remains server-side and is not included in the offline cart queue.
+
+This closes the controlled cart synchronization loop:
+
+`Offline-safe read → local mutation draft → Idempotency-Key → server reservation → domain mutation → CONFIRMED → audit evidence → replay-safe readback`
+
+The next controlled slice is Documents + Notifications, followed by Search/Pricing/CRM, AI/HUS market-context verification, Developer Platform trusted-provenance hardening, Yemen E2E, and only then external G01–G10 evidence closure.

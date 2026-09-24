@@ -9,6 +9,8 @@ MOCK = r"""
 window.__e2eStorage={_:{},getItem(k){return this._[k]??null},setItem(k,v){this._[k]=String(v)},removeItem(k){delete this._[k]}};
 window.__e2eCheckoutCalls=0;
 window.__e2eLastCheckoutHeaders=null;
+window.__e2eCartMutationCalls=0;
+window.__e2eLastCartMutationHeaders=null;
 window.__e2eOfflineReads=false;
 (() => {
   const originalFetch = window.fetch.bind(window);
@@ -24,6 +26,8 @@ window.__e2eOfflineReads=false;
     if (url.endsWith('/marketplace/seller/center')) return json({metrics:{listings_published:1,listings_total:1,orders_actionable:0,fulfillments_actionable:0,net:0,currency:'YER'},actions:[],recent_orders:[]});
     if (url.endsWith('/marketplace/seller/catalog')) return json({items:[]});
     if (url.endsWith('/marketplace/buyer/cart')) return json({id:1,status:'active',market_id:1,market_code:'YEM',items:[{id:1,quantity:'1',line_total:'1500',listing}]});
+    if (url.endsWith('/marketplace/buyer/cart/items')) { window.__e2eCartMutationCalls += 1; window.__e2eLastCartMutationHeaders = Object.fromEntries(new Headers(options.headers||{}).entries()); return json({id:1,status:'active',market_id:1,market_code:'YEM',items:[{id:1,quantity:'1',line_total:'1500',listing}]}); }
+    if (url.includes('/marketplace/buyer/cart/items/')) { window.__e2eCartMutationCalls += 1; window.__e2eLastCartMutationHeaders = Object.fromEntries(new Headers(options.headers||{}).entries()); return json({id:1,status:'active',market_id:1,market_code:'YEM',items:[]}); }
     if (url.includes('/marketplace/buyer/addresses')) return json({items:[{id:20,label:'المنزل',city:'Khor Maksar',address_line:'Main road'}]});
     if (url.includes('/platform/market-context')) return json({items:[{id:1,code:'YEM',locale:'ar-YE'}]});
     if (url.includes('/platform/yemen/checkout-context/YEM')) return json({schema_version:'1.0',market:{code:'YEM',locale:'ar-YE'},money:{currency:'YER',label:'ريال يمني',conversion:{automatic_conversion:false}},payments:{methods:[{code:'cod',name:'Cash on delivery',method_type:'cod',requires_provider:false,available:true}],cod:{available:true}},delivery:{destination:{coverage:'available'}},sellers:[]});
@@ -79,6 +83,19 @@ def run():
                     assert page.locator(".workspace-nav button[data-ws='products']").is_visible()
                     page.locator("button[data-action='home']").click()
                     page.wait_for_timeout(100)
+                    page.locator("button[data-add='1']").first.click()
+                    page.wait_for_timeout(120)
+                    assert page.evaluate("window.__e2eCartMutationCalls") == 1
+                    assert page.evaluate("window.__e2eLastCartMutationHeaders['idempotency-key']")
+                    page.evaluate("window.dispatchEvent(new Event('offline'))")
+                    page.locator("button[data-add='1']").first.click()
+                    page.wait_for_timeout(100)
+                    assert page.evaluate("window.__e2eCartMutationCalls") == 1
+                    assert page.evaluate("JSON.parse(window.__e2eStorage._['hussam_cart_mutation_queue_v1']).length") == 1
+                    page.evaluate("window.dispatchEvent(new Event('online'))")
+                    page.wait_for_timeout(250)
+                    assert page.evaluate("window.__e2eCartMutationCalls") == 2
+                    assert page.evaluate("JSON.parse(window.__e2eStorage._['hussam_cart_mutation_queue_v1']).length") == 0
                     page.locator("button[data-action='cart']").click()
                     page.wait_for_timeout(150)
                     page.locator("button[data-action='checkout']:visible").click()
