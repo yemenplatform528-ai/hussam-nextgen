@@ -36,6 +36,7 @@ class DeveloperExtensionVersion(Base):
     compatibility: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
     test_status: Mapped[str] = mapped_column(String(30), nullable=False, default='pending')
     test_evidence_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    test_source_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
     test_run_id: Mapped[str | None] = mapped_column(String(120), nullable=True)
     tested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     release_status: Mapped[str] = mapped_column(String(30), nullable=False, default='draft')
