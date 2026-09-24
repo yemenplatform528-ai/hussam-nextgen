@@ -217,7 +217,7 @@ def checkout(body:CheckoutIn,ctx=Depends(get_context),db=Depends(get_session)):
                     raise HTTPException(status_code=409, detail='delivery coverage is not available for this address')
             except ValueError as exc:
                 raise HTTPException(status_code=409 if str(exc) == 'market is not active' else 404, detail=str(exc))
-    orders=MarketplaceService(db).checkout(ctx.user_id,shipping_address_id=body.shipping_address_id,shipping_fee=body.shipping_fee,shipping_quote_id=body.shipping_quote_id,shipping_quote_ids=body.shipping_quote_ids,market_id=body.market_id)
+    orders=MarketplaceService(db).checkout(ctx.user_id,shipping_address_id=body.shipping_address_id,shipping_fee=body.shipping_fee,shipping_quote_id=body.shipping_quote_id,shipping_quote_ids=body.shipping_quote_ids,market_id=market_id)
     return {'orders':[{'id':o.id,'reference':o.reference,'seller_tenant_id':o.seller_tenant_id,'currency':o.currency,'subtotal':str(o.subtotal),'shipping_fee':str(o.shipping_fee),'platform_fee':str(o.platform_fee),'total':str(o.total),'status':o.status} for o in orders]}
 
 @router.post('/buyer/customer-orders/{customer_order_id}/payment-session',status_code=201)
