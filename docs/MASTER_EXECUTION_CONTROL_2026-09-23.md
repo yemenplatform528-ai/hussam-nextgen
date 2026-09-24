@@ -276,3 +276,16 @@ The project remains fail-closed at the external certification boundary.
 ### Post-consolidation operating model
 
 `main` → Release Candidate Freeze → exact SHA → trusted CI/provenance → G01–G10 → evidence validation → fresh release manifest → fail-closed final gate → final artifact/SHA-256 → immutable release lock → Developer Platform extensions.
+
+
+## Recovery/transport consolidation decision — 2026-09-24
+
+The project owner has explicitly selected a **main-only operational model**. The two non-ancestor refs were therefore analyzed separately rather than merged.
+
+- `recovery/canonical-35266d1` points into the historical canonical-recovery lineage. Its recovered commit `35266d1899d9e32ac983115fd067cc39e35b322a` is historical recovery material, not a feature branch to merge. A durable archive reference `archive/recovery-canonical-35266d1` was created at that exact historical commit before retirement.
+- `transport/canonical-bundle-2026-09-23` is a transport/bundle lineage with no common ancestor with main. It is not safe to merge blindly because that would create a second unrelated history rather than transfer the bundle into the current repository lineage.
+- The transport branch's content was inspected and confirmed to be a minimal historical transport snapshot (including the repository README) rather than a missing operational implementation. No production code from it has been identified as missing from main.
+- The correct policy is therefore **content migration, not history merge**: only verified missing value would be recreated as a normal commit on main. No such missing production value was found in the transport snapshot inspected.
+- The requested end state remains main-only for operational development. Historical recovery/transport material is archival metadata, not a second development line.
+- GitHub's connected write surface currently exposes branch creation and ref movement but no branch-ref deletion operation. The automatic branch-deletion setting does not itself delete arbitrary existing branches; it normally cleans up branches associated with merged pull requests. Therefore existing historical refs cannot honestly be reported as deleted through the current tool surface.
+- The recovery archive ref was intentionally created before any deletion attempt so the historical baseline has a durable reference independent of the original recovery branch.
