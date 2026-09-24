@@ -65,3 +65,21 @@ def test_b2b_bundle_subscription_brand_bulk_and_search_primitives():
     feed=svc.create_feed(seller.id,'catalog',{}); issues=svc.validate_bulk_rows(seller.id,feed.id,[{'row_number':2,'required_missing':['sku','price']}]); assert len(issues)==2
     ev=svc.record_analytics_event(seller.id,'purchase',900,str(order.id),{'channel':'search'}); assert ev.event_type=='purchase'
     se=svc.record_search_event(buyer.id,'rice',1,l.id); assert se.clicked_listing_id==l.id
+
+
+def test_case_message_rejects_other_seller_case():
+    db, seller, buyer, su, l = setup(); svc = MarketplaceCompletionService(db)
+    other_tenant = __import__('app.engines.identity', fromlist=['IdentityService']).IdentityService(db).create_tenant('Other Seller')
+    case = MarketplaceCustomerCase(buyer_user_id=buyer.id, seller_tenant_id=other_tenant.id, case_type='order', subject='Private', description='x')
+    db.add(case); db.commit(); db.refresh(case)
+    with pytest.raises(MarketplaceCompletionError, match='does not belong to seller'):
+        svc.add_case_message(case.id, su.id, 'seller', 'no access', seller_tenant_id=seller.id)
+
+
+def test_webhook_queue_rejects_other_seller_integration_app():
+    db, seller, buyer, su, l = setup(); svc = MarketplaceCompletionService(db)
+    other_tenant = __import__('app.engines.identity', fromlist=['IdentityService']).IdentityService(db).create_tenant('Other Seller')
+    app = MarketplaceIntegrationApp(owner_tenant_id=other_tenant.id, name='Other App', client_id='other-scope-client', scopes_json=['orders.read'])
+    db.add(app); db.commit(); db.refresh(app)
+    with pytest.raises(MarketplaceCompletionError, match='does not belong to seller'):
+        svc.queue_webhook(app.id, 'ORDER_CHANGE', 'evt-cross-tenant', {'order_id': 1}, owner_tenant_id=seller.id)
