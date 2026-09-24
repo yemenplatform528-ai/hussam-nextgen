@@ -64,3 +64,6 @@ Establish an extension manifest schema, extension version/hash identity, capabil
 
 ### 12. Non-goal
 The Developer Platform does not promise arbitrary unreviewed code execution in production. It provides a durable, governed path for internal developers to build what the business needs without creating a second platform beside Hussam.
+
+### Test evidence source binding
+A test result is not reusable merely because it has a valid evidence hash and CI run identifier. The recorded evidence must also carry the exact `source_hash` of the extension version that was tested. The server rejects evidence for a different source revision. This proves source/evidence association; trusted CI provenance remains a separate verification boundary.

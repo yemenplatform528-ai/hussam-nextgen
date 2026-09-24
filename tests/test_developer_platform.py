@@ -399,6 +399,7 @@ def test_developer_version_can_record_immutable_test_evidence():
     db.commit()
     version.test_status = "passed"
     version.test_evidence_hash = "d" * 64
+    version.test_source_hash = "c" * 64
     version.test_run_id = "ci-run-108"
     from datetime import datetime, timezone
     version.tested_at = datetime.now(timezone.utc)
@@ -406,6 +407,7 @@ def test_developer_version_can_record_immutable_test_evidence():
     row = db.query(DeveloperExtensionVersion).one()
     assert row.test_status == "passed"
     assert row.test_evidence_hash == "d" * 64
+    assert row.test_source_hash == "c" * 64
     assert row.test_run_id == "ci-run-108"
     assert row.tested_at is not None
 
@@ -444,10 +446,16 @@ def test_developer_test_evidence_cannot_promote_failed_evidence_to_passed():
         record_test_evidence(
             "evidence-ext-3",
             "1.0.0",
-            TestEvidenceIn(evidence_hash="a" * 64, run_id="ci-run-pass", status="passed"),
+            TestEvidenceIn(evidence_hash="a" * 64, source_hash="e" * 64, run_id="ci-run-pass", status="passed"),
             Ctx(),
             db,
         )
 
     row = db.query(DeveloperExtensionVersion).one()
     assert row.test_status == "failed"
+
+
+def test_developer_test_evidence_requires_exact_source_hash():
+    from app.api.routes.developer_platform import TestEvidenceIn
+    with pytest.raises(Exception):
+        TestEvidenceIn(evidence_hash="a" * 64, source_hash="b" * 63, run_id="ci-run", status="passed")
