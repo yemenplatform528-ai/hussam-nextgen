@@ -16,7 +16,7 @@ def main() -> int:
     p.add_argument("--evidence-manifest", type=Path, required=True)
     p.add_argument("--release-manifest", type=Path, required=True)
     p.add_argument("--expected-commit", required=True)
-    p.add_argument("--ci-evidence", type=Path)
+    p.add_argument("--ci-evidence", type=Path, required=True)
     args = p.parse_args()
 
     evidence = json.loads(args.evidence_manifest.read_text(encoding="utf-8"))
@@ -26,15 +26,20 @@ def main() -> int:
     manifest = json.loads(args.release_manifest.read_text(encoding="utf-8"))
     if manifest.get("format") != "hussam-release-manifest/v1" or not manifest.get("files"):
         raise SystemExit("FAIL: release manifest is missing or invalid")
+    if manifest.get("source_commit") != args.expected_commit:
+        raise SystemExit("FAIL: release manifest source commit does not match expected release commit")
+    if not manifest.get("source_manifest_hash"):
+        raise SystemExit("FAIL: release manifest lacks source manifest hash")
 
-    if args.ci_evidence:
-        ci = json.loads(args.ci_evidence.read_text(encoding="utf-8"))
-        if ci.get("status") != "passed":
-            raise SystemExit("FAIL: trusted CI evidence is not passed")
-        if ci.get("commit_sha") != args.expected_commit:
-            raise SystemExit("FAIL: CI evidence commit does not match expected release commit")
-        if not ci.get("run_id") or not ci.get("source_manifest_hash"):
-            raise SystemExit("FAIL: CI evidence lacks run identity/source hash")
+    ci = json.loads(args.ci_evidence.read_text(encoding="utf-8"))
+    if ci.get("status") != "passed":
+        raise SystemExit("FAIL: trusted CI evidence is not passed")
+    if ci.get("commit_sha") != args.expected_commit:
+        raise SystemExit("FAIL: CI evidence commit does not match expected release commit")
+    if not ci.get("run_id") or not ci.get("source_manifest_hash"):
+        raise SystemExit("FAIL: CI evidence lacks run identity/source hash")
+    if ci["source_manifest_hash"] != manifest["source_manifest_hash"]:
+        raise SystemExit("FAIL: trusted CI source manifest hash does not match release manifest source hash")
 
     print("FINAL_RELEASE_GATE=PASS")
     print(f"commit={args.expected_commit}")
@@ -42,6 +47,7 @@ def main() -> int:
     print(f"release_files={manifest['file_count']}")
     print(f"evidence_manifest_sha256={sha256(args.evidence_manifest)}")
     print(f"release_manifest_sha256={sha256(args.release_manifest)}")
+    print(f"ci_evidence_sha256={sha256(args.ci_evidence)}")
     return 0
 
 if __name__ == "__main__":
