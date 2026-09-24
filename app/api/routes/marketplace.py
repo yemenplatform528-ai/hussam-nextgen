@@ -1,6 +1,8 @@
 from decimal import Decimal
 from datetime import date
-from fastapi import APIRouter, Depends, Query, HTTPException
+import hashlib
+import json
+from fastapi import APIRouter, Depends, Query, HTTPException, Header
 from pydantic import BaseModel, Field
 from sqlalchemy import desc, select, func
 from app.api.dependencies import get_context, get_session
@@ -188,7 +190,17 @@ def add_cart(body:CartIn,ctx=Depends(get_context),db=Depends(get_session)): Mark
 def remove_cart(listing_id:int,ctx=Depends(get_context),db=Depends(get_session)): MarketplaceService(db).remove_from_cart(ctx.user_id,listing_id); return MarketplaceService(db).cart_view(ctx.user_id)
 
 @router.post('/buyer/checkout',status_code=201)
-def checkout(body:CheckoutIn,ctx=Depends(get_context),db=Depends(get_session)):
+def checkout(body:CheckoutIn,ctx=Depends(get_context),db=Depends(get_session),idempotency_key: str | None = Header(default=None, alias='Idempotency-Key')):
+    request_hash = None
+    if idempotency_key is not None:
+        canonical = {
+            'operation': 'marketplace.checkout.v1',
+            'user_id': ctx.user_id,
+            'body': body.model_dump(mode='json'),
+        }
+        request_hash = hashlib.sha256(
+            json.dumps(canonical, sort_keys=True, separators=(',', ':')).encode('utf-8')
+        ).hexdigest()
     # Resolve the same market that authoritative checkout will use, including the
     # single-active-cart fallback. This prevents the Yemen context from validating
     # one market while checkout executes against another.
@@ -217,7 +229,18 @@ def checkout(body:CheckoutIn,ctx=Depends(get_context),db=Depends(get_session)):
                     raise HTTPException(status_code=409, detail='delivery coverage is not available for this address')
             except ValueError as exc:
                 raise HTTPException(status_code=409 if str(exc) == 'market is not active' else 404, detail=str(exc))
-    orders=MarketplaceService(db).checkout(ctx.user_id,shipping_address_id=body.shipping_address_id,shipping_fee=body.shipping_fee,shipping_quote_id=body.shipping_quote_id,shipping_quote_ids=body.shipping_quote_ids,market_id=market_id,payment_method_code=body.payment_method_code)
+    orders=MarketplaceService(db).checkout(
+        ctx.user_id,
+        shipping_address_id=body.shipping_address_id,
+        shipping_fee=body.shipping_fee,
+        shipping_quote_id=body.shipping_quote_id,
+        shipping_quote_ids=body.shipping_quote_ids,
+        market_id=market_id,
+        payment_method_code=body.payment_method_code,
+        idempotency_key=idempotency_key,
+        idempotency_tenant_id=ctx.tenant_id,
+        idempotency_request_hash=request_hash,
+    )
     return {'orders':[{'id':o.id,'reference':o.reference,'seller_tenant_id':o.seller_tenant_id,'currency':o.currency,'subtotal':str(o.subtotal),'shipping_fee':str(o.shipping_fee),'platform_fee':str(o.platform_fee),'total':str(o.total),'status':o.status} for o in orders]}
 
 @router.post('/buyer/customer-orders/{customer_order_id}/payment-session',status_code=201)
