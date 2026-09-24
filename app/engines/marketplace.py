@@ -8,6 +8,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.models.core import User, Tenant, IdempotencyRecord
+from app.core.services.mutation_lifecycle import MutationLifecycleError, MutationLifecycleService, canonical_request_hash
 from app.core.models.market import MarketContext, MarketCurrency, MarketGeography, PaymentMethodCatalogEntry
 import os
 from app.core.models.catalog import MarketplaceCatalogGroup, MarketplaceProduct, MarketplaceSKU, MarketplaceOffer
@@ -748,25 +749,61 @@ class MarketplaceService:
             delivery_instructions=delivery_instructions,active=True)
         self.db.add(x); self.db.commit(); return x
 
-    def cart(self,user_id,market_id=None):
+    def cart(self,user_id,market_id=None,*,commit=True):
         self.ensure_buyer(user_id); market_id=self._market_id(market_id)
         x=self.db.scalar(select(MarketplaceCart).where(MarketplaceCart.buyer_user_id==user_id,MarketplaceCart.market_id==market_id,MarketplaceCart.status=='active'))
         if not x:
-            x=MarketplaceCart(buyer_user_id=user_id,market_id=market_id,status='active'); self.db.add(x); self.db.commit(); self.db.refresh(x)
+            x=MarketplaceCart(buyer_user_id=user_id,market_id=market_id,status='active'); self.db.add(x); self.db.flush();
+            if commit: self.db.commit(); self.db.refresh(x)
         return x
 
-    def add_to_cart(self,user_id,listing_id,quantity):
-        q=_positive(quantity,'quantity'); listing=self._listing(listing_id,public=True); cart=self.cart(user_id,listing.market_id)
+    def _cart_mutation(self, *, user_id, tenant_id, operation, mutation_key, body, action):
+        lifecycle=MutationLifecycleService(self.db)
+        request_hash=canonical_request_hash(operation,str(user_id),body)
+        try:
+            record,replay=lifecycle.reserve(tenant_id,str(user_id),operation,mutation_key,request_hash)
+        except MutationLifecycleError as exc:
+            raise MarketplaceError(str(exc))
+        if replay:
+            if record.state == 'confirmed':
+                return json.loads(record.response_json or '{}')
+            raise MarketplaceError(record.response_json or 'mutation is not replayable')
+        try:
+            action()
+            payload=self.cart_view(user_id,body.get('market_id'))
+            lifecycle.transition(record,'confirmed',resource_type='marketplace_cart',resource_id=payload.get('id'),response=payload)
+            self.db.commit()
+            return payload
+        except Exception:
+            self.db.rollback()
+            raise
+
+    def add_to_cart(self,user_id,listing_id,quantity,*,mutation_key=None,tenant_id=None):
+        q=_positive(quantity,'quantity'); listing=self._listing(listing_id,public=True)
+        if mutation_key:
+            if tenant_id is None: raise MarketplaceError('tenant context is required for mutation lifecycle')
+            return self._cart_mutation(user_id=user_id,tenant_id=tenant_id,operation='marketplace.cart.add.v1',mutation_key=mutation_key,body={'listing_id':listing_id,'quantity':str(q),'market_id':listing.market_id},action=lambda:self._add_to_cart_domain(user_id,listing_id,q))
+        return self._add_to_cart_domain(user_id,listing_id,q)
+
+    def _add_to_cart_domain(self,user_id,listing_id,q):
+        listing=self._listing(listing_id,public=True); cart=self.cart(user_id,listing.market_id,commit=False)
         if listing.market_id is None: raise MarketplaceError('listing market is required')
         item=self.db.scalar(select(MarketplaceCartItem).where(MarketplaceCartItem.cart_id==cart.id,MarketplaceCartItem.listing_id==listing_id))
         if item: item.quantity=_money(item.quantity)+q
         else: self.db.add(MarketplaceCartItem(cart_id=cart.id,listing_id=listing_id,quantity=q))
-        cart.updated_at=datetime.now(timezone.utc); self.db.commit(); return cart
+        cart.updated_at=datetime.now(timezone.utc); self.db.flush(); return cart
 
-    def remove_from_cart(self,user_id,listing_id):
-        listing=self._listing(listing_id,public=True); cart=self.cart(user_id,listing.market_id); item=self.db.scalar(select(MarketplaceCartItem).where(MarketplaceCartItem.cart_id==cart.id,MarketplaceCartItem.listing_id==listing_id))
-        if item: self.db.delete(item); cart.updated_at=datetime.now(timezone.utc); self.db.commit()
-        return cart
+    def remove_from_cart(self,user_id,listing_id,*,mutation_key=None,tenant_id=None):
+        listing=self._listing(listing_id,public=True)
+        if mutation_key:
+            if tenant_id is None: raise MarketplaceError('tenant context is required for mutation lifecycle')
+            return self._cart_mutation(user_id=user_id,tenant_id=tenant_id,operation='marketplace.cart.remove.v1',mutation_key=mutation_key,body={'listing_id':listing_id,'market_id':listing.market_id},action=lambda:self._remove_from_cart_domain(user_id,listing_id))
+        return self._remove_from_cart_domain(user_id,listing_id)
+
+    def _remove_from_cart_domain(self,user_id,listing_id):
+        listing=self._listing(listing_id,public=True); cart=self.cart(user_id,listing.market_id,commit=False); item=self.db.scalar(select(MarketplaceCartItem).where(MarketplaceCartItem.cart_id==cart.id,MarketplaceCartItem.listing_id==listing_id))
+        if item: self.db.delete(item); cart.updated_at=datetime.now(timezone.utc)
+        self.db.flush(); return cart
 
     def cart_view(self,user_id,market_id=None):
         cart=self.cart(user_id,market_id); rows=self.db.execute(select(MarketplaceCartItem,MarketplaceListing,MarketplaceSellerProfile).join(MarketplaceListing,MarketplaceListing.id==MarketplaceCartItem.listing_id).join(MarketplaceSellerProfile,MarketplaceSellerProfile.tenant_id==MarketplaceListing.seller_tenant_id).where(MarketplaceCartItem.cart_id==cart.id)).all()
