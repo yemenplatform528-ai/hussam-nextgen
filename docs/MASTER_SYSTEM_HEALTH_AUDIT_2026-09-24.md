@@ -22,7 +22,7 @@ No rebuild is justified. The next work must be controlled convergence, verificat
 
 Repository: yemenplatform528-ai/hussam-nextgen
 
-Current main head: `18fa892d0fa3771181991415b6bd9ae595e546e0`.
+Current main head is the latest `main` commit; the repository-level control issue records its exact SHA.
 
 PR #40 is merged. The latest main changes are provenance-hardening and control-document synchronization.
 
