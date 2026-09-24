@@ -244,3 +244,18 @@ The project remains fail-closed at the external certification boundary.
 - A controlled hardening branch audit/system-health-2026-09-24 now requires exact commit binding and trusted CI/source-manifest hash agreement, with executable tests.
 - This hardening must pass exact-head CI and merge before it becomes release authority.
 - G01–G10 remain PENDING_EXTERNAL; final release lock remains open.
+
+
+## 2026-09-24 post-audit convergence checkpoint
+
+- Final-release provenance hardening PR #40 is merged on `main` as `390cc3326f10b743713ad214a3333be4aabbce56`.
+- `scripts/final_release_gate.py` now requires trusted CI evidence and exact agreement between expected commit, release-manifest source commit, trusted CI commit, and source-manifest hash.
+- `scripts/artifact_manifest.py` now records the exact Git source commit and deterministic source-manifest hash in generated release manifests.
+- Final-gate executable tests now cover missing trusted CI evidence, source-manifest mismatch, and matching provenance.
+- The connected GitHub workflow-run interface does not currently expose a push-triggered run for the merged main commit; therefore exact-head CI is not claimed green until a run is directly observed.
+- Master System Health Audit has been updated to record the merge and current convergence state.
+- G01–G10 remain `PENDING_EXTERNAL`; the final release lock remains closed by policy until all ten evidence gates are real and attributable.
+
+### Current controlled path
+
+`main` → exact-head CI evidence → control-document consolidation → real G01–G10 evidence → evidence validation → fresh release manifest → fail-closed final gate → final artifact/SHA-256 → immutable release lock.
