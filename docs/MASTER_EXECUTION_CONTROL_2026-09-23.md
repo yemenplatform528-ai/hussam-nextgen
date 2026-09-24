@@ -7,7 +7,7 @@ This document is the execution-control companion to the canonical engineering ba
 ### Current source of truth
 - Repository: `yemenplatform528-ai/hussam-nextgen`
 - Default branch: `main`
-- Current `main`: `8339d0aba01367049c1ac243e68abaf93ac5bdc5`
+- Current `main`: latest controlled commit on the default branch; this document is updated as part of the controlled merge history.
 - Canonical engineering baseline remains: `473cb7785bf2853e884a3ed28ea17f18d5085efa`
 - Certification-control delta remains separate from additive Yemenization/Developer Platform BUILD work.
 - Marketplace, AI, HUS, finance and sovereign-core business behavior remain protected; Yemenization is implemented as governed compatibility/configuration layers rather than a parallel core.
