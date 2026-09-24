@@ -4,6 +4,7 @@ import pytest
 from sqlalchemy import select
 
 from app.core.models.market import PaymentMethodCatalogEntry
+from app.core.models.marketplace import MarketplaceCustomerOrder
 from app.engines.marketplace import MarketplaceError
 from tests.test_marketplace_completion import setup
 
@@ -37,7 +38,7 @@ def test_cod_selection_is_persisted_without_creating_provider_payment():
     service.add_to_cart(buyer.id, listing.id, 1)
     order = service.checkout(buyer.id, address.id, Decimal("0"), None, None, None, payment_method_code="cod")[0]
 
-    customer_order = db.get(type(order).customer_order.property.mapper.class_, order.customer_order_id)
+    customer_order = db.get(MarketplaceCustomerOrder, order.customer_order_id)
     assert order.payment_method_code == "cod"
     assert customer_order.payment_method_code == "cod"
     assert order.payment_reference is None
