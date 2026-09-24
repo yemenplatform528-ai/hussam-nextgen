@@ -164,7 +164,17 @@ def report(body:ReportIn,ctx=Depends(get_context),db=Depends(get_session)):
 
 @router.post('/seller/notifications',status_code=201)
 def notification(body:NotificationIn,ctx=Depends(get_context),db=Depends(get_session)):
-    seller_guard(ctx); x=MarketplaceNotification(tenant_id=ctx.tenant_id,**body.model_dump()); db.add(x); db.commit(); db.refresh(x); return {'id':x.id,'notification_type':x.notification_type,'status':x.status}
+    seller_guard(ctx)
+    if body.recipient_user_id is not None:
+        recipient=db.scalar(select(User).join(TenantMembership,TenantMembership.user_id==User.id).where(
+            User.id==body.recipient_user_id,
+            User.active.is_(True),
+            TenantMembership.tenant_id==ctx.tenant_id,
+            TenantMembership.active.is_(True),
+        ))
+        if not recipient:
+            raise ValueError('notification recipient is not in seller tenant')
+    x=MarketplaceNotification(tenant_id=ctx.tenant_id,**body.model_dump()); db.add(x); db.commit(); db.refresh(x); return {'id':x.id,'notification_type':x.notification_type,'status':x.status}
 
 @router.post('/seller/integrations',status_code=201)
 def integration(body:IntegrationAppIn,ctx=Depends(get_context),db=Depends(get_session)):
