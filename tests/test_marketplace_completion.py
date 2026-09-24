@@ -14,7 +14,7 @@ from app.engines.marketplace import MarketplaceService, ListingInput, Marketplac
 from app.engines.marketplace_completion import MarketplaceCompletionService
 
 def setup():
-    e=create_engine('sqlite+pysqlite:///:memory:',future=True); Base.metadata.create_all(e); db=sessionmaker(e,expire_on_commit=False)(); ensure_market(db)
+    e=create_engine('sqlite+pysqlite:///:memory:',future=True); Base.metadata.create_all(e); db=sessionmaker(e,expire_on_commit=False)(); ensure_market(db, code='YEM')
     ids=IdentityService(db); seller=ids.create_tenant('Seller'); buyer_t=ids.create_tenant('Buyer'); buyer=ids.create_user('buyer','buyer@example.com'); su=ids.create_user('seller','seller@example.com'); ids.add_membership(buyer.id,buyer_t.id,'owner'); ids.add_membership(su.id,seller.id,'owner')
     inv=InventoryProductionService(db); inv.create_item(seller.id,'rice','Rice','bag'); inv.create_warehouse(seller.id,'wh','Main'); inv.record(seller.id,StockMovement('rice','wh',Decimal('20'),'in','opening'))
     m=MarketplaceService(db); m.register_seller(seller.id,'seller','Seller'); m.review_seller_verification(seller.id,su.id,'approved')
@@ -159,12 +159,6 @@ def test_seller_funded_discount_reduces_seller_payout_snapshot():
 
 def test_yemen_checkout_context_and_authoritative_checkout_share_market_and_quote():
     db,seller,buyer,su,l,a,m=setup()
-    from tests.market_test_support import ensure_market
-    db.query(__import__('app.core.models.market', fromlist=['MarketContext']).MarketContext).delete()
-    db.commit()
-    ensure_market(db, code='YEM')
-    a.market_id=1
-    db.commit()
     m.add_shipping_rate(seller.id,'Aden','Aden','YER',Decimal('250'))
     m.add_to_cart(buyer.id,l.id,1)
     q=m.quote_shipping(buyer.id,a.id,seller.id,'YER')
