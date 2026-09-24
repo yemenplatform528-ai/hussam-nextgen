@@ -83,3 +83,22 @@ def test_webhook_queue_rejects_other_seller_integration_app():
     db.add(app); db.commit(); db.refresh(app)
     with pytest.raises(MarketplaceCompletionError, match='does not belong to seller'):
         svc.queue_webhook(app.id, 'ORDER_CHANGE', 'evt-cross-tenant', {'order_id': 1}, owner_tenant_id=seller.id)
+
+
+def test_completion_reference_ownership_rejects_cross_tenant_rule_and_bundle_order():
+    db, seller, buyer, su, l = setup(); svc = MarketplaceCompletionService(db)
+    from app.engines.identity import IdentityService
+    from app.core.models.marketplace_growth import MarketplacePricingRule
+    ids = IdentityService(db)
+    other = ids.create_tenant('Other Seller')
+    other_rule = MarketplacePricingRule(seller_tenant_id=other.id, name='other-rule', scope_json={}, action_json={'type':'floor'}, min_price=Decimal('1'), priority=1)
+    db.add(other_rule)
+    own_bundle = MarketplaceBundle(seller_tenant_id=seller.id, name='Own Kit', sku='OWN-KIT', price=100, currency='YER', status='published', components_json=[])
+    db.add(own_bundle)
+    other_order = MarketplaceOrder(reference='other-bundle-order', buyer_user_id=buyer.id, seller_tenant_id=other.id, currency='YER', subtotal=100, shipping_fee=0, platform_fee=0, total=100)
+    db.add(other_order); db.commit(); db.refresh(other_rule); db.refresh(own_bundle); db.refresh(other_order)
+    svc.record_price_competitor(seller.id, l.id, 'external', Decimal('80'), 'YER')
+    out = svc.reprice_against_market(seller.id, l.id, other_rule.id)
+    assert out['price'] == '80.0000'
+    with pytest.raises(MarketplaceCompletionError, match='order not found for seller'):
+        svc.reserve_bundle(seller.id, own_bundle.id, other_order.id, 1)
