@@ -22,7 +22,7 @@ No rebuild is justified. The next work must be controlled convergence, verificat
 
 Repository: yemenplatform528-ai/hussam-nextgen
 
-Current main head: `aa33e323c63eed4bf2010285a59246979a09704e`.
+Current main head: `18fa892d0fa3771181991415b6bd9ae595e546e0`.
 
 PR #40 is merged. The latest main changes are provenance-hardening and control-document synchronization.
 
@@ -141,7 +141,7 @@ Do not rebuild the marketplace; rewrite Finance; create a second payment engine;
 ## 12. Remaining controlled work
 
 ### Immediate convergence
-1. Observe and verify exact-head CI for `aa33e323c63eed4bf2010285a59246979a09704e`.
+1. Observe and verify exact-head CI for `18fa892d0fa3771181991415b6bd9ae595e546e0`.
 2. Preserve trusted CI evidence and source-manifest hash from that exact run.
 3. Keep the current release gate fail-closed until G01–G10 evidence is real.
 4. Execute real G01–G10 evidence collection and validation.
