@@ -299,3 +299,14 @@ The project owner has explicitly selected a **main-only operational model**. The
 - The connected GitHub write surface still exposes no branch-ref deletion operation. Therefore ref deletion remains an external GitHub administration action rather than an operation this control plane can truthfully mark complete.
 - This verification does not alter the release-certification boundary: G01–G10 remain external, and final release lock remains closed.
 - Next execution authority remains: stabilize main, observe exact-head CI on the final candidate, then proceed through the evidence-bound release path without changing the candidate SHA during certification.
+
+
+## 2026-09-24 repository hygiene / documentation convergence
+
+- A repository-wide cleanup was performed after the branch consolidation study.
+- Superseded release snapshots, dated readiness/verification records, stale status/reconciliation records, historical branch-audit copy, legacy HUS release-evidence placeholders, the old canonical-recovery provenance note, and the committed generated `release-manifest.json` were removed from `main`.
+- The cleanup is intentional: generated release manifests must be produced from the exact frozen release tree by `scripts/artifact_manifest.py`; a stale committed manifest must not masquerade as current provenance.
+- Current authoritative controls are the master execution control, master system audit, production-gate/evidence protocol, G01–G10 engineering closures, HUS/AI locks, Yemenization Phase 1 contracts/maps, and Developer Platform contract.
+- The deleted branch-consolidation audit is now historical execution evidence; its operational conclusion remains recorded here: `main` is the sole operational development source, while remaining non-main refs are historical/retirement candidates.
+- Legacy `scripts/release_check.sh` was removed; the fail-closed `scripts/final_release_gate.py` plus deterministic `scripts/artifact_manifest.py` are the current release controls.
+- This cleanup changes the release tree, so all CI/provenance evidence from earlier commits is historical and must not be reused as evidence for the new head.
