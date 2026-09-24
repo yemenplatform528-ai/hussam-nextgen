@@ -24,6 +24,7 @@ def upgrade():
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
         sa.UniqueConstraint("tenant_id", "mutation_key", name="uq_mutation_tenant_key"),
+        sa.CheckConstraint("state IN ('draft','pending','confirmed','failed','conflict')", name="ck_mutation_state"),
     )
     op.create_index("ix_mutation_records_tenant_id", "mutation_records", ["tenant_id"])
 
