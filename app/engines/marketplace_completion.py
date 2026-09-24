@@ -349,7 +349,7 @@ def _reprice_against_market(self,seller_tenant_id,listing_id,rule_id=None):
     if not listing: raise MarketplaceCompletionError('listing not found')
     q=self.db.scalar(select(MarketplacePriceCompetitor.price).where(MarketplacePriceCompetitor.listing_id==listing_id,MarketplacePriceCompetitor.currency==listing.currency).order_by(MarketplacePriceCompetitor.observed_at.desc()))
     if q is None: return self.evaluate_price(seller_tenant_id,listing_id,'competitive_no_observation')
-    rule=self.db.get(MarketplacePricingRule,rule_id) if rule_id else None
+    rule=self.db.scalar(select(MarketplacePricingRule).where(MarketplacePricingRule.id==rule_id, MarketplacePricingRule.seller_tenant_id==seller_tenant_id)) if rule_id else None
     target=money(q)
     if rule and rule.min_price is not None: target=max(target,money(rule.min_price))
     if rule and rule.max_price is not None: target=min(target,money(rule.max_price))
@@ -447,8 +447,10 @@ def _reserve_bundle(self,seller_tenant_id,bundle_id,order_id,quantity):
     b=self.db.scalar(select(MarketplaceBundle).where(MarketplaceBundle.id==bundle_id,MarketplaceBundle.seller_tenant_id==seller_tenant_id))
     if not b: raise MarketplaceCompletionError('bundle not found')
     if b.status!='published': raise MarketplaceCompletionError('bundle is not sellable')
+    order=self.db.scalar(select(MarketplaceOrder).where(MarketplaceOrder.id==order_id,MarketplaceOrder.seller_tenant_id==seller_tenant_id))
+    if not order: raise MarketplaceCompletionError('order not found for seller')
     comps=b.components_json or []
-    x=MarketplaceBundleReservation(bundle_id=bundle_id,order_id=order_id,quantity=quantity,component_snapshot_json=comps,status='reserved'); self.db.add(x); self.db.commit(); return x
+    x=MarketplaceBundleReservation(bundle_id=bundle_id,order_id=order.id,quantity=quantity,component_snapshot_json=comps,status='reserved'); self.db.add(x); self.db.commit(); return x
 
 def _schedule_subscription(self,seller_tenant_id,offer_id,buyer_user_id,next_run_at):
     offer=self.db.scalar(select(MarketplaceSubscriptionOffer).where(MarketplaceSubscriptionOffer.id==offer_id,MarketplaceSubscriptionOffer.seller_tenant_id==seller_tenant_id,MarketplaceSubscriptionOffer.active.is_(True)))
