@@ -140,5 +140,7 @@ The project is not production-ready until all applicable external gates have rea
 - CI run #113 exposed the duplicate-column migration defect; it was corrected rather than suppressed.
 - CI run #114 then passed all baseline, PostgreSQL and container-security jobs.
 - The temporary attempt to consume market runtime context directly in the existing browser UI exposed a pre-existing-style browser contract sensitivity; the UI files and E2E fixture were restored to their known-good tree, while the stable backend client contract remains in place.
-- CI run #119 on branch head `fc1c3d34b1f5cec0184daac9f944a1ce19750dc6` passed: 374+ tests including browser E2E, fresh SQLite migration/schema drift, PostgreSQL migration/schema drift/integration, baseline audit, dependency checks and container scan.
+- CI run #123 on branch head `b6b231ce5384ebe9b3eb9ed5d51a9f4a35a8bef8` passed: 375 tests including browser E2E, fresh SQLite migration/schema drift, PostgreSQL migration/schema drift/integration, baseline audit, dependency checks and container scan.
 - Current decision: do not merge or lock the release yet. First complete the remaining Yemen runtime behavior wiring and Developer Platform evidence trust boundary, then regenerate release provenance and run the final exact-head CI.
+
+- Developer test evidence is now immutable after the first recorded result; a failed evidence record cannot be promoted to passed evidence through the same endpoint.
