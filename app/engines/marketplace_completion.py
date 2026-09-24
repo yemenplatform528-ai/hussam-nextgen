@@ -100,7 +100,7 @@ class MarketplaceCompletionService:
         if currency.upper() != authoritative_currency: raise MarketplaceCompletionError('coupon currency does not match order')
         subtotal = authoritative_subtotal; currency = authoritative_currency
         now = now or datetime.now(timezone.utc)
-        coupon = self.db.scalar(select(MarketplaceCoupon).where(MarketplaceCoupon.code == code.strip().upper(), MarketplaceCoupon.active.is_(True)))
+        coupon = self.db.scalar(select(MarketplaceCoupon).where(MarketplaceCoupon.code == code.strip().upper(), MarketplaceCoupon.seller_tenant_id == order.seller_tenant_id, MarketplaceCoupon.active.is_(True)))
         if not coupon: raise MarketplaceCompletionError('coupon not found or inactive')
         starts = coupon.starts_at.replace(tzinfo=timezone.utc) if coupon.starts_at.tzinfo is None else coupon.starts_at
         ends = coupon.ends_at.replace(tzinfo=timezone.utc) if coupon.ends_at.tzinfo is None else coupon.ends_at
