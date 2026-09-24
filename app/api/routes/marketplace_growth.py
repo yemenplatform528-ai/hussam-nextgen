@@ -72,7 +72,7 @@ def brand_store(body:BrandStoreIn,ctx=Depends(get_context),db=Depends(get_sessio
     seller_guard(ctx)
     brand=db.scalar(select(MarketplaceBrand).where(MarketplaceBrand.id==body.brand_id,MarketplaceBrand.owner_tenant_id==ctx.tenant_id))
     if not brand: raise ValueError('brand not found for seller')
-    x=MarketplaceBrandStore(brand_id=brand.id,slug=body.slug,title=body.title,content_json=body.content_json,status=body.status); db.add(x); db.commit(); db.refresh(x); return {'id':x.id,'brand_id':x.brand_id,'slug':x.slug,'status':x.status}
+    x=MarketplaceBrandStore(brand_id=brand.id,slug=body.slug,title=body.title,content_json=body.content_json,status='draft'); db.add(x); db.commit(); db.refresh(x); return {'id':x.id,'brand_id':x.brand_id,'slug':x.slug,'status':x.status}
 
 @router.post('/seller/ad-campaigns',status_code=201)
 def ad_campaign(body:AdCampaignIn,ctx=Depends(get_context),db=Depends(get_session)):
