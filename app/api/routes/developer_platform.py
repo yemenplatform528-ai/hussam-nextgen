@@ -212,6 +212,7 @@ def activate_market_capability(market_code: str, capability_code: str, body: Cap
         service.validate_market_scope(market, capability)
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+    validate_capability_configuration(capability.config_schema or {}, body.configuration)
     activation = service.db.scalar(select(MarketCapabilityActivation).where(
         MarketCapabilityActivation.market_id == market.id,
         MarketCapabilityActivation.capability_id == capability.id,
