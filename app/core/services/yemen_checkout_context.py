@@ -148,30 +148,42 @@ class YemenCheckoutContextService:
 
     def _seller_context(self, market: MarketContext, seller_tenant_id: int, address):
         currency = market.default_currency
-        if address is None:
-            rate_available = False
-        else:
-            predicates = [
-                MarketplaceShippingRate.governorate_id == address.governorate_id,
-                MarketplaceShippingRate.district_id == address.district_id,
-                MarketplaceShippingRate.locality_id == address.locality_id,
-            ]
-            rate = self.db.scalar(
-                select(MarketplaceShippingRate)
-                .where(
-                    MarketplaceShippingRate.seller_tenant_id == seller_tenant_id,
-                    MarketplaceShippingRate.market_id == market.id,
-                    MarketplaceShippingRate.currency == currency,
-                    MarketplaceShippingRate.active.is_(True),
-                    or_(*[x for x in predicates if x.left is not None]),
-                )
-                .order_by(
-                    MarketplaceShippingRate.locality_id.is_(None),
-                    MarketplaceShippingRate.district_id.is_(None),
-                    MarketplaceShippingRate.governorate_id.is_(None),
-                )
+        cod_available = bool(
+            self.db.scalar(
+                select(PaymentMethodCatalogEntry.id).where(
+                    PaymentMethodCatalogEntry.market_id == market.id,
+                    PaymentMethodCatalogEntry.active.is_(True),
+                    or_(
+                        PaymentMethodCatalogEntry.method_type == "cod",
+                        PaymentMethodCatalogEntry.code.in_({"cod", "cash_on_delivery"}),
+                    ),
+                ).limit(1)
             )
-            rate_available = rate is not None
+        )
+        rate_available = False
+        if address is not None:
+            predicates = []
+            if address.locality_id is not None:
+                predicates.append(MarketplaceShippingRate.locality_id == address.locality_id)
+            if address.district_id is not None:
+                predicates.append(MarketplaceShippingRate.district_id == address.district_id)
+            if address.governorate_id is not None:
+                predicates.append(MarketplaceShippingRate.governorate_id == address.governorate_id)
+            if predicates:
+                rate = self.db.scalar(
+                    select(MarketplaceShippingRate).where(
+                        MarketplaceShippingRate.seller_tenant_id == seller_tenant_id,
+                        MarketplaceShippingRate.market_id == market.id,
+                        MarketplaceShippingRate.currency == currency,
+                        MarketplaceShippingRate.active.is_(True),
+                        or_(*predicates),
+                    ).order_by(
+                        MarketplaceShippingRate.locality_id.is_(None),
+                        MarketplaceShippingRate.district_id.is_(None),
+                        MarketplaceShippingRate.governorate_id.is_(None),
+                    )
+                )
+                rate_available = rate is not None
 
         return {
             "seller_tenant_id": seller_tenant_id,
@@ -181,6 +193,6 @@ class YemenCheckoutContextService:
                 "requires_address": address is None,
             },
             "payment": {
-                "cod_available": True,
+                "cod_available": cod_available,
             },
         }
