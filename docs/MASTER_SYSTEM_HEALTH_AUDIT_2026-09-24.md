@@ -169,3 +169,12 @@ The remaining problem is convergence:
 implemented capabilities → verified runtime behavior → trusted provenance → external certification → final immutable baseline
 
 That is the path we should continue on.
+
+## 2026-09-24 post-audit convergence checkpoint
+
+- PR #40 `fix(release): bind final lock to exact provenance` has now been merged to `main` as `390cc3326f10b743713ad214a3333be4aabbce56`.
+- The merged hardening makes trusted CI evidence mandatory for the final release gate and binds the release manifest to the exact expected Git commit and trusted CI source-manifest hash.
+- Executable final-gate tests are included for missing CI evidence, provenance-hash mismatch, and matching provenance acceptance.
+- The repository CI workflow is configured for both `push` to `main` and `pull_request`; the connected workflow-run view currently does not expose a push-triggered run for the merge commit, so no green exact-head CI result is claimed yet.
+- G01–G10 remain `PENDING_EXTERNAL`. Final release lock remains intentionally open.
+- Next authority step is exact-head CI observation/verification, followed by control-document consolidation and only then external certification evidence closure.
