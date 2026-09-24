@@ -201,3 +201,21 @@ A provider cannot become production-capable merely because it appears in a publi
 The current national payment direction also makes interoperability a first-class architectural requirement: the Central Bank describes the Unified Money Network as a key national payments component and is pursuing RTGS/FPS infrastructure and wallet interoperability. cite-source:turn0search5turn0search8turn0search10
 
 This checkpoint is research/control guidance only; it does not activate any provider or payment rail.
+
+
+## 9. BUILD execution checkpoint — checkout context slice (2026-09-24)
+
+Completed on branch `feat/yemen-checkout-context`:
+
+- Added `YemenCheckoutContextService` as an additive composition boundary.
+- Exposes explicit market currency and money-unit presentation without performing FX conversion.
+- Requires source/context for any future conversion and defaults automatic conversion to false.
+- Exposes active market payment methods and derives COD availability from the market payment catalog.
+- Resolves a buyer-owned, market-bound delivery address and reports geography coverage.
+- Reuses existing seller shipping-rate and market-geography primitives to report delivery availability.
+- Added deterministic SQLite tests for COD, currency presentation, address ownership and inactive-market rejection.
+- Added client-safe API endpoint: `GET /platform/yemen/checkout-context/{market_code}`.
+
+This slice does **not** execute payment, create orders, certify providers, calculate authoritative totals, or replace checkout. The existing marketplace domain remains authoritative for those operations.
+
+Next controlled slice: connect this context to the existing buyer checkout contract and browser E2E, then continue delivery/payment behavior verification.
