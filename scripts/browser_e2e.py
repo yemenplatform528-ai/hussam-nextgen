@@ -9,12 +9,14 @@ MOCK = r"""
 window.__e2eStorage={_:{},getItem(k){return this._[k]??null},setItem(k,v){this._[k]=String(v)},removeItem(k){delete this._[k]}};
 window.__e2eCheckoutCalls=0;
 window.__e2eLastCheckoutHeaders=null;
+window.__e2eOfflineReads=false;
 (() => {
   const originalFetch = window.fetch.bind(window);
   const listing = {id: 1, title: 'E2E Phone', description: 'Browser journey product', unit_price: '1500', currency: 'YER', stock: null, seller: {slug: 'e2e-store', display_name: 'E2E Store', description: 'Browser test store'}};
   const json = (data, status=200) => Promise.resolve(new Response(JSON.stringify(data), {status, headers: {'Content-Type': 'application/json'}}));
   window.fetch = (input, options={}) => {
     const url = String(input);
+    if (window.__e2eOfflineReads && (url.includes('/marketplace/listings?') || url.endsWith('/marketplace/categories') || url.includes('/marketplace/sellers?'))) return Promise.reject(new TypeError('offline'));
     if (url.includes('/marketplace/listings?')) return json({items:[listing], total:1, limit:24, offset:0, sort:'relevance'});
     if (url.endsWith('/marketplace/categories')) return json({items:[{id:1, slug:'e2e-category', name:'E2E Category', parent_id:null}]});
     if (url.includes('/marketplace/sellers?')) return json({items:[{tenant_id:1, slug:'e2e-store', display_name:'E2E Store', description:'Browser test store', seller_type:'business'}]});
@@ -57,6 +59,11 @@ def run():
                     assert page.title() == "Hussam — شبكة التجارة"
                     assert page.locator("h1", has_text="كل ما تحتاجه، في Hussam.").is_visible()
                     assert page.locator("text=E2E Phone").is_visible()
+                    page.evaluate("window.__e2eOfflineReads=true")
+                    page.evaluate("loadPublic()")
+                    page.wait_for_timeout(100)
+                    assert page.locator("text=E2E Phone").is_visible()
+                    page.evaluate("window.__e2eOfflineReads=false")
                     page.locator("button[data-action='account']").click()
                     assert page.locator("a[href='/api/v1/auth/oidc/login']").is_visible()
                     assert page.locator("text=HttpOnly cookie").is_visible()
