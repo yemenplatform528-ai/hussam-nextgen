@@ -117,5 +117,6 @@ class FulfillmentService:
         if not address: raise FulfillmentError('customer shipping address is required')
         destination = f'{address.recipient_name}, {address.phone}, {address.governorate}, {address.city}, {address.address_line}' + (f', {address.landmark}' if address.landmark else '')
         ref=f'SHP-{mo.reference}-{f.id}'
-        shipment = LogisticsProductionService(self.db).create_shipment(seller_tenant_id, order_id=mo.sales_order_id, reference=ref, origin_warehouse_id=sales.warehouse_id, destination=destination, carrier=carrier, currency=mo.currency, cod_amount=Decimal('0'), tracking_number=tracking_number)
+        cod_amount = mo.total if mo.payment_method_code == 'cod' else Decimal('0')
+        shipment = LogisticsProductionService(self.db).create_shipment(seller_tenant_id, order_id=mo.sales_order_id, reference=ref, origin_warehouse_id=sales.warehouse_id, destination=destination, carrier=carrier, currency=mo.currency, cod_amount=Decimal(str(cod_amount)), tracking_number=tracking_number)
         f.shipment_id=shipment.id; f.carrier=carrier; f.status='ready'; f.updated_at=datetime.now(timezone.utc); self.db.commit(); self.db.refresh(f); return f, shipment
