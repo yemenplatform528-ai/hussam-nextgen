@@ -51,6 +51,22 @@ def test_client_market_context_is_stable_and_hides_control_plane_configuration()
             "internal_adapter_secret": "hidden",
         },
     ))
+    for code, category, config in [
+        ("yem_local_pricing", "pricing", {"enabled": True, "modes": ["retail", "wholesale"], "branch_overrides": True}),
+        ("yem_business_verticals", "verticals", {"enabled": True, "verticals": ["retail", "clinic"]}),
+        ("yem_branch_warehouse_network", "operations", {"enabled": True, "branch_aware": True, "warehouse_aware": True, "service_area_aware": True}),
+        ("yem_local_reporting", "analytics", {"enabled": True, "dimensions": ["governorate", "channel"]}),
+    ]:
+        cap = PlatformCapability(
+            id=code, code=code, category=category, name=code, market_scope=["YEM"],
+            config_schema={}, status="active",
+        )
+        db.add(cap)
+        db.flush()
+        db.add(MarketCapabilityActivation(
+            id=f"activation-{code}", market_id=1, capability_id=code, status="active",
+            configuration=config,
+        ))
     db.commit()
 
     result = client_market_context("YEM", Ctx(), db)
@@ -64,6 +80,17 @@ def test_client_market_context_is_stable_and_hides_control_plane_configuration()
         "offline_drafts": True,
         "idempotent_mutations": True,
         "explicit_pending_states": True,
+    }
+    assert result["pricing"] == {
+        "enabled": True, "modes": ["retail", "wholesale"], "branch_overrides": True,
+    }
+    assert result["verticals"] == {"enabled": True, "verticals": ["retail", "clinic"]}
+    assert result["operations"] == {
+        "enabled": True, "branch_aware": True, "warehouse_aware": True,
+        "service_area_aware": True,
+    }
+    assert result["reporting"] == {
+        "enabled": True, "dimensions": ["governorate", "channel"],
     }
     assert result["capabilities"] == [
         {"code": "yem_connectivity_policy", "category": "connectivity", "status": "active"}
