@@ -58,3 +58,16 @@ When the real external gates are complete, the release record must contain:
 - known limitations/accepted risks.
 
 The lock record becomes the source of truth for future extensions. Core production software is then treated as immutable; subsequent capabilities are introduced through the governed Developer Platform and its validation/promotion lifecycle.
+
+
+## 2026-09-24 provenance hardening checkpoint
+
+The release manifest is now required to carry the exact Git source commit and deterministic source-manifest hash.
+
+The final release gate requires trusted CI evidence as a mandatory input and requires:
+- trusted CI status = passed;
+- trusted CI commit = expected release commit;
+- release manifest source commit = expected release commit;
+- trusted CI source-manifest hash = release manifest source-manifest hash.
+
+A release manifest that merely has the correct file shape is insufficient.
