@@ -1,7 +1,7 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from app.api.routes.platform import client_market_context
+from app.api.routes.platform import _public_runtime_context, client_market_context
 from app.core.models.market import MarketContext, MarketCurrency, MarketMoneyUnit, PaymentMethodCatalogEntry
 from app.core.models.yemen_capability import MarketCapabilityActivation, PlatformCapability
 from app.core.persistence import Base
