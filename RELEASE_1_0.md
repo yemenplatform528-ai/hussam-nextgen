@@ -12,8 +12,9 @@ end-to-end tests, and external production gates are evidenced.
 - One platform, one codebase, one Sovereign Core.
 - Marketplace, Retail, AI and HUS are capabilities over shared authorities.
 - No historical milestone/version is a runtime product boundary.
-- Yemen-specific behavior will be added through market configuration/adapters
-  after the global capability model is complete.
+- Yemenization is a governed compatibility layer over the shared capability model;
+  Yemen market behavior is composed through market configuration, capabilities and
+  provider-neutral adapters without cloning authoritative domain engines.
 
 ## Required release gates
 - Complete customer and seller journeys.
