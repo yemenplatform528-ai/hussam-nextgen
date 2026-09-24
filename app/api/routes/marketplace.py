@@ -29,7 +29,7 @@ class AddressIn(BaseModel):
     geo_lat:Decimal|None=Field(default=None,ge=-90,le=90); geo_lng:Decimal|None=Field(default=None,ge=-180,le=180)
     address_confidence:str='low'; delivery_instructions:str|None=None
 class CartIn(BaseModel): listing_id:int; quantity:Decimal=Field(gt=0)
-class CheckoutIn(BaseModel): shipping_address_id:int|None=None; shipping_fee:Decimal=Field(default=Decimal('0'),ge=0); shipping_quote_id:int|None=None; shipping_quote_ids:list[int]=Field(default_factory=list, max_length=50); market_id:int|None=None
+class CheckoutIn(BaseModel): shipping_address_id:int|None=None; shipping_fee:Decimal=Field(default=Decimal('0'),ge=0); shipping_quote_id:int|None=None; shipping_quote_ids:list[int]=Field(default_factory=list, max_length=50); market_id:int|None=None; payment_method_code:str|None=None
 class ReviewIn(BaseModel): listing_id:int; rating:int=Field(ge=1,le=5); title:str=''; body:str=''
 class DisputeIn(BaseModel): reason:str; description:str
 class PaymentIn(BaseModel): provider:str=Field(min_length=1,max_length=80)
@@ -217,7 +217,7 @@ def checkout(body:CheckoutIn,ctx=Depends(get_context),db=Depends(get_session)):
                     raise HTTPException(status_code=409, detail='delivery coverage is not available for this address')
             except ValueError as exc:
                 raise HTTPException(status_code=409 if str(exc) == 'market is not active' else 404, detail=str(exc))
-    orders=MarketplaceService(db).checkout(ctx.user_id,shipping_address_id=body.shipping_address_id,shipping_fee=body.shipping_fee,shipping_quote_id=body.shipping_quote_id,shipping_quote_ids=body.shipping_quote_ids,market_id=market_id)
+    orders=MarketplaceService(db).checkout(ctx.user_id,shipping_address_id=body.shipping_address_id,shipping_fee=body.shipping_fee,shipping_quote_id=body.shipping_quote_id,shipping_quote_ids=body.shipping_quote_ids,market_id=market_id,payment_method_code=body.payment_method_code)
     return {'orders':[{'id':o.id,'reference':o.reference,'seller_tenant_id':o.seller_tenant_id,'currency':o.currency,'subtotal':str(o.subtotal),'shipping_fee':str(o.shipping_fee),'platform_fee':str(o.platform_fee),'total':str(o.total),'status':o.status} for o in orders]}
 
 @router.post('/buyer/customer-orders/{customer_order_id}/payment-session',status_code=201)
