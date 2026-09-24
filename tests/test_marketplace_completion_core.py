@@ -32,9 +32,11 @@ def test_pricing_decision_is_server_authoritative():
 def test_coupon_limits_and_discount():
     db,seller,buyer,su,l=setup(); svc=MarketplaceCompletionService(db); now=datetime.now(timezone.utc)
     c=svc.create_coupon(seller.id,'SAVE10','percentage',Decimal('10'),now-timedelta(minutes=1),now+timedelta(hours=1),currency='YER',minimum_subtotal=500,per_buyer_limit=1)
-    o=svc.redeem_coupon(buyer.id,1,'SAVE10',Decimal('1000'),'YER')
+    from app.core.models.marketplace import MarketplaceOrder
+    order=MarketplaceOrder(reference='coupon-limit-order',buyer_user_id=buyer.id,seller_tenant_id=seller.id,currency='YER',subtotal=1000,shipping_fee=0,platform_fee=0,total=1000,status='pending_payment'); db.add(order); db.commit(); db.refresh(order)
+    o=svc.redeem_coupon(buyer.id,order.id,'SAVE10',Decimal('1000'),'YER')
     assert o['discount']=='100.0000'
-    with pytest.raises(MarketplaceCompletionError): svc.redeem_coupon(buyer.id,2,'SAVE10',Decimal('1000'),'YER')
+    with pytest.raises(MarketplaceCompletionError): svc.redeem_coupon(buyer.id,order.id,'SAVE10',Decimal('1000'),'YER')
 
 
 def test_cpc_charge_and_budget_are_audited():
