@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Query, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import desc, select, func
 from app.api.dependencies import get_context, get_session
-from app.core.models.marketplace import MarketplaceSellerProfile, MarketplaceOfferCompetition, MarketplaceCategory, MarketplaceListing, MarketplaceOrder, MarketplaceOrderLine, MarketplacePayout, MarketplaceReview, MarketplaceDispute, MarketplaceAddress, MarketplaceSellerVerification, MarketplaceReturnRequest, MarketplaceReturnLine, MarketplaceFeeRule
+from app.core.models.marketplace import MarketplaceSellerProfile, MarketplaceOfferCompetition, MarketplaceCategory, MarketplaceListing, MarketplaceOrder, MarketplaceOrderLine, MarketplacePayout, MarketplaceReview, MarketplaceDispute, MarketplaceAddress, MarketplaceSellerVerification, MarketplaceReturnRequest, MarketplaceReturnLine, MarketplaceFeeRule, MarketplaceCart
 from app.core.models.payments import PaymentIntent
 from app.engines.marketplace import MarketplaceService, ListingInput
 from app.engines.catalog import CatalogService, CatalogError, ProductInput, SKUInput, OfferInput
@@ -189,20 +189,27 @@ def remove_cart(listing_id:int,ctx=Depends(get_context),db=Depends(get_session))
 
 @router.post('/buyer/checkout',status_code=201)
 def checkout(body:CheckoutIn,ctx=Depends(get_context),db=Depends(get_session)):
-    # Yemen runtime validation is advisory to the domain checkout boundary:
-    # it validates market/address context without replacing authoritative totals,
-    # quotes, inventory, payment or order mutation in MarketplaceService.
-    if body.market_id is not None or body.shipping_address_id is not None:
-        from app.core.services.yemen_checkout_context import YemenCheckoutContextService
-        from app.core.models.market import MarketContext
-        market_code = None
-        if body.market_id is not None:
-            market = db.scalar(select(MarketContext).where(MarketContext.id == body.market_id))
-            market_code = market.code if market else None
-        if market_code is not None:
+    # Resolve the same market that authoritative checkout will use, including the
+    # single-active-cart fallback. This prevents the Yemen context from validating
+    # one market while checkout executes against another.
+    from app.core.services.yemen_checkout_context import YemenCheckoutContextService
+    from app.core.models.market import MarketContext
+    market_id = body.market_id
+    if market_id is None:
+        active_carts = db.scalars(
+            select(MarketplaceCart).where(
+                MarketplaceCart.buyer_user_id == ctx.user_id,
+                MarketplaceCart.status == 'active',
+            ).order_by(MarketplaceCart.id)
+        ).all()
+        if len(active_carts) == 1:
+            market_id = active_carts[0].market_id
+    if market_id is not None:
+        market = db.scalar(select(MarketContext).where(MarketContext.id == market_id))
+        if market is not None:
             try:
                 context = YemenCheckoutContextService(db).build(
-                    market_code,
+                    market.code,
                     user_id=ctx.user_id,
                     address_id=body.shipping_address_id,
                 )
