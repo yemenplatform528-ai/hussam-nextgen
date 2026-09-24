@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Query, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import desc, select, func
 from app.api.dependencies import get_context, get_session
-from app.core.models.marketplace import MarketplaceSellerProfile, MarketplaceOfferCompetition, MarketplaceCategory, MarketplaceListing, MarketplaceOrder, MarketplaceOrderLine, MarketplacePayout, MarketplaceReview, MarketplaceDispute, MarketplaceAddress, MarketplaceSellerVerification, MarketplaceReturnRequest, MarketplaceReturnLine, MarketplaceFeeRule
+from app.core.models.marketplace import MarketplaceSellerProfile, MarketplaceOfferCompetition, MarketplaceCategory, MarketplaceListing, MarketplaceOrder, MarketplaceOrderLine, MarketplacePayout, MarketplaceReview, MarketplaceDispute, MarketplaceAddress, MarketplaceSellerVerification, MarketplaceReturnRequest, MarketplaceReturnLine, MarketplaceFeeRule, MarketplaceCart
 from app.core.models.payments import PaymentIntent
 from app.engines.marketplace import MarketplaceService, ListingInput
 from app.engines.catalog import CatalogService, CatalogError, ProductInput, SKUInput, OfferInput
@@ -189,7 +189,35 @@ def remove_cart(listing_id:int,ctx=Depends(get_context),db=Depends(get_session))
 
 @router.post('/buyer/checkout',status_code=201)
 def checkout(body:CheckoutIn,ctx=Depends(get_context),db=Depends(get_session)):
-    orders=MarketplaceService(db).checkout(ctx.user_id,shipping_address_id=body.shipping_address_id,shipping_fee=body.shipping_fee,shipping_quote_id=body.shipping_quote_id,shipping_quote_ids=body.shipping_quote_ids,market_id=body.market_id)
+    # Resolve the same market that authoritative checkout will use, including the
+    # single-active-cart fallback. This prevents the Yemen context from validating
+    # one market while checkout executes against another.
+    from app.core.services.yemen_checkout_context import YemenCheckoutContextService
+    from app.core.models.market import MarketContext
+    market_id = body.market_id
+    if market_id is None:
+        active_carts = db.scalars(
+            select(MarketplaceCart).where(
+                MarketplaceCart.buyer_user_id == ctx.user_id,
+                MarketplaceCart.status == 'active',
+            ).order_by(MarketplaceCart.id)
+        ).all()
+        if len(active_carts) == 1:
+            market_id = active_carts[0].market_id
+    if market_id is not None:
+        market = db.scalar(select(MarketContext).where(MarketContext.id == market_id))
+        if market is not None:
+            try:
+                context = YemenCheckoutContextService(db).build(
+                    market.code,
+                    user_id=ctx.user_id,
+                    address_id=body.shipping_address_id,
+                )
+                if body.shipping_address_id is not None and context['delivery']['destination']['coverage'] not in {'available', 'active'}:
+                    raise HTTPException(status_code=409, detail='delivery coverage is not available for this address')
+            except ValueError as exc:
+                raise HTTPException(status_code=409 if str(exc) == 'market is not active' else 404, detail=str(exc))
+    orders=MarketplaceService(db).checkout(ctx.user_id,shipping_address_id=body.shipping_address_id,shipping_fee=body.shipping_fee,shipping_quote_id=body.shipping_quote_id,shipping_quote_ids=body.shipping_quote_ids,market_id=market_id)
     return {'orders':[{'id':o.id,'reference':o.reference,'seller_tenant_id':o.seller_tenant_id,'currency':o.currency,'subtotal':str(o.subtotal),'shipping_fee':str(o.shipping_fee),'platform_fee':str(o.platform_fee),'total':str(o.total),'status':o.status} for o in orders]}
 
 @router.post('/buyer/customer-orders/{customer_order_id}/payment-session',status_code=201)

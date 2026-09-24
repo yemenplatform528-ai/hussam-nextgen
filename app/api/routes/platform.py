@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from app.api.dependencies import get_context, get_session
 from app.core.services.market_context import MarketContextService
+from app.core.services.yemen_checkout_context import YemenCheckoutContextService
 
 router = APIRouter(prefix="/platform", tags=["platform"])
 
@@ -110,3 +111,30 @@ def client_market_context(
     if market.status != "active":
         raise HTTPException(status_code=409, detail="market is not active")
     return _public_runtime_context(service.runtime_context(market))
+
+
+@router.get("/yemen/checkout-context/{market_code}")
+def yemen_checkout_context(
+    market_code: str,
+    address_id: int | None = None,
+    seller_tenant_ids: list[int] | None = None,
+    ctx=Depends(get_context),
+    db=Depends(get_session),
+):
+    """Return the deterministic Yemen checkout context for the buyer UI.
+
+    Amount conversion is never performed here; domain checkout remains
+    authoritative for totals, payment execution and order mutation.
+    """
+    service = YemenCheckoutContextService(db)
+    try:
+        return service.build(
+            market_code,
+            user_id=ctx.user_id,
+            address_id=address_id,
+            seller_tenant_ids=seller_tenant_ids,
+        )
+    except ValueError as exc:
+        message = str(exc)
+        status = 409 if message == "market is not active" else 404
+        raise HTTPException(status_code=status, detail=message)

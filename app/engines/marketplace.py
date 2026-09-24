@@ -773,7 +773,8 @@ class MarketplaceService:
         items=[]
         for ci,l,s in rows:
             items.append({'id':ci.id,'listing':self._listing_view(l,s),'quantity':str(ci.quantity),'line_total':str(_money(ci.quantity)*_money(l.unit_price))})
-        return {'id':cart.id,'status':cart.status,'items':items}
+        market=self.db.get(MarketContext,cart.market_id) if cart.market_id is not None else None
+        return {'id':cart.id,'status':cart.status,'market_id':cart.market_id,'market_code':market.code if market else None,'items':items}
 
     def checkout(self,user_id, shipping_address_id=None, shipping_fee=Decimal('0'), platform_fee_bps=None, shipping_quote_id=None, shipping_quote_ids=None, market_id=None):
         if platform_fee_bps is not None:

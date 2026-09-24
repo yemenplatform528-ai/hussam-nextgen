@@ -7,6 +7,7 @@ from sqlalchemy.orm import sessionmaker
 from app.core.persistence import Base
 from app.core.models import Tenant, User, TenantMembership
 from app.core.models.marketplace import MarketplaceSellerVerification, MarketplaceShippingQuote, MarketplaceFavorite, MarketplaceReturnRequest
+from app.core.models.market import MarketGeography, MarketCoverage
 from app.engines.identity import IdentityService
 from app.engines.inventory.production import InventoryProductionService
 from app.core.contracts import StockMovement
@@ -14,13 +15,13 @@ from app.engines.marketplace import MarketplaceService, ListingInput, Marketplac
 from app.engines.marketplace_completion import MarketplaceCompletionService
 
 def setup():
-    e=create_engine('sqlite+pysqlite:///:memory:',future=True); Base.metadata.create_all(e); db=sessionmaker(e,expire_on_commit=False)(); ensure_market(db)
+    e=create_engine('sqlite+pysqlite:///:memory:',future=True); Base.metadata.create_all(e); db=sessionmaker(e,expire_on_commit=False)(); market=ensure_market(db, code='YEM')
     ids=IdentityService(db); seller=ids.create_tenant('Seller'); buyer_t=ids.create_tenant('Buyer'); buyer=ids.create_user('buyer','buyer@example.com'); su=ids.create_user('seller','seller@example.com'); ids.add_membership(buyer.id,buyer_t.id,'owner'); ids.add_membership(su.id,seller.id,'owner')
     inv=InventoryProductionService(db); inv.create_item(seller.id,'rice','Rice','bag'); inv.create_warehouse(seller.id,'wh','Main'); inv.record(seller.id,StockMovement('rice','wh',Decimal('20'),'in','opening'))
     m=MarketplaceService(db); m.register_seller(seller.id,'seller','Seller'); m.review_seller_verification(seller.id,su.id,'approved')
     l=m.create_listing(seller.id,ListingInput('rice','Rice','product','product','YER',Decimal('1000'),'rice','wh'))
     m.moderate_listing(l.id,su.id,'approved')
-    m.publish_listing(seller.id,l.id); m.ensure_buyer(buyer.id); a=m.add_address(buyer.id,'home','Buyer','777','Aden','Aden','Street')
+    m.publish_listing(seller.id,l.id); m.ensure_buyer(buyer.id); a=m.add_address(buyer.id,'home','Buyer','777','Aden','Aden','Street',market_id=market.id)
     return db,seller,buyer,su,l,a,m
 
 def test_verification_is_required_for_activation_and_public_visibility():
@@ -155,3 +156,28 @@ def test_seller_funded_discount_reduces_seller_payout_snapshot():
     assert payout.seller_funded_discount == Decimal('100.0000')
     assert payout.platform_funded_discount == Decimal('0.0000')
     assert payout.net_amount == Decimal('850.0000')
+
+
+def test_yemen_checkout_context_and_authoritative_checkout_share_market_and_quote():
+    db,seller,buyer,su,l,a,m=setup()
+    root=MarketGeography(market_id=a.market_id,parent_id=None,code='YE',level='country',name='Yemen',name_ar='اليمن',status='active')
+    db.add(root); db.flush()
+    governorate=MarketGeography(market_id=a.market_id,parent_id=root.id,code='YE-AD',level='governorate',name='Aden',name_ar='عدن',status='active')
+    db.add(governorate); db.flush()
+    db.add(MarketCoverage(market_id=a.market_id,geography_id=governorate.id,status='available'))
+    a.governorate_id=governorate.id; a.country_code='YE'; db.commit(); db.refresh(a)
+    m.add_shipping_rate(seller.id,'Aden','Aden','YER',Decimal('250'),governorate_id=governorate.id)
+    m.add_to_cart(buyer.id,l.id,1)
+    q=m.quote_shipping(buyer.id,a.id,seller.id,'YER')
+    from app.core.services.yemen_checkout_context import YemenCheckoutContextService
+    context=YemenCheckoutContextService(db).build('YEM', user_id=buyer.id, address_id=a.id, seller_tenant_ids=[seller.id])
+    assert context['market']['code']=='YEM'
+    assert context['money']['currency']=='YER'
+    assert context['money']['conversion']['automatic_conversion'] is False
+    assert context['delivery']['destination']['coverage'] in {'available','active'}
+    assert context['sellers'][0]['delivery']['available'] is True
+    orders=m.checkout(buyer.id, a.id, Decimal('0'), None, q.id, None)
+    assert len(orders)==1
+    assert orders[0].currency=='YER'
+    assert orders[0].shipping_fee==Decimal('250.0000')
+    assert q.consumed_at is not None
