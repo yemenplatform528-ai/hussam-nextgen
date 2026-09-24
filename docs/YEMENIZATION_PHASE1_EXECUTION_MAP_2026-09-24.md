@@ -304,7 +304,7 @@ The connectivity mutation foundation is now wired to a real non-financial Market
 - PR #31 merged after full CI success: baseline, PostgreSQL migration/schema-drift/integration, container security.
 - The next controlled slice is synchronization/conflict evidence and UI lifecycle visibility, followed by Documents/Notifications and then Search/Pricing/CRM. Financial mutations remain server-authoritative and offline payment/ledger authority remains prohibited.
 
-## 11. BUILD execution checkpoint — cart synchronization evidence (2026-09-24)
+## 12. BUILD execution checkpoint — cart synchronization evidence (2026-09-24)
 
 The connectivity slice now extends from server-side lifecycle primitives into the buyer UI without granting offline authority:
 
@@ -322,3 +322,46 @@ This closes the controlled cart synchronization loop:
 `Offline-safe read → local mutation draft → Idempotency-Key → server reservation → domain mutation → CONFIRMED → audit evidence → replay-safe readback`
 
 The next controlled slice is Documents + Notifications, followed by Search/Pricing/CRM, AI/HUS market-context verification, Developer Platform trusted-provenance hardening, Yemen E2E, and only then external G01–G10 evidence closure.
+
+
+## 13. Controlled completion map — current engineering state (2026-09-24)
+
+### Closed engineering slices
+
+- Market runtime context and capability activation boundary.
+- Yemen checkout context with explicit money, geography, payment and delivery context.
+- Explicit payment-method selection and immutable order snapshot.
+- COD fulfillment bridge through existing logistics authority.
+- Connectivity-safe checkout with server-authoritative idempotency.
+- Safe offline public-read cache.
+- General mutation lifecycle with request-hash binding and explicit states.
+- Replay-safe cart add/remove mutations.
+- Mutation status/readback boundary.
+- Offline cart mutation queue and replay using the same idempotency key.
+- Durable audit evidence for reservation, replay and lifecycle transitions.
+- Existing Documents, Notifications, Search, Pricing, CRM, AI/HUS and marketplace completion capabilities remain authoritative existing engines; Yemenization must wire their market context rather than duplicate them.
+
+### Remaining engineering gates
+
+1. Trusted CI provenance for Developer Platform test evidence.
+2. Cross-capability Yemen E2E proving runtime behavior rather than configuration presence.
+3. Production evidence collection for G01–G10.
+4. Final release/baseline lock only after the preceding gates are independently satisfied.
+
+### Non-negotiable authority boundaries
+
+- Offline state is never financial authority.
+- Client totals, FX, settlement, ledger posting and provider execution are never authoritative.
+- Payment providers are not production-certified by public documentation alone.
+- Developer-submitted test evidence is source-bound but must not be treated as trusted CI provenance until an independently verifiable CI artifact is bound to the source hash and run identity.
+- Yemen capability configuration is control-plane data; domain behavior is executed by typed runtime/domain contracts.
+
+### Current project status
+
+**Engineering:** active and controlled; core architecture remains preserved.
+
+**Yemenization Phase 1:** behavior wiring and verification in progress.
+
+**Production certification:** not closed; G01–G10 require external evidence.
+
+**Final lock:** intentionally deferred until evidence gates are closed.
