@@ -124,3 +124,27 @@ def test_public_market_context_geography_is_allow_listed():
     }
     assert "internal_secret" not in str(result)
     assert "internal_control_plane" not in str(result)
+
+def test_public_market_context_exposes_remaining_capability_contracts_only():
+    runtime = {
+        "market": {"code": "YEM", "country_code": "YE", "name": "Yemen", "locale": "ar-YE", "timezone": "Asia/Aden", "default_currency": "YER", "status": "active"},
+        "money": {"currencies": [], "money_units": []},
+        "payments": {"methods": []},
+        "geography": {"coverage": []},
+        "delivery": {"configuration": {}},
+        "connectivity": {"configuration": {}},
+        "documents": {"configuration": {}, "lifecycle": [], "versioned": False, "immutable_versions": False},
+        "notifications": {"configuration": {}},
+        "ai_hus": {"configuration": {},"market_context": {}, "governance": {}},
+        "pricing": {"enabled": True, "modes": ["retail", "wholesale"], "branch_overrides": True, "internal": "hidden"},
+        "verticals": {"enabled": True, "verticals": ["retail", "clinic"], "internal": "hidden"},
+        "operations": {"enabled": True, "branch_aware": True, "warehouse_aware": True, "service_area_aware": True, "internal": "hidden"},
+        "reporting": {"enabled": True, "dimensions": ["governorate", "channel"], "internal": "hidden"},
+        "capabilities": [],
+    }
+    result = _public_runtime_context(runtime)
+    assert result["pricing"] == {"enabled": True, "modes": ["retail", "wholesale"], "branch_overrides": True}
+    assert result["verticals"] == {"enabled": True, "verticals": ["retail", "clinic"]}
+    assert result["operations"] == {"enabled": True, "branch_aware": True, "warehouse_aware": True, "service_area_aware": True}
+    assert result["reporting"] == {"enabled": True, "dimensions": ["governorate", "channel"]}
+    assert "internal" not in str(result)
