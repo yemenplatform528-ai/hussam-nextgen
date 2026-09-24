@@ -133,3 +133,12 @@ The project is not production-ready until all applicable external gates have rea
 - Added migration `0033_developer_test_evidence` and executable persistence coverage.
 - CI run #108 for the preceding Yemen runtime-context slice completed successfully: baseline audit, compile, PostgreSQL migration/schema drift/integration and container-security all passed; the full baseline test job completed successfully in that run.
 - The latest evidence-hardening commits are on PR #22 and require a fresh CI execution before merge. No production certification claim is made.
+
+
+## 2026-09-24 execution checkpoint — migration convergence + verified CI
+- Migration `0033_developer_test_evidence` was hardened to converge safely when test/dev schemas already contain the new columns, and to add the invariant correctly on both SQLite and PostgreSQL.
+- CI run #113 exposed the duplicate-column migration defect; it was corrected rather than suppressed.
+- CI run #114 then passed all baseline, PostgreSQL and container-security jobs.
+- The temporary attempt to consume market runtime context directly in the existing browser UI exposed a pre-existing-style browser contract sensitivity; the UI files and E2E fixture were restored to their known-good tree, while the stable backend client contract remains in place.
+- CI run #119 on branch head `fc1c3d34b1f5cec0184daac9f944a1ce19750dc6` passed: 374+ tests including browser E2E, fresh SQLite migration/schema drift, PostgreSQL migration/schema drift/integration, baseline audit, dependency checks and container scan.
+- Current decision: do not merge or lock the release yet. First complete the remaining Yemen runtime behavior wiring and Developer Platform evidence trust boundary, then regenerate release provenance and run the final exact-head CI.
