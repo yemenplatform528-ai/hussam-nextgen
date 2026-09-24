@@ -171,3 +171,14 @@ Continue with the broader connectivity contract only after the checkout mutation
 4. sync/audit proof;
 5. prohibition of offline financial authority;
 6. then move through Documents → Notifications → Search/Pricing/CRM → AI/HUS context verification → Developer Platform trust/provenance hardening → full Yemen E2E → external G01–G10 → final release lock.
+
+
+## 2026-09-24 execution checkpoint — safe offline public reads
+
+- PR #29 `feat(yemen): add safe offline public-read cache` was merged after CI run #169 completed successfully.
+- The browser can now retain only public catalog data needed for discovery: listings, categories and sellers.
+- When public read requests fail, the client can render the last safe public cache rather than treating an intermittent connection as an empty catalog.
+- Private buyer addresses, orders, payment state, provider data and ledger state are deliberately excluded from this cache.
+- Browser E2E verifies that public catalog content remains available after simulated read failure.
+- This complements the atomic checkout idempotency boundary already recorded above; read caching and mutation replay are intentionally separate safety contracts.
+- No production certification or offline financial authority is implied.
