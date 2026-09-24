@@ -1,10 +1,11 @@
 from datetime import datetime, timezone
 from decimal import Decimal
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import desc, select
 from app.api.dependencies import get_context, get_session
 from app.api.routes.marketplace import seller_guard
+from app.engines.marketplace_completion import MarketplaceCompletionService, MarketplaceCompletionError
 from app.core.models.marketplace_growth import (
     MarketplacePricingRule, MarketplacePromotion, MarketplacePromotionItem,
     MarketplaceBrand, MarketplaceBrandStore, MarketplaceAdCampaign, MarketplaceAdGroup, MarketplaceAdTarget,
