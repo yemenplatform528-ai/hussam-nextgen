@@ -9,6 +9,14 @@ depends_on = None
 
 
 def upgrade():
+    # The canonical 0001 baseline creates the current SQLAlchemy metadata.
+    # Therefore newly introduced model tables may already exist on a fresh
+    # baseline migration. Keep this revision additive for databases that were
+    # genuinely upgraded from 0035 without the table.
+    inspector = sa.inspect(op.get_bind())
+    if inspector.has_table("mutation_records"):
+        return
+
     op.create_table(
         "mutation_records",
         sa.Column("id", sa.Integer(), primary_key=True),
@@ -24,11 +32,18 @@ def upgrade():
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
         sa.UniqueConstraint("tenant_id", "mutation_key", name="uq_mutation_tenant_key"),
-        sa.CheckConstraint("state IN ('draft','pending','confirmed','failed','conflict')", name="ck_mutation_state"),
+        sa.CheckConstraint(
+            "state IN ('draft','pending','confirmed','failed','conflict')",
+            name="ck_mutation_state",
+        ),
     )
     op.create_index("ix_mutation_records_tenant_id", "mutation_records", ["tenant_id"])
 
 
 def downgrade():
-    op.drop_index("ix_mutation_records_tenant_id", table_name="mutation_records")
+    inspector = sa.inspect(op.get_bind())
+    if not inspector.has_table("mutation_records"):
+        return
+    if any(i["name"] == "ix_mutation_records_tenant_id" for i in inspector.get_indexes("mutation_records")):
+        op.drop_index("ix_mutation_records_tenant_id", table_name="mutation_records")
     op.drop_table("mutation_records")
