@@ -2,7 +2,7 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from app.api.routes.developer_platform import validate_manifest
+from app.api.routes.developer_platform import developer_guard, validate_manifest, _get_version
 from app.core.models.core import Tenant, User, TenantMembership
 from app.core.models.developer_platform import DeveloperExtension, DeveloperExtensionVersion
 from app.core.models.market import MarketContext, MarketCoverage, MarketCurrency, MarketGeography, MarketMoneyUnit, PaymentMethodCatalogEntry
@@ -459,3 +459,38 @@ def test_developer_test_evidence_requires_exact_source_hash():
     from app.api.routes.developer_platform import TestEvidenceIn
     with pytest.raises(Exception):
         TestEvidenceIn(evidence_hash="a" * 64, source_hash="b" * 63, run_id="ci-run", status="passed")
+
+
+
+def test_developer_guard_rejects_non_operator_roles():
+    class Ctx:
+        role = "member"
+    with pytest.raises(Exception) as exc:
+        developer_guard(Ctx())
+    assert getattr(exc.value, "status_code", None) == 403
+
+
+def test_developer_version_lookup_is_tenant_scoped():
+    e = create_engine("sqlite+pysqlite:///:memory:", future=True)
+    Base.metadata.create_all(e)
+    db = sessionmaker(e, expire_on_commit=False)()
+    db.add_all([
+        Tenant(id=10, name="Tenant A", status="active"),
+        Tenant(id=20, name="Tenant B", status="active"),
+    ])
+    db.add(DeveloperExtension(
+        id="tenant-bound-ext", tenant_id=10, code="tenant.bound", name="Tenant Bound",
+        created_by="u10",
+    ))
+    db.flush()
+    db.add(DeveloperExtensionVersion(
+        id="tenant-bound-v1", extension_id="tenant-bound-ext", version="1.0.0",
+        source_hash="a" * 64, created_by="u10",
+    ))
+    db.commit()
+    x, version = _get_version(db, 10, "tenant-bound-ext", "1.0.0")
+    assert x.tenant_id == 10
+    assert version.version == "1.0.0"
+    with pytest.raises(Exception) as exc:
+        _get_version(db, 20, "tenant-bound-ext", "1.0.0")
+    assert getattr(exc.value, "status_code", None) == 404
