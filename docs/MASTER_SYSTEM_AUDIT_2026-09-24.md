@@ -178,7 +178,7 @@ G01–G10 remain external evidence gates. The repository's engineering work does
 - legal/compliance approval.
 
 ## 11. Current CI truth
-The latest observed workflow run for commit 39c79ea67ff1bf997e590bd02fc890f882a0e789 is run 35930826305, completed successfully.
+The latest verified workflow run for the current branch head `fc1c3d34b1f5cec0184daac9f944a1ce19750dc6` is CI run #119 (`35936950344`), completed successfully. Baseline audit, compile, full pytest, fresh SQLite migration/schema drift, PostgreSQL migration/schema drift/integration and container security all passed.
 
 GitHub's workflow-run API exposes status/conclusion and head SHA, so a successful run is recorded only when the run itself reports success. This audit intentionally does not convert older successful runs into evidence for newer commits.
 
@@ -187,11 +187,11 @@ The committed release-manifest is an older provenance snapshot relative to the c
 
 ## 13. Controlled remaining engineering sequence
 1. Finish Market Runtime Context composition.
-2. Add a safe deterministic client-facing market-context contract; do not expose owner/admin-only control-plane internals.
-3. Add tests for tenant/role boundaries and stable response shape.
-4. Wire the client contract into existing Web/API surfaces without duplicating domain engines.
+2. Keep the client-facing market-context contract stable, allow-listed and covered by executable boundary tests.
+3. Add remaining tenant/role boundary coverage where a client or Developer Studio surface needs it.
+4. Wire the client contract into existing Web/API surfaces only when the browser contract fixture is updated and the exact E2E path passes; do not duplicate domain engines.
 5. Finish Yemen capability composition across pricing, verticals, branches/warehouses and local reporting using existing authorities.
-6. Harden Developer Studio API surface around extension validation, test evidence, release and rollback.
+6. Harden Developer Studio API surface around extension validation, test evidence, release and rollback; trusted CI evidence verification remains a separate integration task and must be fail-closed.
 7. Regenerate release provenance from the actual repository state.
 8. Run full CI and release audit from the resulting exact commit.
 9. Keep G01–G10 external gates separate and fail-closed.
