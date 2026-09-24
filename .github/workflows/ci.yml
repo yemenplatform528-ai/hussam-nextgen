@@ -11,6 +11,10 @@ permissions:
 jobs:
   baseline:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -43,6 +47,21 @@ jobs:
         run: |
           python -m pip install pip-audit
           pip-audit
+      - name: Generate trusted CI test evidence
+        env:
+          CI_EVIDENCE_OUTPUT: /tmp/hussam-ci-evidence.json
+        run: python scripts/ci_test_evidence.py
+      - name: Upload trusted CI test evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: hussam-trusted-ci-evidence-${{ github.run_id }}
+          path: /tmp/hussam-ci-evidence.json
+          if-no-files-found: error
+          retention-days: 90
+      - name: Attest trusted CI test evidence
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: /tmp/hussam-ci-evidence.json
 
   postgres-integration:
     runs-on: ubuntu-latest
