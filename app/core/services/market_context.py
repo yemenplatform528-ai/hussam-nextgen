@@ -90,6 +90,10 @@ class MarketContextService:
         document_configuration = active_configuration("yem_arabic_documents")
         notification_configuration = active_configuration("yem_notification_channels")
         ai_hus_configuration = active_configuration("yem_ai_hus_context")
+        local_pricing_configuration = active_configuration("yem_local_pricing")
+        business_verticals_configuration = active_configuration("yem_business_verticals")
+        branch_warehouse_configuration = active_configuration("yem_branch_warehouse_network")
+        local_reporting_configuration = active_configuration("yem_local_reporting")
 
         return {
             "market": {
