@@ -200,3 +200,14 @@ The committed release-manifest is an older provenance snapshot relative to the c
 BUILD Phase 1 is complete when the existing platform can enter a Yemen market context and its normal business workflows consistently consume shared Yemen market configuration across commerce, money, geography, payments, logistics, documents, notifications, AI/HUS, reporting and extension surfaces without cloning an authoritative engine or weakening security/accounting/tenant invariants.
 
 This document does not declare production launch readiness.
+
+
+## 2026-09-24 repository hygiene convergence
+
+The earlier committed `release-manifest.json` was intentionally removed during the repository cleanup because it was a historical 391-file snapshot and did not contain the current exact source provenance. The repository now treats release manifests as generated release-time artifacts from an exact frozen Git tree.
+
+The cleanup also removed superseded dated verification/readiness snapshots, legacy HUS release-evidence placeholders, obsolete status/reconciliation records, the historical branch-consolidation copy, and the legacy release wrapper. No application domain engine, migration, production test, CI workflow, policy, evidence protocol, Yemenization contract, or Developer Platform contract was removed by this hygiene pass.
+
+The current migration tree reaches revision `0036_mutation_records`; the previous inventory statement about 28 migrations was therefore historical and is no longer authoritative. The current repository state must be measured again by exact-head CI before any release certification claim.
+
+The project remains fail-closed: G01–G10 are not closed, exact-head CI for the post-cleanup head must be observed, and the final release manifest/artifact must be regenerated only after the candidate SHA is frozen.
