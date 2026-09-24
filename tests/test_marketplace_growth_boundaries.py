@@ -68,6 +68,6 @@ def test_seller_notification_recipient_must_have_active_membership_in_current_te
         ])
         db.commit()
         with pytest.raises(ValueError, match="not in seller tenant"):
-            notification(NotificationIn(recipient_user_id="u-b", notification_type="order"), ctx(1), db)
-        out = notification(NotificationIn(recipient_user_id="u-a", notification_type="order"), ctx(1), db)
+            notification(NotificationIn(recipient_user_id="u-b", notification_type="order", title="Order"), ctx(1), db)
+        out = notification(NotificationIn(recipient_user_id="u-a", notification_type="order", title="Order"), ctx(1), db)
         assert out["id"] > 0
