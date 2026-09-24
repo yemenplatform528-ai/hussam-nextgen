@@ -6,6 +6,7 @@ from sqlalchemy import desc, select
 from app.api.dependencies import get_context, get_session
 from app.api.routes.marketplace import seller_guard
 from app.core.models.marketplace import MarketplaceListing
+from app.core.models.catalog import MarketplaceSKU
 from app.core.models.marketplace_growth import (
     MarketplacePricingRule, MarketplacePromotion, MarketplacePromotionItem,
     MarketplaceBrand, MarketplaceBrandStore, MarketplaceAdCampaign, MarketplaceAdGroup, MarketplaceAdTarget,
@@ -132,7 +133,17 @@ def warehouse(body:WarehouseIn,ctx=Depends(get_context),db=Depends(get_session))
 
 @router.post('/seller/inventory-transfers',status_code=201)
 def transfer(body:TransferIn,ctx=Depends(get_context),db=Depends(get_session)):
-    seller_guard(ctx); x=MarketplaceInventoryTransfer(seller_tenant_id=ctx.tenant_id,**body.model_dump()); db.add(x); db.commit(); db.refresh(x); return {'id':x.id,'reference':x.reference,'status':x.status}
+    seller_guard(ctx)
+    warehouses=db.scalars(select(MarketplaceWarehouse).where(
+        MarketplaceWarehouse.id.in_([body.from_warehouse_id,body.to_warehouse_id]),
+        MarketplaceWarehouse.owner_tenant_id==ctx.tenant_id,
+    )).all()
+    if len(warehouses) != 2 or {x.id for x in warehouses} != {body.from_warehouse_id,body.to_warehouse_id}:
+        raise ValueError('warehouses not found for seller')
+    if body.sku_id is not None:
+        sku=db.scalar(select(MarketplaceSKU).where(MarketplaceSKU.id==body.sku_id,MarketplaceSKU.seller_tenant_id==ctx.tenant_id))
+        if not sku: raise ValueError('sku not found for seller')
+    x=MarketplaceInventoryTransfer(seller_tenant_id=ctx.tenant_id,**body.model_dump()); db.add(x); db.commit(); db.refresh(x); return {'id':x.id,'reference':x.reference,'status':x.status}
 
 @router.post('/seller/pickup-points',status_code=201)
 def pickup(body:PickupPointIn,ctx=Depends(get_context),db=Depends(get_session)):
