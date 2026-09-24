@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+import hashlib
 import json
 from datetime import datetime, timezone, timedelta
 from decimal import Decimal, ROUND_HALF_UP
@@ -7,7 +8,7 @@ from sqlalchemy import select, func, or_, desc
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.core.models.core import User, Tenant
+from app.core.models.core import User, Tenant, IdempotencyRecord
 from app.core.models.market import MarketContext, MarketCurrency, MarketGeography, PaymentMethodCatalogEntry
 import os
 from app.core.models.catalog import MarketplaceCatalogGroup, MarketplaceProduct, MarketplaceSKU, MarketplaceOffer
@@ -776,7 +777,52 @@ class MarketplaceService:
         market=self.db.get(MarketContext,cart.market_id) if cart.market_id is not None else None
         return {'id':cart.id,'status':cart.status,'market_id':cart.market_id,'market_code':market.code if market else None,'items':items}
 
-    def checkout(self,user_id, shipping_address_id=None, shipping_fee=Decimal('0'), platform_fee_bps=None, shipping_quote_id=None, shipping_quote_ids=None, market_id=None, payment_method_code=None):
+    def checkout(self,user_id, shipping_address_id=None, shipping_fee=Decimal('0'), platform_fee_bps=None, shipping_quote_id=None, shipping_quote_ids=None, market_id=None, payment_method_code=None, idempotency_key=None, idempotency_tenant_id=None, idempotency_request_hash=None):
+        idempotency_record = None
+        if idempotency_key is not None:
+            key = str(idempotency_key).strip()
+            if not key or len(key) > 255:
+                raise MarketplaceError('idempotency key must be between 1 and 255 characters')
+            if not idempotency_tenant_id:
+                raise MarketplaceError('idempotency tenant context is required')
+            if not idempotency_request_hash or len(str(idempotency_request_hash)) != 64:
+                raise MarketplaceError('idempotency request hash is required')
+            try:
+                int(str(idempotency_request_hash), 16)
+            except ValueError:
+                raise MarketplaceError('idempotency request hash is invalid')
+            try:
+                with self.db.begin_nested():
+                    idempotency_record = IdempotencyRecord(
+                        tenant_id=idempotency_tenant_id,
+                        key=key,
+                        request_hash=str(idempotency_request_hash).lower(),
+                        response_json='__pending__',
+                    )
+                    self.db.add(idempotency_record)
+                    self.db.flush()
+            except IntegrityError:
+                existing = self.db.scalar(select(IdempotencyRecord).where(
+                    IdempotencyRecord.tenant_id == idempotency_tenant_id,
+                    IdempotencyRecord.key == key,
+                ))
+                if existing is None:
+                    raise MarketplaceError('idempotent request could not be resolved; retry safely')
+                if existing.request_hash != str(idempotency_request_hash).lower():
+                    raise MarketplaceError('idempotency key was already used for a different request')
+                if existing.response_json == '__pending__':
+                    raise MarketplaceError('idempotent request is still in progress')
+                try:
+                    stored = json.loads(existing.response_json)
+                    order_ids = [int(x) for x in stored.get('order_ids', [])]
+                except (TypeError, ValueError, AttributeError):
+                    raise MarketplaceError('stored idempotency result is invalid')
+                if not order_ids:
+                    raise MarketplaceError('stored idempotency result is empty')
+                return self.db.scalars(select(MarketplaceOrder).where(
+                    MarketplaceOrder.id.in_(order_ids)
+                ).order_by(MarketplaceOrder.id)).all()
+
         if platform_fee_bps is not None:
             raise MarketplaceError('platform fee is policy-controlled; client-supplied platform_fee_bps is not accepted')
         self.ensure_buyer(user_id)
@@ -902,6 +948,12 @@ class MarketplaceService:
         # line allocations/payout snapshot do not reconcile.
         for created_order in created:
             self.assert_financial_invariants(created_order.id)
+        if idempotency_record is not None:
+            idempotency_record.response_json = json.dumps(
+                {'order_ids': [o.id for o in created]},
+                sort_keys=True,
+                separators=(',', ':'),
+            )
         self.db.commit()
         return created
 
