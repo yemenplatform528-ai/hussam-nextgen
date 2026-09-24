@@ -219,3 +219,39 @@ Completed on branch `feat/yemen-checkout-context`:
 This slice does **not** execute payment, create orders, certify providers, calculate authoritative totals, or replace checkout. The existing marketplace domain remains authoritative for those operations.
 
 The checkout route now resolves the same active-cart market used by the authoritative domain checkout before applying Yemen market/address/coverage validation. The buyer UI no longer sends client-supplied platform-fee policy data. Existing domain tests already cover server-owned shipping quotes and quote consumption; the next controlled slice is browser E2E against this contract, followed by explicit COD/payment behavior verification.
+
+
+## 10. BUILD execution checkpoint — payment selection + COD fulfillment bridge (2026-09-24)
+
+Completed and merged through controlled PRs:
+
+- Checkout context was promoted from presentation-only context into an explicit payment-method selection boundary.
+- `payment_method_code` is validated against the active market payment catalog at authoritative checkout.
+- The selected method is persisted on the customer order and seller-facing marketplace order snapshot.
+- COD is explicitly represented as a non-provider collection method; checkout does not fabricate a provider payment intent for COD.
+- Buyer checkout now requires an explicit payment-method selection from the market runtime context.
+- Browser E2E verifies Yemen checkout selection of COD.
+- Fulfillment now carries the selected COD order total into the physical shipment as `cod_amount`.
+- Existing logistics authority remains responsible for delivery-state transitions and COD collection.
+- Focused end-to-end coverage verifies: COD selection → shipment COD amount → delivery → COD collection.
+- Provider-backed payment execution remains behind the existing production gate and is not activated by this slice.
+
+The controlled payment/fulfillment boundary is therefore now:
+
+`Market Payment Catalog → Checkout Selection → Immutable Order Snapshot → Fulfillment Shipment COD Amount → Delivery → COD Collection`
+
+No provider certification, live credentials, settlement integration, or external production evidence is implied by this checkpoint.
+
+### Verification record
+
+- PR #25: payment-method selection — CI green before merge.
+- PR #26: COD fulfillment bridge — CI green before merge.
+- Baseline audit: 0 failures / 0 warnings.
+- Compileall: passed.
+- Full pytest suite: passed on the PR head.
+- Fresh SQLite migration: passed.
+- Alembic schema drift: passed.
+- PostgreSQL migration/schema/integration: passed.
+- Container security scan: passed.
+
+Next controlled capability slice: connectivity-aware mutation behavior, with special attention to offline drafts, explicit pending states, replay-safe idempotency, and prohibition of offline payment/ledger authority.
