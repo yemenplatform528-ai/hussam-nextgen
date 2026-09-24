@@ -90,7 +90,16 @@ class MarketplaceCompletionService:
         return {'promotion_id': chosen.id if chosen else None, 'discount': str(best), 'subtotal_after': str(subtotal - best)}
 
     def redeem_coupon(self, buyer_user_id, marketplace_order_id, code, subtotal, currency, now=None):
-        now = now or datetime.now(timezone.utc); subtotal = money(subtotal)
+        from app.core.models.marketplace import MarketplaceOrder
+        order = self.db.scalar(select(MarketplaceOrder).where(MarketplaceOrder.id == marketplace_order_id, MarketplaceOrder.buyer_user_id == buyer_user_id).with_for_update())
+        if not order: raise MarketplaceCompletionError('order does not belong to buyer')
+        if order.status != 'pending_payment': raise MarketplaceCompletionError('coupon can only be redeemed before payment')
+        authoritative_subtotal = money(order.subtotal)
+        authoritative_currency = order.currency.upper()
+        if money(subtotal) != authoritative_subtotal: raise MarketplaceCompletionError('coupon subtotal does not match order')
+        if currency.upper() != authoritative_currency: raise MarketplaceCompletionError('coupon currency does not match order')
+        subtotal = authoritative_subtotal; currency = authoritative_currency
+        now = now or datetime.now(timezone.utc)
         coupon = self.db.scalar(select(MarketplaceCoupon).where(MarketplaceCoupon.code == code.strip().upper(), MarketplaceCoupon.active.is_(True)))
         if not coupon: raise MarketplaceCompletionError('coupon not found or inactive')
         starts = coupon.starts_at.replace(tzinfo=timezone.utc) if coupon.starts_at.tzinfo is None else coupon.starts_at
