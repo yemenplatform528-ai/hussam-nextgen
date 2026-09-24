@@ -20,9 +20,18 @@ customer service, plus a full Seller Center and network operations.
 
 ## Engineering rule
 
-This repository is not developed as a chain of feature releases. The `1.0`
-label is reserved for the first real product release after the complete capability
-and production gates are satisfied.
+This repository is developed as one continuous platform. The `1.0` label is reserved
+for the first real product release after the complete capability and production gates
+are satisfied. Yemenization is a governed compatibility layer over the shared engines,
+not a parallel Yemen-only implementation.
+
+## Current BUILD Phase 1
+
+The active engineering path composes the Yemen market runtime across the existing
+authorities for money, geography, payments, logistics, documents, notifications,
+AI/HUS, reporting and governed Developer Platform capabilities. It preserves the
+shared domain engines and adds provider-neutral local behavior through market
+configuration and adapters.
 
 See:
 - `docs/PLATFORM_BLUEPRINT.md`
