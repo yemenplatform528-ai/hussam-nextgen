@@ -1,7 +1,7 @@
 from sqlalchemy import select
 import pytest
 
-from app.core.models.core import Tenant, User, MutationRecord
+from app.core.models.core import AuditRecord, Tenant, User, MutationRecord
 from app.core.persistence import make_session_factory
 from app.core.services.mutation_lifecycle import MutationLifecycleError, MutationLifecycleService, canonical_request_hash
 
@@ -30,6 +30,10 @@ def test_mutation_lifecycle_reserve_replay_and_conflict():
     assert replay is True
     assert second.id == first.id
     assert second.state == "confirmed"
+    audits = db.scalars(select(AuditRecord).where(AuditRecord.tenant_id == tenant.id).order_by(AuditRecord.id)).all()
+    assert [x.action for x in audits] == ["mutation_reserved", "mutation_transitioned", "mutation_replayed"]
+    assert '"request_hash":"' in audits[0].metadata_json
+    assert '"from_state":"pending"' in audits[1].metadata_json
 
     with pytest.raises(MutationLifecycleError, match="different request"):
         service.reserve(tenant.id, user.id, "marketplace.cart.add", "m-001",
