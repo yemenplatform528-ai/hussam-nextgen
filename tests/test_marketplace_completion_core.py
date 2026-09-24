@@ -87,3 +87,15 @@ def test_customer_case_cannot_reference_another_buyers_order():
         svc.create_customer_case(other.id,'order','Unauthorized',order_id=order.id,seller_tenant_id=seller.id)
     case=svc.create_customer_case(buyer.id,'order','Authorized',order_id=order.id,seller_tenant_id=seller.id)
     assert case.order_id == order.id and case.buyer_user_id == buyer.id
+
+
+def test_coupon_redemption_rejects_coupon_from_other_seller():
+    db, seller, buyer, su, l = setup(); svc = MarketplaceCompletionService(db); now = datetime.now(timezone.utc)
+    from app.engines.identity import IdentityService
+    from app.core.models.marketplace import MarketplaceOrder
+    other = IdentityService(db).create_tenant('Other Seller')
+    svc.create_coupon(other.id, 'SHARED-CODE', 'percentage', Decimal('10'), now-timedelta(minutes=1), now+timedelta(hours=1), currency='YER')
+    order = MarketplaceOrder(reference='coupon-seller-boundary', buyer_user_id=buyer.id, seller_tenant_id=seller.id, currency='YER', subtotal=1000, shipping_fee=0, platform_fee=0, total=1000, status='pending_payment')
+    db.add(order); db.commit(); db.refresh(order)
+    with pytest.raises(MarketplaceCompletionError, match='coupon not found or inactive'):
+        svc.redeem_coupon(buyer.id, order.id, 'SHARED-CODE', Decimal('1000'), 'YER')
