@@ -5,9 +5,9 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.api.routes.marketplace_growth import TransferIn, transfer
+from app.api.routes.marketplace_growth import TransferIn, transfer, NotificationIn, notification
 from app.core.models.marketplace_growth import MarketplaceInventoryTransfer, MarketplaceWarehouse
-from app.core.models.core import Tenant
+from app.core.models.core import Tenant, User, TenantMembership
 from app.core.persistence import Base
 
 
@@ -55,3 +55,19 @@ def test_inventory_transfer_requires_both_warehouses_in_current_tenant():
         row = db.scalar(select(MarketplaceInventoryTransfer).where(MarketplaceInventoryTransfer.reference == "own"))
         assert row is not None
         assert row.seller_tenant_id == 1
+
+
+def test_seller_notification_recipient_must_have_active_membership_in_current_tenant():
+    Factory = setup_db()
+    with Factory() as db:
+        db.add_all([
+            User(id="u-a", email="a@example.test", active=True),
+            User(id="u-b", email="b@example.test", active=True),
+            TenantMembership(user_id="u-a", tenant_id=1, role="member", active=True),
+            TenantMembership(user_id="u-b", tenant_id=2, role="member", active=True),
+        ])
+        db.commit()
+        with pytest.raises(ValueError, match="not in seller tenant"):
+            notification(NotificationIn(recipient_user_id="u-b", notification_type="order"), ctx(1), db)
+        out = notification(NotificationIn(recipient_user_id="u-a", notification_type="order"), ctx(1), db)
+        assert out["id"] > 0
