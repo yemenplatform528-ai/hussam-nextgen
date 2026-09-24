@@ -159,6 +159,12 @@ def test_seller_funded_discount_reduces_seller_payout_snapshot():
 
 def test_yemen_checkout_context_and_authoritative_checkout_share_market_and_quote():
     db,seller,buyer,su,l,a,m=setup()
+    from tests.market_test_support import ensure_market
+    db.query(__import__('app.core.models.market', fromlist=['MarketContext']).MarketContext).delete()
+    db.commit()
+    ensure_market(db, code='YEM')
+    a.market_id=1
+    db.commit()
     m.add_shipping_rate(seller.id,'Aden','Aden','YER',Decimal('250'))
     m.add_to_cart(buyer.id,l.id,1)
     q=m.quote_shipping(buyer.id,a.id,seller.id,'YER')
