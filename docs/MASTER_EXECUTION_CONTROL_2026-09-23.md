@@ -182,3 +182,29 @@ Continue with the broader connectivity contract only after the checkout mutation
 - Browser E2E verifies that public catalog content remains available after simulated read failure.
 - This complements the atomic checkout idempotency boundary already recorded above; read caching and mutation replay are intentionally separate safety contracts.
 - No production certification or offline financial authority is implied.
+
+
+## 2026-09-24 control update — connectivity closure and remaining gates
+
+### Closed in this execution window
+
+- Explicit checkout idempotency and offline draft boundary.
+- Safe offline public-read cache.
+- Tenant/actor-scoped MutationRecord lifecycle with canonical request hashes.
+- Replay-safe cart add/remove mutations.
+- Mutation status/readback.
+- Offline cart queue with replay using the original mutation key.
+- Durable mutation audit evidence for reservation, replay and transition.
+
+### Existing engines confirmed as reuse targets
+
+Documents, notifications, search, pricing, CRM, AI and HUS already have engineering implementations and contracts in the repository. Yemenization must verify their runtime market-context wiring and E2E behavior; it must not create parallel implementations.
+
+### Final controlled gates
+
+1. Cross-system Yemen E2E behavior proof.
+2. Developer Platform trusted CI provenance integration. Source-bound developer evidence is not equivalent to independently verified CI provenance.
+3. External G01–G10 evidence closure.
+4. Final baseline/release lock only after all evidence gates pass.
+
+The project remains engineering-active and production-certification-open. No external certification is inferred from CI success.
