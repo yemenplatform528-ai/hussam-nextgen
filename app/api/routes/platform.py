@@ -19,6 +19,10 @@ def _public_runtime_context(runtime: dict) -> dict:
     documents_config = runtime["documents"].get("configuration", {})
     notifications_config = runtime["notifications"].get("configuration", {})
     ai_config = runtime["ai_hus"].get("configuration", {})
+    pricing_config = runtime.get("pricing", {})
+    verticals_config = runtime.get("verticals", {})
+    operations_config = runtime.get("operations", {})
+    reporting_config = runtime.get("reporting", {})
 
     return {
         "schema_version": "1.0",
@@ -85,6 +89,25 @@ def _public_runtime_context(runtime: dict) -> dict:
         "notifications": {
             "channels": notifications_config.get("channels", ["in_app"]),
             "tenant_scoped": True,
+        },
+        "pricing": {
+            "enabled": bool(pricing_config.get("enabled", False)),
+            "modes": [value for value in pricing_config.get("modes", []) if isinstance(value, str)],
+            "branch_overrides": bool(pricing_config.get("branch_overrides", False)),
+        },
+        "verticals": {
+            "enabled": bool(verticals_config.get("enabled", False)),
+            "verticals": [value for value in verticals_config.get("verticals", []) if isinstance(value, str)],
+        },
+        "operations": {
+            "enabled": bool(operations_config.get("enabled", False)),
+            "branch_aware": bool(operations_config.get("branch_aware", False)),
+            "warehouse_aware": bool(operations_config.get("warehouse_aware", False)),
+            "service_area_aware": bool(operations_config.get("service_area_aware", False)),
+        },
+        "reporting": {
+            "enabled": bool(reporting_config.get("enabled", False)),
+            "dimensions": [value for value in reporting_config.get("dimensions", []) if isinstance(value, str)],
         },
         "ai_hus": {
             "market_context": runtime["ai_hus"]["market_context"],

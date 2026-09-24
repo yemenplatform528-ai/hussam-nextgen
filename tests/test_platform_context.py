@@ -51,6 +51,22 @@ def test_client_market_context_is_stable_and_hides_control_plane_configuration()
             "internal_adapter_secret": "hidden",
         },
     ))
+    for code, category, config in [
+        ("yem_local_pricing", "pricing", {"enabled": True, "modes": ["retail", "wholesale"], "branch_overrides": True}),
+        ("yem_business_verticals", "verticals", {"enabled": True, "verticals": ["retail", "clinic"]}),
+        ("yem_branch_warehouse_network", "operations", {"enabled": True, "branch_aware": True, "warehouse_aware": True, "service_area_aware": True}),
+        ("yem_local_reporting", "analytics", {"enabled": True, "dimensions": ["governorate", "channel"]}),
+    ]:
+        cap = PlatformCapability(
+            id=code, code=code, category=category, name=code, market_scope=["YEM"],
+            config_schema={}, status="active",
+        )
+        db.add(cap)
+        db.flush()
+        db.add(MarketCapabilityActivation(
+            id=f"activation-{code}", market_id=1, capability_id=code, status="active",
+            configuration=config,
+        ))
     db.commit()
 
     result = client_market_context("YEM", Ctx(), db)
@@ -65,9 +81,24 @@ def test_client_market_context_is_stable_and_hides_control_plane_configuration()
         "idempotent_mutations": True,
         "explicit_pending_states": True,
     }
-    assert result["capabilities"] == [
-        {"code": "yem_connectivity_policy", "category": "connectivity", "status": "active"}
-    ]
+    assert result["pricing"] == {
+        "enabled": True, "modes": ["retail", "wholesale"], "branch_overrides": True,
+    }
+    assert result["verticals"] == {"enabled": True, "verticals": ["retail", "clinic"]}
+    assert result["operations"] == {
+        "enabled": True, "branch_aware": True, "warehouse_aware": True,
+        "service_area_aware": True,
+    }
+    assert result["reporting"] == {
+        "enabled": True, "dimensions": ["governorate", "channel"],
+    }
+    assert {item["code"] for item in result["capabilities"]} == {
+        "yem_connectivity_policy",
+        "yem_local_pricing",
+        "yem_business_verticals",
+        "yem_branch_warehouse_network",
+        "yem_local_reporting",
+    }
     assert "configuration" not in result["market"]
     assert "internal_secret" not in result["market"]
     assert "internal_adapter_secret" not in str(result)
@@ -124,3 +155,27 @@ def test_public_market_context_geography_is_allow_listed():
     }
     assert "internal_secret" not in str(result)
     assert "internal_control_plane" not in str(result)
+
+def test_public_market_context_exposes_remaining_capability_contracts_only():
+    runtime = {
+        "market": {"code": "YEM", "country_code": "YE", "name": "Yemen", "locale": "ar-YE", "timezone": "Asia/Aden", "default_currency": "YER", "status": "active"},
+        "money": {"currencies": [], "money_units": []},
+        "payments": {"methods": []},
+        "geography": {"coverage": []},
+        "delivery": {"configuration": {}},
+        "connectivity": {"configuration": {}},
+        "documents": {"configuration": {}, "lifecycle": [], "versioned": False, "immutable_versions": False},
+        "notifications": {"configuration": {}},
+        "ai_hus": {"configuration": {},"market_context": {}, "governance": {}},
+        "pricing": {"enabled": True, "modes": ["retail", "wholesale"], "branch_overrides": True, "internal": "hidden"},
+        "verticals": {"enabled": True, "verticals": ["retail", "clinic"], "internal": "hidden"},
+        "operations": {"enabled": True, "branch_aware": True, "warehouse_aware": True, "service_area_aware": True, "internal": "hidden"},
+        "reporting": {"enabled": True, "dimensions": ["governorate", "channel"], "internal": "hidden"},
+        "capabilities": [],
+    }
+    result = _public_runtime_context(runtime)
+    assert result["pricing"] == {"enabled": True, "modes": ["retail", "wholesale"], "branch_overrides": True}
+    assert result["verticals"] == {"enabled": True, "verticals": ["retail", "clinic"]}
+    assert result["operations"] == {"enabled": True, "branch_aware": True, "warehouse_aware": True, "service_area_aware": True}
+    assert result["reporting"] == {"enabled": True, "dimensions": ["governorate", "channel"]}
+    assert "internal" not in str(result)
