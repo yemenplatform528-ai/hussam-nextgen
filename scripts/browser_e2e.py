@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Engineering browser UI contract run for Hussam NextGen."""
-import os\nfrom pathlib import Path
+import os
+from pathlib import Path
 from playwright.sync_api import sync_playwright
 
 ROOT = Path(__file__).resolve().parents[1] / "app/ui"
