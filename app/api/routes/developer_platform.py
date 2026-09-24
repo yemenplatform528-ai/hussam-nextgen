@@ -94,6 +94,7 @@ class VersionIn(BaseModel):
 
 class TestEvidenceIn(BaseModel):
     evidence_hash: str = Field(min_length=64, max_length=64, pattern=r"^[0-9a-fA-F]{64}$")
+    source_hash: str = Field(min_length=64, max_length=64, pattern=r"^[0-9a-fA-F]{64}$")
     run_id: str = Field(min_length=1, max_length=120)
     status: str = Field(default="passed", pattern=r"^(passed|failed)$")
 
@@ -298,8 +299,11 @@ def record_test_evidence(extension_id: str, version: str, body: TestEvidenceIn, 
         raise HTTPException(status_code=404, detail="extension version not found")
     if v.test_evidence_hash:
         raise HTTPException(status_code=409, detail="test evidence is immutable once recorded")
+    if body.source_hash.lower() != v.source_hash:
+        raise HTTPException(status_code=409, detail="test evidence source does not match extension version source_hash")
     v.test_status = body.status
     v.test_evidence_hash = body.evidence_hash.lower()
+    v.test_source_hash = body.source_hash.lower()
     v.test_run_id = body.run_id
     v.tested_at = datetime.now(timezone.utc)
     db.add(DeveloperExtensionAudit(
@@ -310,7 +314,7 @@ def record_test_evidence(extension_id: str, version: str, body: TestEvidenceIn, 
         details={"status": v.test_status, "evidence_hash": v.test_evidence_hash, "run_id": v.test_run_id},
     ))
     db.commit()
-    return {"id": v.id, "extension_id": x.id, "version": v.version, "test_status": v.test_status, "test_evidence_hash": v.test_evidence_hash, "test_run_id": v.test_run_id}
+    return {"id": v.id, "extension_id": x.id, "version": v.version, "test_status": v.test_status, "test_evidence_hash": v.test_evidence_hash, "test_source_hash": v.test_source_hash, "test_run_id": v.test_run_id}
 
 @router.post("/extensions/{extension_id}/versions/{version}/publish")
 def publish_version(extension_id: str, version: str, ctx=Depends(get_context), db=Depends(get_session)):
