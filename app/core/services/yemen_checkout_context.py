@@ -1,7 +1,11 @@
 from sqlalchemy import or_, select
 
 from app.core.models.market import MarketContext, MarketCoverage, MarketGeography, PaymentMethodCatalogEntry
-from app.core.models.marketplace import MarketplaceAddress, MarketplaceShippingRate
+from app.core.models.marketplace import (
+    MarketplaceAddress,
+    MarketplaceSellerProfile,
+    MarketplaceShippingRate,
+)
 from app.core.services.market_context import MarketContextService
 
 
@@ -147,6 +151,15 @@ class YemenCheckoutContextService:
         return row.status if row else "unknown"
 
     def _seller_context(self, market: MarketContext, seller_tenant_id: int, address):
+        seller = self.db.scalar(
+            select(MarketplaceSellerProfile).where(
+                MarketplaceSellerProfile.tenant_id == seller_tenant_id,
+                MarketplaceSellerProfile.status == "active",
+            )
+        )
+        if seller is None:
+            raise ValueError("seller is not active")
+
         currency = market.default_currency
         cod_available = bool(
             self.db.scalar(
