@@ -3,7 +3,7 @@ from decimal import Decimal, ROUND_HALF_UP
 from uuid import uuid4
 from sqlalchemy import select, func
 
-from app.core.models.marketplace import MarketplaceListing, MarketplaceOrder, MarketplaceDispute, MarketplaceReturnRequest
+from app.core.models.marketplace import MarketplaceListing, MarketplaceOrder, MarketplaceOrderLine, MarketplaceDispute, MarketplaceReturnRequest
 from app.core.models.marketplace_operational import MarketplaceDiscountAllocation, MarketplaceRepricingJob
 from app.core.models.marketplace_growth import MarketplacePricingRule, MarketplacePromotion, MarketplacePromotionItem, MarketplaceAdCampaign, MarketplaceAdGroup, MarketplaceB2BPrice, MarketplaceCustomerCase, MarketplaceIntegrationApp
 from app.core.models.platform_completion import (
