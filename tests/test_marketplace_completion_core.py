@@ -93,6 +93,7 @@ def test_customer_case_cannot_reference_another_buyers_order():
 def test_coupon_redemption_is_bound_to_order_seller_tenant():
     db,seller,buyer,su,l=setup(); svc=MarketplaceCompletionService(db); now=datetime.now(timezone.utc)
     from app.core.models.marketplace import MarketplaceOrder
+    from app.engines.identity import IdentityService
     other_seller=IdentityService(db).create_tenant('Other Coupon Seller')
     order=MarketplaceOrder(reference='coupon-seller-boundary',buyer_user_id=buyer.id,seller_tenant_id=seller.id,currency='YER',subtotal=1000,shipping_fee=0,platform_fee=0,total=1000,status='pending_payment')
     db.add(order); db.commit(); db.refresh(order)
