@@ -7,7 +7,7 @@ This document is the execution-control companion to the canonical engineering ba
 ### Current source of truth
 - Repository: `yemenplatform528-ai/hussam-nextgen`
 - Default branch: `main`
-- Current `main`: `67d5916f917fc29a8ad49f0c04161ae93cf5327e`
+- Current `main`: `8339d0aba01367049c1ac243e68abaf93ac5bdc5`
 - Canonical engineering baseline remains: `473cb7785bf2853e884a3ed28ea17f18d5085efa`
 - Certification-control delta remains separate from additive Yemenization/Developer Platform BUILD work.
 - Marketplace, AI, HUS, finance and sovereign-core business behavior remain protected; Yemenization is implemented as governed compatibility/configuration layers rather than a parallel core.
@@ -144,3 +144,30 @@ The project is not production-ready until all applicable external gates have rea
 - Current decision: do not merge or lock the release yet. First complete the remaining Yemen runtime behavior wiring and Developer Platform evidence trust boundary, then regenerate release provenance and run the final exact-head CI.
 
 - Developer test evidence is now immutable after the first recorded result; a failed evidence record cannot be promoted to passed evidence through the same endpoint.
+
+
+## 2026-09-24 execution checkpoint — connectivity-safe checkout
+
+- PR #28 `feat(yemen): make checkout connectivity-safe and replay-safe` was merged after its final CI run #165 completed successfully.
+- Final PR head: `e24e4802956a547f94e9eb720cdc5e3e59d94df6`.
+- Merge commit on `main`: `8339d0aba01367049c1ac243e68abaf93ac5bdc5`.
+- The slice uses the existing `IdempotencyRecord` table; no schema migration was needed.
+- Checkout idempotency is atomic with order creation: reservation, domain mutation and stored replay result share the same transaction.
+- The request hash binds the authenticated buyer to the canonical checkout body; reusing a key for a different request is rejected.
+- Browser checkout now has an explicit local draft boundary. Offline submission does not call the checkout API and the saved draft is explicitly not an order.
+- Online retry reuses the same idempotency key, protecting against the common case where a server-side mutation succeeds but the client loses the response.
+- Final PR CI evidence: baseline, PostgreSQL integration and container-security all passed.
+- The previously open verification-only PR #21 was closed as obsolete; it was not merged.
+- Post-merge `main` CI is not claimed here because the connected workflow query did not report a push-triggered run for merge commit `8339d0aba01367049c1ac243e68abaf93ac5bdc5`.
+- G01–G10 remain `PENDING_EXTERNAL`. This checkpoint is engineering behavior evidence, not production certification.
+
+### Next controlled track
+
+Continue with the broader connectivity contract only after the checkout mutation boundary is stable:
+
+1. offline-safe read/cache boundaries;
+2. explicit mutation lifecycle states (`DRAFT`, `PENDING`, `CONFIRMED`, `FAILED`, `CONFLICT`);
+3. replay and conflict proof for non-payment mutations;
+4. sync/audit proof;
+5. prohibition of offline financial authority;
+6. then move through Documents → Notifications → Search/Pricing/CRM → AI/HUS context verification → Developer Platform trust/provenance hardening → full Yemen E2E → external G01–G10 → final release lock.
