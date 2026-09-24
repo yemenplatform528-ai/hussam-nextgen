@@ -218,4 +218,4 @@ Completed on branch `feat/yemen-checkout-context`:
 
 This slice does **not** execute payment, create orders, certify providers, calculate authoritative totals, or replace checkout. The existing marketplace domain remains authoritative for those operations.
 
-Next controlled slice: connect this context to the existing buyer checkout contract and browser E2E, then continue delivery/payment behavior verification.
+The checkout route now resolves the same active-cart market used by the authoritative domain checkout before applying Yemen market/address/coverage validation. The buyer UI no longer sends client-supplied platform-fee policy data. Existing domain tests already cover server-owned shipping quotes and quote consumption; the next controlled slice is browser E2E against this contract, followed by explicit COD/payment behavior verification.
