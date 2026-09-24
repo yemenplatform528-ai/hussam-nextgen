@@ -208,3 +208,27 @@ Documents, notifications, search, pricing, CRM, AI and HUS already have engineer
 4. Final baseline/release lock only after all evidence gates pass.
 
 The project remains engineering-active and production-certification-open. No external certification is inferred from CI success.
+
+
+## 2026-09-24 final engineering-gate update — trusted CI + browser E2E
+
+- PR #35 was merged into main as ff28d68aa7a8c9e727ed4802d8dd31e5f7f71686, consolidating the controlled Yemenization completion map.
+- PR #36 was merged as df1d8fde11beb68ce9c4df75340fe145c7e9b96f. It added deterministic source-manifest hashing, run/commit-bound trusted CI evidence, immutable workflow artifact upload, and GitHub build-provenance attestation.
+- CI run #187 for PR #36 completed successfully across baseline, PostgreSQL and container-security; trusted evidence generation, artifact upload and attestation all completed successfully.
+- PR #37 added the browser contract as an explicit CI job and made Chromium provisioning CI-managed.
+- The first browser-gate run exposed a real CI defect: the existing browser pytest contract had no browser runtime in the baseline job. This was corrected by provisioning Chromium before the baseline test suite.
+- CI run #192 then completed successfully across all four jobs: baseline, PostgreSQL integration, container-security and browser E2E. The browser job passed the existing desktop + mobile journey covering Yemen context, YER/COD checkout, offline public reads, offline cart mutation queue/replay, offline checkout draft behavior and checkout idempotency.
+- PR #37 was then merged as 8f662708cea45da2e0d3e084384d85f08e5fcb1d.
+
+### Gate interpretation
+
+The following engineering gates are now evidenced on the controlled branch history:
+
+1. Trusted repository-level CI test provenance: CLOSED for the CI evidence mechanism.
+2. Desktop/mobile browser contract: CLOSED for the existing mocked browser journey.
+3. Cross-capability production/runtime E2E: NOT CLOSED; the browser contract is not equivalent to a live production environment with real database/payment/provider infrastructure.
+4. DeveloperExtensionVersion source-artifact integration with trusted CI provenance: NOT CLOSED; repository-level evidence is deliberately not substituted for extension source hashes.
+5. G01–G10 external production evidence: NOT CLOSED.
+6. Final release/baseline lock: NOT CLOSED.
+
+The project remains fail-closed at the external certification boundary.
