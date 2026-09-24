@@ -232,3 +232,15 @@ The following engineering gates are now evidenced on the controlled branch histo
 6. Final release/baseline lock: NOT CLOSED.
 
 The project remains fail-closed at the external certification boundary.
+
+
+## 2026-09-24 master system health checkpoint
+
+- PR #39 is merged as 3eff91dbfa3d2620144ffe5684d535dd6958107d.
+- CI run 36019937809 completed successfully across baseline, PostgreSQL integration, container-security and browser-E2E.
+- A deep repository health audit confirmed that the architecture is unified and that no rebuild is justified.
+- The audit identified documentation/provenance drift in older control snapshots; this is a synchronization issue, not a domain-engineering defect.
+- The audit also identified that the first final-release gate implementation did not require trusted CI evidence and did not bind the release manifest to the exact commit/source hash.
+- A controlled hardening branch audit/system-health-2026-09-24 now requires exact commit binding and trusted CI/source-manifest hash agreement, with executable tests.
+- This hardening must pass exact-head CI and merge before it becomes release authority.
+- G01–G10 remain PENDING_EXTERNAL; final release lock remains open.
