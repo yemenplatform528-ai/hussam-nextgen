@@ -86,3 +86,32 @@ def test_checkout_idempotency_key_rejects_different_request():
     changed=dict(body); changed['payment_method_code']='different'
     with pytest.raises(MarketplaceError, match='different request'):
         m.checkout(buyer.id,idempotency_key=key,idempotency_tenant_id=bt.id,idempotency_request_hash=_checkout_hash(buyer.id,changed))
+
+
+def test_cart_mutation_lifecycle_replays_without_double_apply():
+    db,seller,bt,buyer,su=setup(); m=MarketplaceService(db)
+    m.register_seller(seller.id,'lifecycle-seller','Lifecycle Seller'); m.review_seller_verification(seller.id,su.id,'approved')
+    l=m.create_listing(seller.id,ListingInput('life-rice','Lifecycle Rice','', 'product','YER',Decimal('500'),'rice','wh')); m.moderate_listing(l.id,su.id,'approved'); m.publish_listing(seller.id,l.id)
+
+    first=m.add_to_cart(buyer.id,l.id,1,mutation_key='cart-add-001',tenant_id=bt.id)
+    replay=m.add_to_cart(buyer.id,l.id,1,mutation_key='cart-add-001',tenant_id=bt.id)
+    assert first == replay
+    assert first['items'][0]['quantity']=='1.0000'
+
+    record=db.scalar(select(__import__('app.core.models.core',fromlist=['MutationRecord']).MutationRecord).where(
+        __import__('app.core.models.core',fromlist=['MutationRecord']).MutationRecord.tenant_id==bt.id,
+        __import__('app.core.models.core',fromlist=['MutationRecord']).MutationRecord.mutation_key=='cart-add-001'))
+    assert record.state=='confirmed' and record.resource_type=='marketplace_cart'
+
+    with pytest.raises(MarketplaceError, match='different request'):
+        m.add_to_cart(buyer.id,l.id,2,mutation_key='cart-add-001',tenant_id=bt.id)
+
+
+def test_cart_remove_mutation_is_replay_safe():
+    db,seller,bt,buyer,su=setup(); m=MarketplaceService(db)
+    m.register_seller(seller.id,'remove-seller','Remove Seller'); m.review_seller_verification(seller.id,su.id,'approved')
+    l=m.create_listing(seller.id,ListingInput('remove-rice','Remove Rice','', 'product','YER',Decimal('500'),'rice','wh')); m.moderate_listing(l.id,su.id,'approved'); m.publish_listing(seller.id,l.id)
+    m.add_to_cart(buyer.id,l.id,1)
+    first=m.remove_from_cart(buyer.id,l.id,mutation_key='cart-remove-001',tenant_id=bt.id)
+    replay=m.remove_from_cart(buyer.id,l.id,mutation_key='cart-remove-001',tenant_id=bt.id)
+    assert first == replay and first['items']==[]
