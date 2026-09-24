@@ -178,7 +178,7 @@ G01–G10 remain external evidence gates. The repository's engineering work does
 - legal/compliance approval.
 
 ## 11. Current CI truth
-The latest verified workflow run for the current branch head `fc1c3d34b1f5cec0184daac9f944a1ce19750dc6` is CI run #119 (`35936950344`), completed successfully. Baseline audit, compile, full pytest, fresh SQLite migration/schema drift, PostgreSQL migration/schema drift/integration and container security all passed.
+The latest verified workflow run for the current branch head `b6b231ce5384ebe9b3eb9ed5d51a9f4a35a8bef8` is CI run #123 (`35937141497`), completed successfully. Baseline audit, compile, full pytest, fresh SQLite migration/schema drift, PostgreSQL migration/schema drift/integration and container security all passed.
 
 GitHub's workflow-run API exposes status/conclusion and head SHA, so a successful run is recorded only when the run itself reports success. This audit intentionally does not convert older successful runs into evidence for newer commits.
 
