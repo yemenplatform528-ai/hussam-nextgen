@@ -22,7 +22,7 @@ window.__e2eStorage={_:{},getItem(k){return this._[k]??null},setItem(k,v){this._
     if (url.endsWith('/marketplace/buyer/cart')) return json({id:1,status:'active',market_id:1,market_code:'YEM',items:[{id:1,quantity:'1',line_total:'1500',listing}]});
     if (url.includes('/marketplace/buyer/addresses')) return json({items:[{id:20,label:'المنزل',city:'Khor Maksar',address_line:'Main road'}]});
     if (url.includes('/platform/market-context')) return json({items:[{id:1,code:'YEM',locale:'ar-YE'}]});
-    if (url.includes('/platform/yemen/checkout-context/YEM')) return json({schema_version:'1.0',market:{code:'YEM',locale:'ar-YE'},money:{currency:'YER',label:'ريال يمني',conversion:{automatic_conversion:false}},payments:{cod:{available:true}},delivery:{destination:{coverage:'available'}},sellers:[]});
+    if (url.includes('/platform/yemen/checkout-context/YEM')) return json({schema_version:'1.0',market:{code:'YEM',locale:'ar-YE'},money:{currency:'YER',label:'ريال يمني',conversion:{automatic_conversion:false}},payments:{methods:[{code:'cod',name:'Cash on delivery',method_type:'cod',requires_provider:false,available:true}],cod:{available:true}},delivery:{destination:{coverage:'available'}},sellers:[]});
     if (url.endsWith('/marketplace/buyer/checkout')) return json({orders:[{id:101,reference:'YEM-E2E-001',currency:'YER',total:'1500'}]});
     if (url.endsWith('/marketplace/buyer/orders')) return json({items:[{id:101,reference:'YEM-E2E-001',seller_tenant_id:1,total:'1500',currency:'YER',status:'pending_payment',payment_reference:null}]});
     return originalFetch(input, options);
@@ -78,6 +78,7 @@ def run():
                     assert page.locator("text=ريال يمني").is_visible()
                     assert page.locator("text=الدفع عند الاستلام: متاح").is_visible()
                     page.locator("select[name='shipping_address_id']").select_option("20")
+                    page.locator("select[name='payment_method_code']").select_option("cod")
                     page.locator("#checkoutForm button").click()
                     page.wait_for_timeout(150)
                     assert page.locator("text=YEM-E2E-001").is_visible()

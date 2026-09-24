@@ -8,7 +8,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.models.core import User, Tenant
-from app.core.models.market import MarketContext, MarketCurrency, MarketGeography
+from app.core.models.market import MarketContext, MarketCurrency, MarketGeography, PaymentMethodCatalogEntry
 import os
 from app.core.models.catalog import MarketplaceCatalogGroup, MarketplaceProduct, MarketplaceSKU, MarketplaceOffer
 from app.core.models.marketplace import (
@@ -776,7 +776,7 @@ class MarketplaceService:
         market=self.db.get(MarketContext,cart.market_id) if cart.market_id is not None else None
         return {'id':cart.id,'status':cart.status,'market_id':cart.market_id,'market_code':market.code if market else None,'items':items}
 
-    def checkout(self,user_id, shipping_address_id=None, shipping_fee=Decimal('0'), platform_fee_bps=None, shipping_quote_id=None, shipping_quote_ids=None, market_id=None):
+    def checkout(self,user_id, shipping_address_id=None, shipping_fee=Decimal('0'), platform_fee_bps=None, shipping_quote_id=None, shipping_quote_ids=None, market_id=None, payment_method_code=None):
         if platform_fee_bps is not None:
             raise MarketplaceError('platform fee is policy-controlled; client-supplied platform_fee_bps is not accepted')
         self.ensure_buyer(user_id)
@@ -790,6 +790,14 @@ class MarketplaceService:
             cart=next((x for x in active_carts if x.market_id==market_id),None)
             if cart is None: raise MarketplaceError('cart not found for market')
         if market_id is None: raise MarketplaceError('cart market is required')
+        if payment_method_code is not None:
+            payment_method_code = str(payment_method_code).strip().lower()
+            method = self.db.scalar(select(PaymentMethodCatalogEntry).where(
+                PaymentMethodCatalogEntry.market_id == market_id,
+                PaymentMethodCatalogEntry.code == payment_method_code,
+                PaymentMethodCatalogEntry.active.is_(True),
+            ))
+            if method is None: raise MarketplaceError('payment method is not available in this market')
         if cart.status!='active': raise MarketplaceError('cart is not active')
         rows=self.db.execute(select(MarketplaceCartItem,MarketplaceListing,MarketplaceSellerProfile).join(MarketplaceListing,MarketplaceListing.id==MarketplaceCartItem.listing_id).join(MarketplaceSellerProfile,MarketplaceSellerProfile.tenant_id==MarketplaceListing.seller_tenant_id).join(MarketplaceSellerVerification,MarketplaceSellerVerification.seller_tenant_id==MarketplaceListing.seller_tenant_id).where(MarketplaceCartItem.cart_id==cart.id,MarketplaceListing.market_id==market_id,MarketplaceListing.status=='published',MarketplaceListing.moderation_status=='approved',MarketplaceSellerProfile.status=='active',MarketplaceSellerVerification.status=='approved')).all()
         if not rows: raise MarketplaceError('cart is empty')
@@ -835,7 +843,7 @@ class MarketplaceService:
         customer_currency=next(iter(currencies))
         customer_subtotal=sum((_money(ci.quantity)*_money(l.unit_price) for group in groups.values() for ci,l,_ in group),Decimal('0'))
         customer_shipping=_money(shipping_fee)
-        customer_order=MarketplaceCustomerOrder(market_id=market_id,reference=f'HUS-{uuid4().hex[:20].upper()}',buyer_user_id=user_id,currency=customer_currency,subtotal=customer_subtotal,shipping_fee=customer_shipping,total=customer_subtotal+customer_shipping,shipping_address_id=shipping_address_id,status='pending_payment')
+        customer_order=MarketplaceCustomerOrder(market_id=market_id,reference=f'HUS-{uuid4().hex[:20].upper()}',buyer_user_id=user_id,currency=customer_currency,subtotal=customer_subtotal,shipping_fee=customer_shipping,total=customer_subtotal+customer_shipping,shipping_address_id=shipping_address_id,status='pending_payment',payment_method_code=payment_method_code)
         self.db.add(customer_order); self.db.flush()
         created=[]
         for (seller_id,currency), group in groups.items():
@@ -857,7 +865,7 @@ class MarketplaceService:
                 commerce=CommerceProductionService(self.db)
                 sales=commerce.create_draft(tenant_id=seller_id,reference=f'MKT-SALE:{ref}',warehouse_id=wh,currency=currency,lines=product_lines,commit=False)
                 commerce.confirm(seller_id,sales.id,commit=False)
-            order=MarketplaceOrder(market_id=market_id,reference=ref,buyer_user_id=user_id,customer_order_id=customer_order.id,seller_tenant_id=seller_id,sales_order_id=sales.id if sales else None,shipping_address_id=shipping_address_id,currency=currency,subtotal=subtotal,shipping_fee=seller_shipping_fee,platform_fee=fee,total=total,status='pending_payment')
+            order=MarketplaceOrder(market_id=market_id,reference=ref,buyer_user_id=user_id,customer_order_id=customer_order.id,seller_tenant_id=seller_id,sales_order_id=sales.id if sales else None,shipping_address_id=shipping_address_id,currency=currency,subtotal=subtotal,shipping_fee=seller_shipping_fee,platform_fee=fee,total=total,status='pending_payment',payment_method_code=payment_method_code)
             self.db.add(order); self.db.flush()
             seller_order=MarketplaceSellerOrder(customer_order_id=customer_order.id,marketplace_order_id=order.id,seller_tenant_id=seller_id,status='pending_payment',subtotal=subtotal,shipping_fee=seller_shipping_fee,total=total)
             self.db.add(seller_order); self.db.flush()
