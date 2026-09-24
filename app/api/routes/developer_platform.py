@@ -102,8 +102,6 @@ def validate_capability_configuration(schema: dict, configuration: dict) -> None
     def check(value, rule, path):
         if not isinstance(rule, dict):
             raise HTTPException(status_code=500, detail="invalid capability config_schema rule")
-        if "enum" in rule and value not in rule["enum"]:
-            raise HTTPException(status_code=400, detail=f"invalid configuration value at {path}")
         expected = rule.get("type")
         valid = {
             "object": lambda x: isinstance(x, dict),
@@ -116,6 +114,8 @@ def validate_capability_configuration(schema: dict, configuration: dict) -> None
         }
         if expected in valid and not valid[expected](value):
             raise HTTPException(status_code=400, detail=f"invalid configuration type at {path}")
+        if "enum" in rule and value not in rule["enum"]:
+            raise HTTPException(status_code=400, detail=f"invalid configuration value at {path}")
         if expected == "object":
             nested_properties = rule.get("properties", {})
             nested_required = rule.get("required", [])
