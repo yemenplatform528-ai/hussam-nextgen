@@ -494,3 +494,20 @@ def test_developer_version_lookup_is_tenant_scoped():
     with pytest.raises(Exception) as exc:
         _get_version(db, 20, "tenant-bound-ext", "1.0.0")
     assert getattr(exc.value, "status_code", None) == 404
+
+
+
+def test_extension_dependency_contract_is_validated_and_resolved_on_activation():
+    from app.api.routes.developer_platform import validate_extension_dependency_contract
+    from app.core.models.developer_platform import DeveloperExtension, DeveloperExtensionVersion
+    db, tenant = setup_db()
+    ext = DeveloperExtension(id="dep-ext", tenant_id=tenant.id, code="consumer", name="Consumer", extension_type="module", capabilities=[], permissions=[], market_scope=[], created_by="u1")
+    dep = DeveloperExtension(id="dep-base", tenant_id=tenant.id, code="base", name="Base", extension_type="module", capabilities=[], permissions=[], market_scope=[], created_by="u1")
+    db.add_all([ext, dep]); db.flush()
+    db.add(DeveloperExtensionVersion(id="base-v", extension_id=dep.id, version="1.2.3", manifest={}, source_hash="b" * 64, compatibility={}, test_status="passed", test_evidence_hash="e" * 64, test_source_hash="b" * 64, test_run_id="run-base", tested_at=datetime.now(timezone.utc), release_status="active", created_by="u1"))
+    db.commit()
+    validate_extension_dependency_contract(db, ext, {"dependencies": [{"extension": "base", "version": "1.2.3"}]}, {"api": "1.0"}, resolve_active=True)
+    with pytest.raises(HTTPException):
+        validate_extension_dependency_contract(db, ext, {"dependencies": [{"extension": "missing", "version": "1.0.0"}]}, {"api": "1.0"}, resolve_active=True)
+    with pytest.raises(HTTPException):
+        validate_extension_dependency_contract(db, ext, {"dependencies": [{"extension": "consumer"}]}, {}, resolve_active=False)
