@@ -365,3 +365,21 @@ The next controlled slice is Documents + Notifications, followed by Search/Prici
 **Production certification:** not closed; G01–G10 require external evidence.
 
 **Final lock:** intentionally deferred until evidence gates are closed.
+
+
+## 14. Engineering gate update — trusted CI and browser E2E
+
+- Repository-level trusted CI evidence is now generated from the exact checked-out revision, records workflow/run identity and a deterministic Git-tracked source-manifest hash, is uploaded as an immutable artifact, and receives GitHub build-provenance attestation.
+- CI run #187 verified the trusted-evidence path end-to-end: baseline, PostgreSQL and container-security succeeded, followed by evidence generation, artifact upload and attestation.
+- The browser contract is now an explicit CI job with CI-managed Chromium provisioning.
+- CI run #192 verified baseline, PostgreSQL, container-security and desktop/mobile browser E2E successfully.
+- The browser contract proves the existing mocked Yemen buyer journey and connectivity boundaries. It is engineering evidence, not live production certification.
+
+### Gate status after this checkpoint
+
+- Trusted repository-level CI evidence mechanism: CLOSED.
+- Existing desktop/mobile browser contract: CLOSED.
+- Live cross-capability runtime E2E with real infrastructure/providers: OPEN.
+- DeveloperExtensionVersion source-artifact-to-trusted-CI integration: OPEN.
+- G01–G10 external production evidence: OPEN.
+- Final release/baseline lock: OPEN.
