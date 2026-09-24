@@ -134,9 +134,11 @@ class MarketplaceCompletionService:
         x = MarketplaceAdAttribution(campaign_id=campaign_id, order_id=order_id, listing_id=listing_id, attributed_revenue=money(revenue), attribution_model='last_touch')
         self.db.add(x); self.db.commit(); self.db.refresh(x); return x
 
-    def add_case_message(self, case_id, sender_user_id, sender_role, body, internal=False):
+    def add_case_message(self, case_id, sender_user_id, sender_role, body, internal=False, seller_tenant_id=None):
         case = self.db.get(MarketplaceCustomerCase, case_id)
         if not case: raise MarketplaceCompletionError('case not found')
+        if seller_tenant_id is not None and case.seller_tenant_id != seller_tenant_id:
+            raise MarketplaceCompletionError('case does not belong to seller')
         if case.status in {'closed','resolved'}: raise MarketplaceCompletionError('case is closed')
         x = MarketplaceCustomerCaseMessage(case_id=case_id, sender_user_id=sender_user_id, sender_role=sender_role, body=body, internal=internal)
         self.db.add(x); case.updated_at = datetime.now(timezone.utc); self.db.commit(); self.db.refresh(x); return x
@@ -165,9 +167,11 @@ class MarketplaceCompletionService:
         x.attempts += 1; x.status = 'completed' if success else 'failed'; x.error = error; x.completed_at = datetime.now(timezone.utc)
         self.db.commit(); return x
 
-    def queue_webhook(self, integration_app_id, event_type, event_id, payload):
+    def queue_webhook(self, integration_app_id, event_type, event_id, payload, owner_tenant_id=None):
         app = self.db.get(MarketplaceIntegrationApp, integration_app_id)
         if not app or app.status != 'active': raise MarketplaceCompletionError('integration app unavailable')
+        if owner_tenant_id is not None and app.owner_tenant_id != owner_tenant_id:
+            raise MarketplaceCompletionError('integration app does not belong to seller')
         x = MarketplaceWebhookDelivery(integration_app_id=integration_app_id, event_type=event_type, event_id=event_id, payload_json=payload, status='queued')
         self.db.add(x); self.db.commit(); self.db.refresh(x); return x
 
