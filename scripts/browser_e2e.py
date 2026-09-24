@@ -19,7 +19,7 @@ window.__e2eStorage={_:{},getItem(k){return this._[k]??null},setItem(k,v){this._
     if (url.endsWith('/session')) return json({user_id:'e2e-user', tenant_id:1, membership_id:1});
     if (url.endsWith('/marketplace/seller/center')) return json({metrics:{listings_published:1,listings_total:1,orders_actionable:0,fulfillments_actionable:0,net:0,currency:'YER'},actions:[],recent_orders:[]});
     if (url.endsWith('/marketplace/seller/catalog')) return json({items:[]});
-    if (url.endsWith('/marketplace/buyer/cart')) return json({id:1,status:'active',market_id:1,items:[{id:1,quantity:'1',line_total:'1500',listing}]});
+    if (url.endsWith('/marketplace/buyer/cart')) return json({id:1,status:'active',market_id:1,market_code:'YEM',items:[{id:1,quantity:'1',line_total:'1500',listing}]});
     if (url.includes('/marketplace/buyer/addresses')) return json({items:[{id:20,label:'المنزل',city:'Khor Maksar',address_line:'Main road'}]});
     if (url.includes('/platform/market-context')) return json({items:[{id:1,code:'YEM',locale:'ar-YE'}]});
     if (url.includes('/platform/yemen/checkout-context/YEM')) return json({schema_version:'1.0',market:{code:'YEM',locale:'ar-YE'},money:{currency:'YER',label:'ريال يمني',conversion:{automatic_conversion:false}},payments:{cod:{available:true}},delivery:{destination:{coverage:'available'}},sellers:[]});
