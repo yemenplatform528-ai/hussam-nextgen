@@ -259,3 +259,20 @@ The project remains fail-closed at the external certification boundary.
 ### Current controlled path
 
 `main` → exact-head CI evidence → control-document consolidation → real G01–G10 evidence → evidence validation → fresh release manifest → fail-closed final gate → final artifact/SHA-256 → immutable release lock.
+
+
+## 2026-09-24 branch consolidation checkpoint
+
+- A complete branch audit was performed against main. The repository currently contains 32 branch refs.
+- Main is the only operational source-of-truth branch.
+- All normal feature/fix/docs/test branches audited are either already represented in main or are stale/superseded snapshots; none should be re-merged merely to remove the branch ref.
+- The old verification branch `verify/yemen-platform-developer-2026-09-24` contains only a verification marker and no production/runtime value.
+- `cert/g02-readiness-2026-09-24` is superseded by the safer readiness workflow already on main, which persists only documented contract fields and an explicit certification status.
+- Recovery and transport branches are intentionally preserved because they have no common ancestor with main and carry historical recovery/transport meaning.
+- The detailed branch-by-branch record is `docs/BRANCH_CONSOLIDATION_AUDIT_2026-09-24.md`.
+- No production certification or final release lock is implied by branch consolidation.
+- The connected GitHub write surface does not expose branch-ref deletion, so the audited retirement set is recorded as safe-to-delete rather than falsely reported as already deleted.
+
+### Post-consolidation operating model
+
+`main` → Release Candidate Freeze → exact SHA → trusted CI/provenance → G01–G10 → evidence validation → fresh release manifest → fail-closed final gate → final artifact/SHA-256 → immutable release lock → Developer Platform extensions.
