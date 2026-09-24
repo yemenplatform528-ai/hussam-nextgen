@@ -55,7 +55,18 @@ def _public_runtime_context(runtime: dict) -> dict:
                 for method in runtime["payments"]["methods"]
             ],
         },
-        "geography": runtime["geography"],
+        "geography": {
+            "coverage": [
+                {
+                    "code": item["code"],
+                    "level": item["level"],
+                    "name": item["name"],
+                    "name_ar": item.get("name_ar"),
+                    "status": item["status"],
+                }
+                for item in runtime["geography"].get("coverage", [])
+            ],
+        },
         "delivery": {
             "modes": delivery_config.get("modes", []),
         },

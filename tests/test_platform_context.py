@@ -1,7 +1,7 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from app.api.routes.platform import client_market_context
+from app.api.routes.platform import _public_runtime_context, client_market_context
 from app.core.models.market import MarketContext, MarketCurrency, MarketMoneyUnit, PaymentMethodCatalogEntry
 from app.core.models.yemen_capability import MarketCapabilityActivation, PlatformCapability
 from app.core.persistence import Base
@@ -89,3 +89,38 @@ def test_client_market_context_rejects_inactive_market():
         assert getattr(exc, "status_code", None) == 409
     else:
         raise AssertionError("inactive market must be rejected")
+
+
+def test_public_market_context_geography_is_allow_listed():
+    runtime = {
+        "market": {
+            "code": "YEM", "country_code": "YE", "name": "Yemen",
+            "locale": "ar-YE", "timezone": "Asia/Aden",
+            "default_currency": "YER", "status": "active",
+        },
+        "money": {"currencies": [], "money_units": []},
+        "payments": {"methods": []},
+        "geography": {
+            "coverage": [{
+                "code": "YE-TA", "level": "governorate", "name": "Taiz",
+                "name_ar": "تعز", "status": "available",
+                "internal_secret": "must-not-leak",
+            }],
+            "internal_control_plane": "must-not-leak",
+        },
+        "delivery": {"configuration": {}},
+        "connectivity": {"configuration": {}},
+        "documents": {"configuration": {}, "lifecycle": [], "versioned": False, "immutable_versions": False},
+        "notifications": {"configuration": {}},
+        "ai_hus": {"configuration": {}, "market_context": {}, "governance": {}},
+        "capabilities": [],
+    }
+    result = _public_runtime_context(runtime)
+    assert result["geography"] == {
+        "coverage": [{
+            "code": "YE-TA", "level": "governorate", "name": "Taiz",
+            "name_ar": "تعز", "status": "available",
+        }]
+    }
+    assert "internal_secret" not in str(result)
+    assert "internal_control_plane" not in str(result)
