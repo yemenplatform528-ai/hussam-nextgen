@@ -13,7 +13,9 @@ from app.core.models import (
     MarketMoneyUnit,
     PaymentMethodCatalogEntry,
     MarketplaceAddress,
+    MarketplaceSellerProfile,
     MarketplaceShippingRate,
+    Tenant,
 )
 from app.core.services.yemen_checkout_context import YemenCheckoutContextService
 
@@ -64,6 +66,10 @@ def seed():
         address_line="Main road", country_code="YE", market_id=1,
         governorate_id=11, district_id=12, address_confidence="high",
     )
+    db.add(Tenant(id=77, name="Seller 77", status="active"))
+    db.add(MarketplaceSellerProfile(
+        tenant_id=77, slug="seller-77", display_name="Seller 77", status="active",
+    ))
     db.add(address)
     db.add(MarketplaceShippingRate(
         seller_tenant_id=77, market_id=1, governorate="Aden",
@@ -104,3 +110,20 @@ def test_checkout_context_rejects_inactive_market():
     db.commit()
     with pytest.raises(ValueError, match="market is not active"):
         YemenCheckoutContextService(db).build("YEM")
+
+
+
+def test_checkout_context_rejects_inactive_seller():
+    db = seed()
+    db.query(MarketplaceSellerProfile).filter(
+        MarketplaceSellerProfile.tenant_id == 77
+    ).update({"status": "suspended"})
+    db.commit()
+    with pytest.raises(ValueError, match="seller is not active"):
+        YemenCheckoutContextService(db).build("YEM", seller_tenant_ids=[77])
+
+
+def test_checkout_context_rejects_unknown_seller():
+    db = seed()
+    with pytest.raises(ValueError, match="seller is not active"):
+        YemenCheckoutContextService(db).build("YEM", seller_tenant_ids=[999])
