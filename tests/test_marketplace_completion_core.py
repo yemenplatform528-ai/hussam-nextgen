@@ -57,3 +57,16 @@ def test_health_snapshot_and_integration_primitives():
     app=MarketplaceIntegrationApp(owner_tenant_id=seller.id,name='Connect',client_id='client-complete',webhook_url='https://example.invalid/hook'); db.add(app); db.commit(); db.refresh(app)
     wh=svc.queue_webhook(app.id,'ORDER_CHANGE','evt-1',{'order_id':1}); assert wh.status=='queued'
     assert db.scalar(select(MarketplaceWebhookDelivery).where(MarketplaceWebhookDelivery.id==wh.id)) is not None
+
+
+def test_customer_case_cannot_reference_another_buyers_order():
+    db,seller,buyer,su,l=setup(); svc=MarketplaceCompletionService(db)
+    from app.engines.identity import IdentityService
+    from app.core.models.marketplace import MarketplaceOrder
+    other=IdentityService(db).create_user('other-case-buyer','other-case@example.test')
+    order=MarketplaceOrder(reference='case-order-owner',buyer_user_id=buyer.id,seller_tenant_id=seller.id,currency='YER',subtotal=1000,shipping_fee=0,platform_fee=0,total=1000,status='pending_payment')
+    db.add(order); db.commit(); db.refresh(order)
+    with pytest.raises(MarketplaceCompletionError, match='not found for buyer'):
+        svc.create_customer_case(other.id,'order','Unauthorized',order_id=order.id,seller_tenant_id=seller.id)
+    case=svc.create_customer_case(buyer.id,'order','Authorized',order_id=order.id,seller_tenant_id=seller.id)
+    assert case.order_id == order.id and case.buyer_user_id == buyer.id
