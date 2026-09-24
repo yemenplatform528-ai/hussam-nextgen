@@ -155,3 +155,22 @@ def test_seller_funded_discount_reduces_seller_payout_snapshot():
     assert payout.seller_funded_discount == Decimal('100.0000')
     assert payout.platform_funded_discount == Decimal('0.0000')
     assert payout.net_amount == Decimal('850.0000')
+
+
+def test_yemen_checkout_context_and_authoritative_checkout_share_market_and_quote():
+    db,seller,buyer,su,l,a,m=setup()
+    m.add_shipping_rate(seller.id,'Aden','Aden','YER',Decimal('250'))
+    m.add_to_cart(buyer.id,l.id,1)
+    q=m.quote_shipping(buyer.id,a.id,seller.id,'YER')
+    from app.core.services.yemen_checkout_context import YemenCheckoutContextService
+    context=YemenCheckoutContextService(db).build('YEM', user_id=buyer.id, address_id=a.id, seller_tenant_ids=[seller.id])
+    assert context['market']['code']=='YEM'
+    assert context['money']['currency']=='YER'
+    assert context['money']['conversion']['automatic_conversion'] is False
+    assert context['delivery']['destination']['coverage'] in {'available','active'}
+    assert context['sellers'][0]['delivery']['available'] is True
+    orders=m.checkout(buyer.id, a.id, Decimal('0'), None, q.id, None)
+    assert len(orders)==1
+    assert orders[0].currency=='YER'
+    assert orders[0].shipping_fee==Decimal('250.0000')
+    assert q.consumed_at is not None
