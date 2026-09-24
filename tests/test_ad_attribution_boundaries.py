@@ -2,7 +2,7 @@ from decimal import Decimal
 import pytest
 from sqlalchemy import select
 
-from app.core.models.marketplace import MarketplaceListing, MarketplaceOrder
+from app.core.models.marketplace import MarketplaceListing, MarketplaceOrder, MarketplaceOrderLine
 from app.core.models.marketplace_growth import MarketplaceAdCampaign
 from app.engines.identity import IdentityService
 from app.engines.marketplace_completion import MarketplaceCompletionService, MarketplaceCompletionError
@@ -32,5 +32,7 @@ def test_ad_attribution_rejects_cross_tenant_references_and_uses_order_total():
         svc.attribute_ad_conversion(seller.id,campaign.id,other_order.id,Decimal('1'),listing_id=None)
     own_order=MarketplaceOrder(reference='own-order',buyer_user_id=buyer.id,seller_tenant_id=seller.id,currency='YER',subtotal=1000,shipping_fee=100,platform_fee=50,total=1150,status='completed')
     db.add(own_order); db.commit(); db.refresh(own_order)
+    db.add(MarketplaceOrderLine(marketplace_order_id=own_order.id, listing_id=l.id, title_snapshot=l.title, quantity=1, unit_price=1150, line_total=1150))
+    db.commit()
     attribution=svc.attribute_ad_conversion(seller.id,campaign.id,own_order.id,Decimal('1'),listing_id=l.id)
     assert attribution.attributed_revenue == Decimal('1150.0000')
