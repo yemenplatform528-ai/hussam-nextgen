@@ -74,3 +74,16 @@ def test_coupon_redemption_is_bound_to_buyer_order_and_authoritative_amounts():
         svc.redeem_coupon(buyer.id,o.id,'OWNERCHECK',Decimal('900'),'YER')
     out=svc.redeem_coupon(buyer.id,o.id,'OWNERCHECK',Decimal('1000'),'YER')
     assert out['discount']=='100.0000'
+
+
+def test_customer_case_cannot_reference_another_buyers_order():
+    db,seller,buyer,su,l=setup(); svc=MarketplaceCompletionService(db)
+    from app.engines.identity import IdentityService
+    from app.core.models.marketplace import MarketplaceOrder
+    other=IdentityService(db).create_user('other-case-buyer','other-case@example.test')
+    order=MarketplaceOrder(reference='case-order-owner',buyer_user_id=buyer.id,seller_tenant_id=seller.id,currency='YER',subtotal=1000,shipping_fee=0,platform_fee=0,total=1000,status='pending_payment')
+    db.add(order); db.commit(); db.refresh(order)
+    with pytest.raises(MarketplaceCompletionError, match='not found for buyer'):
+        svc.create_customer_case(other.id,'order','Unauthorized',order_id=order.id,seller_tenant_id=seller.id)
+    case=svc.create_customer_case(buyer.id,'order','Authorized',order_id=order.id,seller_tenant_id=seller.id)
+    assert case.order_id == order.id and case.buyer_user_id == buyer.id
