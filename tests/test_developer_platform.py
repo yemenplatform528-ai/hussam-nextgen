@@ -408,3 +408,46 @@ def test_developer_version_can_record_immutable_test_evidence():
     assert row.test_evidence_hash == "d" * 64
     assert row.test_run_id == "ci-run-108"
     assert row.tested_at is not None
+
+
+def test_developer_test_evidence_cannot_promote_failed_evidence_to_passed():
+    e = create_engine("sqlite+pysqlite:///:memory:", future=True)
+    Base.metadata.create_all(e)
+    db = sessionmaker(e, expire_on_commit=False)()
+    db.add(Tenant(id=4, name="Evidence", status="active"))
+    db.add(DeveloperExtension(
+        id="evidence-ext-3", tenant_id=4, code="evidence.module", name="Evidence",
+        created_by="u1",
+    ))
+    db.flush()
+    version = DeveloperExtensionVersion(
+        id="evidence-v3", extension_id="evidence-ext-3", version="1.0.0",
+        source_hash="e" * 64, created_by="u1",
+    )
+    db.add(version)
+    db.commit()
+    version.test_status = "failed"
+    version.test_evidence_hash = "f" * 64
+    version.test_run_id = "ci-run-failed"
+    from datetime import datetime, timezone
+    version.tested_at = datetime.now(timezone.utc)
+    db.commit()
+
+    from app.api.routes.developer_platform import record_test_evidence, TestEvidenceIn
+
+    class Ctx:
+        tenant_id = 4
+        user_id = "u1"
+        role = "owner"
+
+    with pytest.raises(Exception, match="immutable"):
+        record_test_evidence(
+            "evidence-ext-3",
+            "1.0.0",
+            TestEvidenceIn(evidence_hash="a" * 64, run_id="ci-run-pass", status="passed"),
+            Ctx(),
+            db,
+        )
+
+    row = db.query(DeveloperExtensionVersion).one()
+    assert row.test_status == "failed"
