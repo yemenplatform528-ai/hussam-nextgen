@@ -35,7 +35,7 @@ L4 Platform Code: changes to Sovereign Core or shared engine internals. This rem
 
 ### 4. Developer lifecycle
 Draft → Validate → Test → Review → Package → Sandbox → Activate → Observe → Suspend/Rollback
-Every extension receives an immutable version, source/package hash, manifest, dependencies, capability declarations, permissions, tenant/market scope, compatibility contract, test evidence, activation actor/time and rollback target.
+Every extension receives an immutable version, source/package hash, manifest, dependencies, capability declarations, permissions, tenant/market scope, compatibility contract, test evidence, activation actor/time and rollback target. `test_status=passed` is never accepted as developer-declared metadata; a passed release requires recorded test evidence hash, test run identifier and test timestamp.
 
 ### 5. Developer Studio
 The internal Developer Studio should expose an extension list, module builder, HUS editor/compiler, workflow builder, tool builder, API contract viewer, UI schema builder, Yemen/market configuration, adapter registry, test runner, logs/events, version history, release controls and rollback.
@@ -60,7 +60,7 @@ Sovereign Core remains the authority. Shared Engines remain business authorities
 Target stack: Sovereign Core → Shared Engines → Verticals/Marketplace → AI + HUS → Developer Platform → Clients/Integrations.
 
 ### 11. Phase 1 implementation target
-Establish an extension manifest schema, extension version/hash identity, capability declarations, tenant/market scope, HUS source attachment, validation/test status, activation/suspension state, audit trail, rollback metadata and an API surface for Developer Studio.
+Establish an extension manifest schema, extension version/hash identity, capability declarations, tenant/market scope, HUS source attachment, validation/test status, immutable test evidence, activation/suspension state, audit trail, rollback metadata and an API surface for Developer Studio.
 
 ### 12. Non-goal
 The Developer Platform does not promise arbitrary unreviewed code execution in production. It provides a durable, governed path for internal developers to build what the business needs without creating a second platform beside Hussam.

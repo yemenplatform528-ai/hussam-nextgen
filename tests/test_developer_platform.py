@@ -248,9 +248,25 @@ def test_market_context_service_composes_governed_runtime_context():
         category="connectivity", name="Connectivity-aware operation",
         market_scope=["YEM"], config_schema={}, status="active",
     )
+    document_capability = PlatformCapability(
+        id="yem_arabic_documents", code="yem_arabic_documents",
+        category="documents", name="Arabic document templates",
+        market_scope=["YEM"], config_schema={}, status="active",
+    )
+    notification_capability = PlatformCapability(
+        id="yem_notification_channels", code="yem_notification_channels",
+        category="notifications", name="Yemen notification channels",
+        market_scope=["YEM"], config_schema={}, status="active",
+    )
+    ai_hus_capability = PlatformCapability(
+        id="yem_ai_hus_context", code="yem_ai_hus_context",
+        category="ai", name="Yemen AI/HUS context",
+        market_scope=["YEM"], config_schema={}, status="active",
+    )
     db.add_all([
         market, country, geography, currency, money_unit, payment_method,
         capability, delivery_capability, connectivity_capability,
+        document_capability, notification_capability, ai_hus_capability,
     ])
     db.flush()
     db.add(MarketCoverage(
@@ -274,6 +290,18 @@ def test_market_context_service_composes_governed_runtime_context():
             "explicit_pending_states": True,
         },
     ))
+    db.add(MarketCapabilityActivation(
+        id="activation-documents-50", market_id=50, capability_id=document_capability.id,
+        status="active", configuration={"arabic_first": True, "templates": ["invoice", "receipt"]},
+    ))
+    db.add(MarketCapabilityActivation(
+        id="activation-notifications-50", market_id=50, capability_id=notification_capability.id,
+        status="active", configuration={"channels": ["in_app", "sms", "whatsapp"]},
+    ))
+    db.add(MarketCapabilityActivation(
+        id="activation-ai-hus-50", market_id=50, capability_id=ai_hus_capability.id,
+        status="active", configuration={"arabic_terminology": True, "local_market_context": True},
+    ))
     db.commit()
 
     runtime = MarketContextService(db).runtime_context(market)
@@ -288,6 +316,15 @@ def test_market_context_service_composes_governed_runtime_context():
     ]
     assert runtime["connectivity"]["configuration"]["offline_drafts"] is True
     assert runtime["connectivity"]["configuration"]["idempotent_mutations"] is True
+    assert runtime["documents"]["configuration"]["arabic_first"] is True
+    assert runtime["documents"]["versioned"] is True
+    assert runtime["documents"]["immutable_versions"] is True
+    assert runtime["notifications"]["channels"] == ["in_app", "sms", "whatsapp"]
+    assert runtime["notifications"]["tenant_scoped"] is True
+    assert runtime["ai_hus"]["configuration"]["local_market_context"] is True
+    assert runtime["ai_hus"]["market_context"]["market_code"] == "YEM"
+    assert runtime["ai_hus"]["governance"]["ai_proposes_not_authorizes"] is True
+    assert runtime["ai_hus"]["governance"]["hus_uses_domain_contracts"] is True
     capability_context = {item["code"]: item for item in runtime["capabilities"]}
     assert capability_context["yem_money_presentation_runtime"]["configuration"] == {"show_unit": True}
     assert capability_context["yem_delivery_modes"]["configuration"]["modes"] == ["pickup", "local_delivery", "inter_city_delivery"]
@@ -324,3 +361,93 @@ def test_capability_service_returns_active_configuration_only():
     activation.status = "suspended"
     db.commit()
     assert service.active_configuration(market, capability.code) == {}
+
+def test_developer_version_requires_real_test_evidence_when_marked_passed():
+    e = create_engine("sqlite+pysqlite:///:memory:", future=True)
+    Base.metadata.create_all(e)
+    db = sessionmaker(e, expire_on_commit=False)()
+    db.add(Tenant(id=2, name="Evidence", status="active"))
+    db.add(DeveloperExtension(
+        id="evidence-ext", tenant_id=2, code="evidence.module", name="Evidence",
+        created_by="u1",
+    ))
+    db.flush()
+    invalid = DeveloperExtensionVersion(
+        id="evidence-v1", extension_id="evidence-ext", version="1.0.0",
+        source_hash="b" * 64, test_status="passed", created_by="u1",
+    )
+    db.add(invalid)
+    with pytest.raises(Exception):
+        db.commit()
+    db.rollback()
+
+def test_developer_version_can_record_immutable_test_evidence():
+    e = create_engine("sqlite+pysqlite:///:memory:", future=True)
+    Base.metadata.create_all(e)
+    db = sessionmaker(e, expire_on_commit=False)()
+    db.add(Tenant(id=3, name="Evidence", status="active"))
+    db.add(DeveloperExtension(
+        id="evidence-ext-2", tenant_id=3, code="evidence.module", name="Evidence",
+        created_by="u1",
+    ))
+    db.flush()
+    version = DeveloperExtensionVersion(
+        id="evidence-v2", extension_id="evidence-ext-2", version="1.0.0",
+        source_hash="c" * 64, created_by="u1",
+    )
+    db.add(version)
+    db.commit()
+    version.test_status = "passed"
+    version.test_evidence_hash = "d" * 64
+    version.test_run_id = "ci-run-108"
+    from datetime import datetime, timezone
+    version.tested_at = datetime.now(timezone.utc)
+    db.commit()
+    row = db.query(DeveloperExtensionVersion).one()
+    assert row.test_status == "passed"
+    assert row.test_evidence_hash == "d" * 64
+    assert row.test_run_id == "ci-run-108"
+    assert row.tested_at is not None
+
+
+def test_developer_test_evidence_cannot_promote_failed_evidence_to_passed():
+    e = create_engine("sqlite+pysqlite:///:memory:", future=True)
+    Base.metadata.create_all(e)
+    db = sessionmaker(e, expire_on_commit=False)()
+    db.add(Tenant(id=4, name="Evidence", status="active"))
+    db.add(DeveloperExtension(
+        id="evidence-ext-3", tenant_id=4, code="evidence.module", name="Evidence",
+        created_by="u1",
+    ))
+    db.flush()
+    version = DeveloperExtensionVersion(
+        id="evidence-v3", extension_id="evidence-ext-3", version="1.0.0",
+        source_hash="e" * 64, created_by="u1",
+    )
+    db.add(version)
+    db.commit()
+    version.test_status = "failed"
+    version.test_evidence_hash = "f" * 64
+    version.test_run_id = "ci-run-failed"
+    from datetime import datetime, timezone
+    version.tested_at = datetime.now(timezone.utc)
+    db.commit()
+
+    from app.api.routes.developer_platform import record_test_evidence, TestEvidenceIn
+
+    class Ctx:
+        tenant_id = 4
+        user_id = "u1"
+        role = "owner"
+
+    with pytest.raises(Exception, match="immutable"):
+        record_test_evidence(
+            "evidence-ext-3",
+            "1.0.0",
+            TestEvidenceIn(evidence_hash="a" * 64, run_id="ci-run-pass", status="passed"),
+            Ctx(),
+            db,
+        )
+
+    row = db.query(DeveloperExtensionVersion).one()
+    assert row.test_status == "failed"

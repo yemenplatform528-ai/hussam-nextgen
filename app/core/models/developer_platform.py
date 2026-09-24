@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Integer, JSON, String, Text, UniqueConstraint
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Integer, JSON, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 from app.core.persistence import Base
 
@@ -35,6 +35,9 @@ class DeveloperExtensionVersion(Base):
     source_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     compatibility: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
     test_status: Mapped[str] = mapped_column(String(30), nullable=False, default='pending')
+    test_evidence_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    test_run_id: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    tested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     release_status: Mapped[str] = mapped_column(String(30), nullable=False, default='draft')
     rollback_version: Mapped[str | None] = mapped_column(String(40), nullable=True)
     created_by: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -42,6 +45,7 @@ class DeveloperExtensionVersion(Base):
     __table_args__ = (
         UniqueConstraint('extension_id','version', name='uq_developer_extension_version'),
         CheckConstraint("test_status IN ('pending','passed','failed')", name='ck_developer_extension_test_status'),
+        CheckConstraint("(test_status = 'pending') OR (test_evidence_hash IS NOT NULL AND test_run_id IS NOT NULL AND tested_at IS NOT NULL)", name='ck_developer_extension_test_evidence'),
         CheckConstraint("release_status IN ('draft','sandbox','published','active','suspended','rolled_back')", name='ck_developer_extension_release_status'),
     )
 

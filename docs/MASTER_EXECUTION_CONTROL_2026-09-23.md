@@ -96,3 +96,51 @@ The project is not production-ready until all applicable external gates have rea
 - Added executable coverage for pickup/local/inter-city delivery modes and offline-draft/idempotent-mutation/pending-state policy metadata.
 - Latest implementation commit: `d083a58f58daafb2612abb970332ae8b7851d7d9`; latest test commit: `67d5916f917fc29a8ad49f0c04161ae93cf5327e`.
 - CI for `da4db46d56de1c5780123e69e75631c49dcbedb4` was observed queued; the latest `67d5916f917fc29a8ad49f0c04161ae93cf5327e` workflow runs had not yet appeared when this checkpoint was written. No green claim is made until runs are observed.
+
+
+## 2026-09-24 Full-System Runtime Context — Documents / Notifications / AI-HUS
+
+- Extended MarketContextService without creating parallel engines.
+- Documents now receive governed market configuration plus the existing immutable/versioned business-document lifecycle metadata.
+- Notifications now receive governed market channel configuration while remaining tenant-scoped and owned by the existing notification domain.
+- AI/HUS now receive a reusable Yemen market context envelope (market, country, locale, timezone, default currency) plus governed policy metadata; this does not grant AI execution authority and does not replace HUS/domain contracts.
+- Added executable coverage for Arabic-first document configuration, SMS/WhatsApp/in-app channel configuration, and Yemen AI/HUS context/governance metadata.
+- Implementation commit: `fda59b421942ba57086a42f4ff322d7597d8b33e`.
+- Test commit: `f5a923642e229ca9258eaa0d6433355f5de1c5b8`.
+- GitHub workflow evidence for `bdb21ddebb74e8c0950b741cd872621ce44a2c05` is currently empty through the connected workflow-run query; therefore no green CI claim is made for this branch yet.
+- Next controlled slice: expose this runtime context through deterministic client-facing response contracts, then verify CI before considering promotion toward `main`.
+
+
+## 2026-09-24 Deep System Audit + Client Context Boundary
+
+- Completed a repository-wide architecture inventory against the committed release manifest, API routes, models, engines, AI/HUS stack, migrations, tests, Yemenization contracts, Developer Platform contract and production gates.
+- Added `docs/MASTER_SYSTEM_AUDIT_2026-09-24.md` as the current engineering study/control reference.
+- Confirmed the existing platform already contains sovereign/core, finance, inventory, commerce, procurement, payments, logistics, documents, workflow, marketplace, AI and HUS authorities; Yemenization must compose them rather than replace them.
+- Confirmed the committed `release-manifest.json` is a provenance snapshot and is not safe to treat as the final hash manifest for the newer Yemenization stream. Formal release locking must regenerate it from the exact repository state.
+- Added tenant-authenticated `GET /api/v1/platform/market-context/{market_code}` as a stable client-facing contract.
+- The client contract deliberately excludes owner/admin control-plane metadata and raw capability configuration while exposing the market, money, payment, geography, delivery, connectivity, documents, notifications, AI/HUS and active-capability state required by clients.
+- Added executable tests for stable schema version, market activation, tenant-safe exposure and control-plane secret/configuration exclusion.
+- Client route commit: `1bb6ee9451f9a3d1ad37c2429071ccce461f8493`.
+- API registration commit: `252b9702dbe8664af8b71a830dc2d6c659e82ac4`.
+- Client contract tests commit: `001464ee72a85300b1be00294337512fb02ea32f`.
+- Next gate is CI verification on the resulting branch head before any promotion or merge decision.
+
+
+## 2026-09-24 execution checkpoint — Developer evidence hardening
+- Client market-context projection was hardened to an allow-listed contract; raw control-plane configuration and provider/internal metadata are excluded.
+- Added executable secret-boundary coverage for the client runtime context.
+- Developer Platform version creation now keeps test status server-controlled at `pending`; `passed` requires immutable test evidence fields: evidence hash, test-run identifier and timestamp.
+- Added migration `0033_developer_test_evidence` and executable persistence coverage.
+- CI run #108 for the preceding Yemen runtime-context slice completed successfully: baseline audit, compile, PostgreSQL migration/schema drift/integration and container-security all passed; the full baseline test job completed successfully in that run.
+- The latest evidence-hardening commits are on PR #22 and require a fresh CI execution before merge. No production certification claim is made.
+
+
+## 2026-09-24 execution checkpoint — migration convergence + verified CI
+- Migration `0033_developer_test_evidence` was hardened to converge safely when test/dev schemas already contain the new columns, and to add the invariant correctly on both SQLite and PostgreSQL.
+- CI run #113 exposed the duplicate-column migration defect; it was corrected rather than suppressed.
+- CI run #114 then passed all baseline, PostgreSQL and container-security jobs.
+- The temporary attempt to consume market runtime context directly in the existing browser UI exposed a pre-existing-style browser contract sensitivity; the UI files and E2E fixture were restored to their known-good tree, while the stable backend client contract remains in place.
+- CI run #123 on branch head `b6b231ce5384ebe9b3eb9ed5d51a9f4a35a8bef8` passed: 375 tests including browser E2E, fresh SQLite migration/schema drift, PostgreSQL migration/schema drift/integration, baseline audit, dependency checks and container scan.
+- Current decision: do not merge or lock the release yet. First complete the remaining Yemen runtime behavior wiring and Developer Platform evidence trust boundary, then regenerate release provenance and run the final exact-head CI.
+
+- Developer test evidence is now immutable after the first recorded result; a failed evidence record cannot be promoted to passed evidence through the same endpoint.
