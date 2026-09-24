@@ -39,6 +39,17 @@ def downgrade():
     if actor is None or isinstance(actor["type"], sa.Integer):
         return
 
+    table = sa.table(
+        "market_capability_activations",
+        sa.column("activated_by", sa.String(255)),
+    )
+    values = bind.execute(sa.select(table.c.activated_by)).scalars().all()
+    non_numeric = [value for value in values if value is not None and not str(value).isdigit()]
+    if non_numeric:
+        raise RuntimeError(
+            "cannot downgrade activated_by to Integer while non-numeric user identities exist"
+        )
+
     with op.batch_alter_table("market_capability_activations") as batch:
         batch.alter_column(
             "activated_by",
