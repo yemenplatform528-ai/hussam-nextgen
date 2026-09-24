@@ -160,8 +160,9 @@ def test_seller_funded_discount_reduces_seller_payout_snapshot():
 
 def test_yemen_checkout_context_and_authoritative_checkout_share_market_and_quote():
     db,seller,buyer,su,l,a,m=setup()
-    market=db.scalar(select(MarketGeography).where(MarketGeography.market_id==a.market_id))
-    governorate=MarketGeography(market_id=a.market_id,parent_id=market.id,code='YE-AD',level='governorate',name='Aden',name_ar='عدن',status='active')
+    root=MarketGeography(market_id=a.market_id,parent_id=None,code='YE',level='country',name='Yemen',name_ar='اليمن',status='active')
+    db.add(root); db.flush()
+    governorate=MarketGeography(market_id=a.market_id,parent_id=root.id,code='YE-AD',level='governorate',name='Aden',name_ar='عدن',status='active')
     db.add(governorate); db.flush()
     db.add(MarketCoverage(market_id=a.market_id,geography_id=governorate.id,status='available'))
     a.governorate_id=governorate.id; a.country_code='YE'; db.commit(); db.refresh(a)
