@@ -1,9 +1,12 @@
 from decimal import Decimal
+import hashlib
+import json
 import pytest
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 from app.core.persistence import Base
 from app.core.models import Tenant, User, TenantMembership, InventoryItem, Warehouse, InventoryMovementRecord
+from app.core.models.core import IdempotencyRecord
 from app.core.models.marketplace import MarketplaceSellerProfile, MarketplaceListing, MarketplaceOrder, MarketplacePayout, MarketplaceReview, MarketplaceDispute, MarketplaceFeeRule
 from app.core.models.market import MarketContext, MarketCurrency
 from app.engines.marketplace import MarketplaceService, ListingInput, MarketplaceError
@@ -48,3 +51,38 @@ def test_service_listing_is_valid_and_stockless():
     db,seller,bt,buyer,su=setup(); m=MarketplaceService(db); m.register_seller(seller.id,'services','Services'); m.review_seller_verification(seller.id,su.id,'approved')
     l=m.create_listing(seller.id,ListingInput('repair','Repair Service','', 'service','YER',Decimal('3000'))); m.moderate_listing(l.id,su.id,'approved'); m.publish_listing(seller.id,l.id)
     assert m.public_listings()[0]['listing_type']=='service' and m.public_listings()[0]['stock'] is None
+
+
+def _checkout_hash(user_id, body):
+    return hashlib.sha256(json.dumps(
+        {'operation': 'marketplace.checkout.v1', 'user_id': user_id, 'body': body},
+        sort_keys=True, separators=(',', ':')
+    ).encode('utf-8')).hexdigest()
+
+
+def test_checkout_idempotency_replays_without_creating_duplicate_orders():
+    db,seller,bt,buyer,su=setup(); m=MarketplaceService(db)
+    m.register_seller(seller.id,'idem-seller','Idempotent Seller'); m.review_seller_verification(seller.id,su.id,'approved')
+    l=m.create_listing(seller.id,ListingInput('idem-rice','Rice','', 'product','YER',Decimal('1000'),'rice','wh'))
+    m.moderate_listing(l.id,su.id,'approved'); m.publish_listing(seller.id,l.id); m.add_to_cart(buyer.id,l.id,1)
+    body={'shipping_address_id':None,'shipping_fee':0,'payment_method_code':None}
+    key='checkout-e2e-001'; request_hash=_checkout_hash(buyer.id,body)
+    first=m.checkout(buyer.id,idempotency_key=key,idempotency_tenant_id=bt.id,idempotency_request_hash=request_hash)
+    second=m.checkout(buyer.id,idempotency_key=key,idempotency_tenant_id=bt.id,idempotency_request_hash=request_hash)
+    assert [o.id for o in second] == [o.id for o in first]
+    assert len(db.scalars(select(MarketplaceOrder)).all()) == 1
+    record=db.scalar(select(IdempotencyRecord).where(IdempotencyRecord.tenant_id==bt.id,IdempotencyRecord.key==key))
+    assert record is not None and json.loads(record.response_json)['order_ids'] == [first[0].id]
+
+
+def test_checkout_idempotency_key_rejects_different_request():
+    db,seller,bt,buyer,su=setup(); m=MarketplaceService(db)
+    m.register_seller(seller.id,'idem-seller-2','Idempotent Seller 2'); m.review_seller_verification(seller.id,su.id,'approved')
+    l=m.create_listing(seller.id,ListingInput('idem-rice-2','Rice','', 'product','YER',Decimal('1000'),'rice','wh'))
+    m.moderate_listing(l.id,su.id,'approved'); m.publish_listing(seller.id,l.id); m.add_to_cart(buyer.id,l.id,1)
+    body={'shipping_address_id':None,'shipping_fee':0,'payment_method_code':None}
+    key='checkout-e2e-002'; request_hash=_checkout_hash(buyer.id,body)
+    m.checkout(buyer.id,idempotency_key=key,idempotency_tenant_id=bt.id,idempotency_request_hash=request_hash)
+    changed=dict(body); changed['payment_method_code']='different'
+    with pytest.raises(MarketplaceError, match='different request'):
+        m.checkout(buyer.id,idempotency_key=key,idempotency_tenant_id=bt.id,idempotency_request_hash=_checkout_hash(buyer.id,changed))
