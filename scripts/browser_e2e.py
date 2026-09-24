@@ -78,6 +78,7 @@ def run():
                     assert page.locator("text=ريال يمني").is_visible()
                     assert page.locator("text=الدفع عند الاستلام: متاح").is_visible()
                     page.locator("select[name='shipping_address_id']").select_option("20")
+                    page.locator("select[name='payment_method_code']").select_option("cod")
                     page.locator("#checkoutForm button").click()
                     page.wait_for_timeout(150)
                     assert page.locator("text=YEM-E2E-001").is_visible()
