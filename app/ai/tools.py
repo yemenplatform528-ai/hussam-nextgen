@@ -83,4 +83,26 @@ def execute_mutation_tool(db: Session, tenant_id: int, tool_code: str, arguments
         return svc.evaluate_price(tenant_id,int(arguments['listing_id']),str(arguments.get('source','ai')))
     if tool_code=='marketplace.pricing.reprice':
         return svc.reprice_against_market(tenant_id,int(arguments['listing_id']),arguments.get('rule_id'))
-    return {'accepted':True,'feed_job_id':int(arguments['feed_job_id'])}
+    if tool_code=='marketplace.feed.validate':
+        if 'feed_job_id' not in arguments or 'rows' not in arguments:
+            raise ValueError('feed validation requires feed_job_id and rows')
+        rows = arguments['rows']
+        if not isinstance(rows, list) or len(rows) > 1000 or not all(isinstance(row, dict) for row in rows):
+            raise ValueError('feed validation rows must be a list of at most 1000 objects')
+        issues = svc.validate_bulk_rows(tenant_id, int(arguments['feed_job_id']), rows)
+        return {
+            'accepted': True,
+            'feed_job_id': int(arguments['feed_job_id']),
+            'issue_count': len(issues),
+            'issues': [
+                {
+                    'id': issue.id,
+                    'row_number': issue.row_number,
+                    'field_name': issue.field_name,
+                    'code': issue.code,
+                    'message': issue.message,
+                }
+                for issue in issues
+            ],
+        }
+    raise ValueError('AI mutation tool is not implemented')
