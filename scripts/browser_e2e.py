@@ -10,12 +10,13 @@ MOCK = r"""
 window.__e2eStorage={_:{},getItem(k){return this._[k]??null},setItem(k,v){this._[k]=String(v)},removeItem(k){delete this._[k]}};
 window.__e2eCheckoutCalls=0;
 window.__e2eLastCheckoutHeaders=null;
+window.__e2eLastCheckoutBody=null;
 window.__e2eCartMutationCalls=0;
 window.__e2eLastCartMutationHeaders=null;
 window.__e2eOfflineReads=false;
 (() => {
   const originalFetch = window.fetch.bind(window);
-  const listing = {id: 1, title: 'E2E Phone', description: 'Browser journey product', unit_price: '1500', currency: 'YER', stock: null, seller: {slug: 'e2e-store', display_name: 'E2E Store', description: 'Browser test store'}};
+  const listing = {id: 1, title: 'E2E Phone', description: 'Browser journey product', unit_price: '1500', currency: 'YER', stock: null, seller: {tenant_id: 1, slug: 'e2e-store', display_name: 'E2E Store', description: 'Browser test store'}};
   const json = (data, status=200) => Promise.resolve(new Response(JSON.stringify(data), {status, headers: {'Content-Type': 'application/json'}}));
   window.fetch = (input, options={}) => {
     const url = String(input);
@@ -32,7 +33,8 @@ window.__e2eOfflineReads=false;
     if (url.includes('/marketplace/buyer/addresses')) return json({items:[{id:20,label:'المنزل',city:'Khor Maksar',address_line:'Main road'}]});
     if (url.includes('/platform/market-context')) return json({items:[{id:1,code:'YEM',locale:'ar-YE'}]});
     if (url.includes('/platform/yemen/checkout-context/YEM')) return json({schema_version:'1.0',market:{code:'YEM',locale:'ar-YE'},money:{currency:'YER',label:'ريال يمني',conversion:{automatic_conversion:false}},payments:{methods:[{code:'cod',name:'Cash on delivery',method_type:'cod',requires_provider:false,available:true}],cod:{available:true}},delivery:{destination:{coverage:'available'}},sellers:[]});
-    if (url.endsWith('/marketplace/buyer/checkout')) { window.__e2eCheckoutCalls += 1; window.__e2eLastCheckoutHeaders = Object.fromEntries(new Headers(options.headers||{}).entries()); return json({orders:[{id:101,reference:'YEM-E2E-001',currency:'YER',total:'1500'}]}); }
+    if (url.endsWith('/marketplace/buyer/shipping-quotes')) return json({id:301,seller_tenant_id:1,address_id:20,currency:'YER',fee:'250',expires_at:'2099-01-01T00:00:00+00:00'});
+    if (url.endsWith('/marketplace/buyer/checkout')) { window.__e2eCheckoutCalls += 1; window.__e2eLastCheckoutHeaders = Object.fromEntries(new Headers(options.headers||{}).entries()); window.__e2eLastCheckoutBody = JSON.parse(options.body||'{}'); return json({orders:[{id:101,reference:'YEM-E2E-001',currency:'YER',total:'1500'}]}); }
     if (url.endsWith('/marketplace/buyer/orders')) return json({items:[{id:101,reference:'YEM-E2E-001',seller_tenant_id:1,total:'1500',currency:'YER',status:'pending_payment',payment_reference:null}]});
     return originalFetch(input, options);
   };
@@ -118,6 +120,8 @@ def run():
                     assert page.locator("text=YEM-E2E-001").is_visible()
                     assert page.evaluate("window.__e2eCheckoutCalls") == 1
                     assert page.evaluate("window.__e2eLastCheckoutHeaders['idempotency-key']")
+                    assert page.evaluate("window.__e2eLastCheckoutBody.shipping_quote_ids") == [301]
+                    assert page.evaluate("window.__e2eLastCheckoutBody.shipping_fee") == 250
                 finally:
                     page.close()
         finally:
