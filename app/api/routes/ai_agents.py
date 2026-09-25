@@ -1,5 +1,5 @@
 """AI-03 governed multi-agent operations API."""
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from app.api.dependencies import get_context, get_session
 from app.ai.agents import AgentTask, orchestrate, complete_delegation, ensure_default_agents
@@ -7,6 +7,11 @@ from app.core.models.ai_agents import AIAgentRun, AIAgentDelegation
 from sqlalchemy import select
 
 router = APIRouter(tags=["ai-agents"])
+
+
+def developer_guard(ctx):
+    if ctx.role not in {"owner", "admin"}:
+        raise HTTPException(status_code=403, detail="AI agent delegation completion requires owner or admin role")
 
 
 class AgentTaskIn(BaseModel):
@@ -45,5 +50,6 @@ def run_status(run_id: str, ctx=Depends(get_context), db=Depends(get_session)):
 
 @router.post("/ai/agents/delegations/{delegation_id}/complete")
 def delegation_complete(delegation_id: str, result: dict, ctx=Depends(get_context), db=Depends(get_session)):
+    developer_guard(ctx)
     x = complete_delegation(db, ctx.tenant_id, delegation_id, result)
     return {"id": x.id, "status": x.status, "agent_code": x.child_agent_code}
