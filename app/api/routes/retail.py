@@ -2,7 +2,7 @@ from decimal import Decimal
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import desc, select
-from app.api.dependencies import get_context, get_session
+from app.api.dependencies import get_context, get_session, require_owner_or_admin
 from app.core.models.retail import RetailCustomer, RetailProductProfile, RetailProductPrice, RetailRegisterShift
 from app.core.models.inventory import InventoryItem
 from app.engines.retail import RetailProductionService, RetailProductInput
@@ -22,6 +22,7 @@ class CloseShiftIn(BaseModel): closing_cash: Decimal = Field(ge=0)
 
 @router.post('/customers', status_code=201)
 def create_customer(body: CustomerIn, ctx=Depends(get_context), db=Depends(get_session)):
+    require_owner_or_admin(ctx)
     x = RetailProductionService(db).create_customer(ctx.tenant_id, body.id, body.name, body.phone, body.customer_type, body.credit_limit)
     return {'id': x.id, 'name': x.name, 'phone': x.phone, 'customer_type': x.customer_type, 'credit_limit': str(x.credit_limit), 'active': x.active}
 
@@ -32,6 +33,7 @@ def customers(limit: int = Query(50, ge=1, le=100), offset: int = Query(0, ge=0)
 
 @router.post('/products', status_code=201)
 def create_product(body: ProductIn, ctx=Depends(get_context), db=Depends(get_session)):
+    require_owner_or_admin(ctx)
     x = RetailProductionService(db).create_product(ctx.tenant_id, RetailProductInput(**body.model_dump()))
     return {'item_id': x.id, 'name': x.name, 'unit_code': x.unit_code}
 
@@ -47,16 +49,19 @@ def products(limit: int = Query(50, ge=1, le=100), offset: int = Query(0, ge=0),
 
 @router.put('/products/{item_id}/price')
 def set_price(item_id: str, body: PriceIn, ctx=Depends(get_context), db=Depends(get_session)):
+    require_owner_or_admin(ctx)
     x = RetailProductionService(db).set_price(ctx.tenant_id, item_id, body.currency, body.unit_price)
     return {'item_id': x.item_id, 'currency': x.currency, 'unit_price': str(x.unit_price), 'active': x.active}
 
 @router.post('/registers/shifts', status_code=201)
 def open_shift(body: ShiftIn, ctx=Depends(get_context), db=Depends(get_session)):
+    require_owner_or_admin(ctx)
     x = RetailProductionService(db).open_shift(ctx.tenant_id, body.register_id, ctx.user_id, body.currency, body.opening_cash)
     return {'id': x.id, 'register_id': x.register_id, 'operator_id': x.operator_id, 'currency': x.currency, 'opening_cash': str(x.opening_cash), 'status': x.status}
 
 @router.post('/registers/shifts/{shift_id}/close')
 def close_shift(shift_id: int, body: CloseShiftIn, ctx=Depends(get_context), db=Depends(get_session)):
+    require_owner_or_admin(ctx)
     x = RetailProductionService(db).close_shift(ctx.tenant_id, shift_id, body.closing_cash)
     return {'id': x.id, 'register_id': x.register_id, 'closing_cash': str(x.closing_cash), 'status': x.status, 'closed_at': x.closed_at.isoformat() if x.closed_at else None}
 
