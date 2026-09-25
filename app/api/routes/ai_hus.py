@@ -46,6 +46,7 @@ def action(body:ActionIn,ctx=Depends(get_context),db=Depends(get_session)):
 
 @router.post('/ai/actions/{action_id}/approve')
 def approve(action_id:str,ctx=Depends(get_context),db=Depends(get_session)):
+    developer_guard(ctx)
     x=approve_action(db,ctx.tenant_id,ctx.user_id,action_id); return {'id':x.id,'status':x.status,'approved_by':x.approved_by}
 
 @router.post('/ai/actions/{action_id}/execute')
