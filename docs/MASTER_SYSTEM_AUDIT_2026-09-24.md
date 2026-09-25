@@ -238,3 +238,18 @@ BUILD Phase 1 runtime composition now covers the full governed Yemen capability 
 - Migration `0038_yemen_runtime_capability_schemas` gives these capabilities explicit configuration contracts; activation validation therefore remains fail-closed.
 - Main checkpoint `45178f749ffeb36a228142cfcb6fcb4c672ea320` passed CI run `36062483140` with fresh migration, schema drift, PostgreSQL integration, browser E2E, container security, dependency checks and trusted evidence generation.
 - The runtime smoke/readiness workflows also passed for this main checkpoint. External G01–G10 certification remains separate and open.
+
+
+## 2026-09-25 Current Main — Product/Security Hardening Convergence
+
+- Current main checkpoint: `08dc03618922db71d5a2e06be3265e77d5873817`.
+- The controlled completion stream has continued incrementally on top of the existing Core; no parallel rebuild was introduced.
+- Marketplace completion boundaries were hardened for seller cases, integrations/webhooks, coupon redemption, buyer-owned support cases, growth references and advertising attribution.
+- Developer Platform capability configuration schemas and extension dependency/compatibility contracts are enforced before activation/release.
+- Buyer checkout now uses server-issued shipping quotes and preserves authoritative order/shipping values.
+- Finance, backoffice and remaining operational mutations now have explicit owner/administrator boundaries while signed provider/carrier webhooks remain integration-driven.
+- AI/HUS control-plane mutation approvals remain governed; read execution is explicit and tenant-scoped, and HUS remains the authoritative governed execution path for operational contracts.
+- PR #84 was merged only after its required CI run `36080625022` reported success across baseline, PostgreSQL integration, browser E2E and container security.
+- Main push runtime smoke for this checkpoint `36081746600` passed. Main engineering CI run `36081746633` is still running at the time of this document update; no exact-head green claim is made until its baseline job completes successfully.
+- External G01–G10 remain `PENDING_EXTERNAL`. The engineering candidate is not promoted to production certification by this hardening stream.
+- The final release manifest, trusted CI provenance and immutable artifact SHA must be generated from the exact frozen release candidate after engineering work stops; no historical manifest or prior commit evidence may be reused.
