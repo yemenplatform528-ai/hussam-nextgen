@@ -334,3 +334,15 @@ The project owner has explicitly selected a **main-only operational model**. The
 - CI run `36062483140` passed all four engineering jobs for the checkpoint. Trusted CI artifact: `hussam-trusted-ci-evidence-36062483140`, digest `sha256:86b51606517c153288abdd76ff406efabf720ada7cae63fc8bf3e918e350f1a3`.
 - Runtime smoke run `36062483120` and readiness run `36062483110` both passed. They remain staging/runtime evidence and do not close G01–G10.
 - G01–G10 remain `PENDING_EXTERNAL`.
+
+
+## 2026-09-25 Current Main — Controlled Completion Stream
+
+- Current main checkpoint: `a8367d41efc9da4bfbc2af20b17f8181eccfe345` (documentation synchronization after the operational hardening merge).
+- Engineering execution remains incremental: Existing Core → gap identification → minimal completion → regression tests → CI → merge → next boundary.
+- Recent completed work includes checkout shipping-quote authority, finance/backoffice/operational role boundaries, marketplace tenant-reference hardening, advertising attribution authority, buyer/seller case ownership, capability configuration validation, and Developer Platform dependency/compatibility enforcement.
+- PR #84 `Harden operational mutation role boundaries` merged as `08dc03618922db71d5a2e06be3265e77d5873817` after CI run `36080625022` passed all four engineering jobs.
+- The documentation-only synchronization commit is intentionally not treated as a release candidate; exact-head CI must be observed again after the document change.
+- Main push runtime smoke for `08dc03618922db71d5a2e06be3265e77d5873817` passed as run `36081746600`; the corresponding main CI run `36081746633` was still executing its baseline job at the time of this update.
+- G01–G10 remain `PENDING_EXTERNAL`; no external certification is inferred from repository CI or staging/runtime smoke.
+- Release-lock sequence remains: freeze exact SHA → fresh trusted CI/source-manifest provenance → real G01–G10 evidence → evidence validation → fresh release manifest → fail-closed final gate → final artifact SHA-256 → rollback/migration record → immutable lock.
