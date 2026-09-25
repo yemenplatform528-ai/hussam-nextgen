@@ -1,7 +1,7 @@
 from datetime import datetime
 from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, Field
-from app.api.dependencies import get_context, get_session
+from app.api.dependencies import get_context, get_session, require_owner_or_admin
 from app.engines.carriers import CarrierLifecycleService, CarrierError
 
 router = APIRouter(prefix='/carriers', tags=['carriers'])
@@ -22,6 +22,7 @@ class CarrierEventIn(BaseModel):
 
 @router.post('', status_code=201)
 def register(body: CarrierIn, ctx=Depends(get_context), db=Depends(get_session)):
+    require_owner_or_admin(ctx)
     try:
         x = CarrierLifecycleService(db).register(ctx.tenant_id, body.code, body.name, body.secret_ref)
         return {'id': x.id, 'code': x.code, 'name': x.name, 'active': x.active}
