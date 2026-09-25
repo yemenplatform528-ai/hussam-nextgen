@@ -40,3 +40,7 @@ def get_context(authorization: str | None = Header(default=None), hussam_token: 
         raise HTTPException(status_code=401, detail="invalid authentication token")
     except PermissionError:
         raise HTTPException(status_code=403, detail="active tenant membership required")
+
+def require_owner_or_admin(ctx) -> None:
+    if ctx.role not in {"owner", "admin"}:
+        raise HTTPException(status_code=403, detail="owner or admin role required")
