@@ -92,7 +92,7 @@ def validate_extension_dependency_contract(db, extension: DeveloperExtension, ma
         code = code.strip()
         if code == extension.code:
             raise HTTPException(status_code=400, detail="extension cannot depend on itself")
-        if version is not None and (not isinstance(version, str) or not re.fullmatch(r"\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]+)?", version)):
+        if version is not None and (not isinstance(version, str) or not re.fullmatch(r"\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?", version)):
             raise HTTPException(status_code=400, detail="dependency version must be a semantic version")
         normalized.append((code, version))
     if not isinstance(compatibility, dict):
