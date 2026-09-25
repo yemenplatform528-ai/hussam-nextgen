@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from app.api.dependencies import get_context,get_session
@@ -15,7 +15,7 @@ router=APIRouter(tags=['ai-hus'])
 
 def developer_guard(ctx):
     if ctx.role not in {'owner','admin'}:
-        raise AIError('developer or tenant administrator role required')
+        raise HTTPException(status_code=403, detail='developer or tenant administrator role required')
 class RunIn(BaseModel): purpose:str=Field(min_length=1,max_length=200); payload:dict={}; model:str|None=None
 class ActionIn(BaseModel): run_id:str; tool_code:str; arguments:dict={}
 class ApprovalIn(BaseModel): action_id:str
