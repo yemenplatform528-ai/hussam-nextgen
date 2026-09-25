@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import desc, select
 from app.api.dependencies import get_context, get_session
 from app.api.routes.marketplace import seller_guard
+from app.core.models.core import User, TenantMembership
 from app.core.models.marketplace import MarketplaceListing
 from app.core.models.catalog import MarketplaceSKU
 from app.core.models.marketplace_growth import (
