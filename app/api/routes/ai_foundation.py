@@ -1,5 +1,5 @@
 """AI-01 control-plane endpoints. Secrets and provider credentials never cross this API."""
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from app.api.dependencies import get_context, get_session
@@ -10,6 +10,11 @@ from app.ai.policy import authorize_tool
 from app.core.models.ai_hus import AIToolDefinition
 
 router = APIRouter(tags=["ai-foundation"])
+
+
+def developer_guard(ctx):
+    if ctx.role not in {"owner", "admin"}:
+        raise HTTPException(status_code=403, detail="AI foundation control plane requires owner or admin role")
 
 class ProviderIn(BaseModel):
     code: str = Field(min_length=1, max_length=120)
@@ -69,6 +74,7 @@ class RouteRequestIn(BaseModel):
 
 @router.post("/ai/foundation/providers", status_code=201)
 def provider(body: ProviderIn, ctx=Depends(get_context), db=Depends(get_session)):
+    developer_guard(ctx)
     x = register_provider(db, ctx.tenant_id, **body.model_dump())
     return {"id": x.id, "code": x.code, "provider_kind": x.provider_kind, "enabled": x.enabled, "privacy_class": x.privacy_class}
 
@@ -79,6 +85,7 @@ def providers(ctx=Depends(get_context), db=Depends(get_session)):
 
 @router.post("/ai/foundation/routes", status_code=201)
 def route(body: RouteIn, ctx=Depends(get_context), db=Depends(get_session)):
+    developer_guard(ctx)
     x = register_model_route(db, ctx.tenant_id, **body.model_dump())
     return {"id": x.id, "route_code": x.route_code, "provider_code": x.provider_code, "model_code": x.model_code, "task_class": x.task_class}
 
@@ -88,6 +95,7 @@ def select_route(body: RouteRequestIn, ctx=Depends(get_context), db=Depends(get_
 
 @router.post("/ai/foundation/tools", status_code=201)
 def tool(body: ToolContractIn, ctx=Depends(get_context), db=Depends(get_session)):
+    developer_guard(ctx)
     from app.ai.contracts import ActionClass
     try: action_class = ActionClass(body.action_class)
     except ValueError: raise ValueError("invalid AI action class")
@@ -98,6 +106,7 @@ def tool(body: ToolContractIn, ctx=Depends(get_context), db=Depends(get_session)
 
 @router.post("/ai/foundation/agents", status_code=201)
 def agent(body: AgentIn, ctx=Depends(get_context), db=Depends(get_session)):
+    developer_guard(ctx)
     contract = AgentContract(code=body.code, role=body.role, scopes=body.scopes, tool_codes=body.tool_codes,
                              data_classes=body.data_classes, risk_class=body.risk_class, approval_mode=body.approval_mode)
     x = register_agent(db, ctx.tenant_id, contract, body.system_policy)
