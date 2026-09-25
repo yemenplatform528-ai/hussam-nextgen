@@ -72,6 +72,52 @@ def validate_manifest(extension: DeveloperExtension, manifest: dict, registered_
     if hus_source is not None and not isinstance(hus_source, str):
         raise HTTPException(status_code=400, detail="hus_source must be text when provided")
 
+def validate_extension_dependency_contract(db, extension: DeveloperExtension, manifest: dict, compatibility: dict, *, resolve_active: bool = False):
+    """Validate bounded governed extension dependency and compatibility declarations."""
+    dependencies = manifest.get("dependencies", [])
+    if not isinstance(dependencies, list):
+        raise HTTPException(status_code=400, detail="manifest dependencies must be a list")
+    normalized = []
+    import re
+    for dependency in dependencies:
+        if isinstance(dependency, str):
+            code, sep, version = dependency.partition("@")
+            dependency = {"extension": code, **({"version": version} if sep else {})}
+        if not isinstance(dependency, dict):
+            raise HTTPException(status_code=400, detail="each dependency must be an object or extension@version string")
+        code = dependency.get("extension") or dependency.get("code")
+        version = dependency.get("version")
+        if not isinstance(code, str) or not code.strip():
+            raise HTTPException(status_code=400, detail="dependency extension is required")
+        code = code.strip()
+        if code == extension.code:
+            raise HTTPException(status_code=400, detail="extension cannot depend on itself")
+        if version is not None and (not isinstance(version, str) or not re.fullmatch(r"\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?", version)):
+            raise HTTPException(status_code=400, detail="dependency version must be a semantic version")
+        normalized.append((code, version))
+    if not isinstance(compatibility, dict):
+        raise HTTPException(status_code=400, detail="compatibility must be an object")
+    allowed_compatibility = {"api", "platform", "python"}
+    unknown = sorted(set(compatibility) - allowed_compatibility)
+    if unknown:
+        raise HTTPException(status_code=400, detail={"unknown_compatibility_keys": unknown})
+    for key, value in compatibility.items():
+        if not isinstance(value, str) or not value.strip():
+            raise HTTPException(status_code=400, detail=f"compatibility.{key} must be a non-empty string")
+    if resolve_active:
+        for code, version in normalized:
+            query = select(DeveloperExtensionVersion).join(DeveloperExtension).where(
+                DeveloperExtension.tenant_id == extension.tenant_id,
+                DeveloperExtension.code == code,
+                DeveloperExtensionVersion.release_status == "active",
+            )
+            if version is not None:
+                query = query.where(DeveloperExtensionVersion.version == version)
+            if db.scalar(query) is None:
+                suffix = f"@{version}" if version else ""
+                raise HTTPException(status_code=409, detail=f"active dependency is not satisfied: {code}{suffix}")
+    return normalized
+
 def validate_capability_configuration(schema: dict, configuration: dict) -> None:
     """Validate the small JSON-schema subset used by governed capabilities.
 
@@ -322,6 +368,7 @@ def create_version(extension_id: str, body: VersionIn, ctx=Depends(get_context),
         raise HTTPException(status_code=400, detail="test_status is server-controlled; submit test evidence after an actual test run")
     registered = set(db.scalars(select(PlatformCapability.code).where(PlatformCapability.status == "active")).all())
     validate_manifest(x, body.manifest, registered_codes=registered)
+    validate_extension_dependency_contract(db, x, body.manifest, body.compatibility)
 
     existing = db.scalar(
         select(DeveloperExtensionVersion).where(
@@ -416,6 +463,7 @@ def activate_version(extension_id: str, version: str, ctx=Depends(get_context), 
         raise HTTPException(status_code=404, detail="extension version not found")
     if v.release_status != "published":
         raise HTTPException(status_code=409, detail="version must be published before activation")
+    validate_extension_dependency_contract(db, x, v.manifest, v.compatibility, resolve_active=True)
 
     active = db.scalars(
         select(DeveloperExtensionVersion).where(
