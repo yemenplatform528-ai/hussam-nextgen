@@ -2,7 +2,7 @@ from datetime import date
 from decimal import Decimal
 from fastapi import APIRouter,Depends,HTTPException
 from pydantic import BaseModel,Field
-from app.api.dependencies import get_context,get_session
+from app.api.dependencies import get_context,get_session,require_owner_or_admin
 from app.engines.finance.production import post_journal,PostingLine
 from app.engines.finance.reconciliation import trial_balance,reconcile_control_account
 from app.engines.finance.accounts import create_account
@@ -15,10 +15,12 @@ class ReconcileIn(BaseModel): account_id:str; currency:str; expected_balance:Dec
 
 @router.post('/journals',status_code=201)
 def journal(body:Journal,ctx=Depends(get_context),db=Depends(get_session)):
+    require_owner_or_admin(ctx)
     x=post_journal(db,tenant_id=ctx.tenant_id,reference=body.reference,currency=body.currency,posting_date=body.posting_date,actor_id=ctx.user_id,lines=[PostingLine(**v.model_dump()) for v in body.lines]);db.commit();return {'id':x.id,'reference':x.reference,'status':x.status,'currency':x.currency}
 
 @router.post('/accounts',status_code=201)
 def account(body:AccountIn,ctx=Depends(get_context),db=Depends(get_session)):
+    require_owner_or_admin(ctx)
     try:
         x=create_account(db,tenant_id=ctx.tenant_id,**body.model_dump());db.commit();return {'id':x.id,'code':x.code,'name':x.name,'account_type':x.account_type,'currency':x.currency,'active':x.active}
     except ValueError as exc:
@@ -33,4 +35,5 @@ def get_trial_balance(currency:str,ctx=Depends(get_context),db=Depends(get_sessi
 
 @router.post('/reconciliation/control')
 def reconcile_control(body:ReconcileIn,ctx=Depends(get_context),db=Depends(get_session)):
+    require_owner_or_admin(ctx)
     return reconcile_control_account(db,tenant_id=ctx.tenant_id,account_id=body.account_id,currency=body.currency.strip().upper(),expected_balance=body.expected_balance)
