@@ -1,5 +1,5 @@
 """AI-01 control-plane endpoints. Secrets and provider credentials never cross this API."""
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from app.api.dependencies import get_context, get_session
