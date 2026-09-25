@@ -29,6 +29,8 @@ jobs:
         run: python -m playwright install --with-deps chromium
       - name: Repository baseline audit
         run: python scripts/baseline_audit.py
+      - name: Phase 1 engineering and data admission gate
+        run: python scripts/phase1_engineering_data_gate.py
       - name: Compile Python sources
         run: python -m compileall -q app alembic tests
       - name: Run tests
