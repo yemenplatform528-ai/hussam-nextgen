@@ -118,6 +118,11 @@ def memory(body: MemoryIn, ctx=Depends(get_context), db=Depends(get_session)):
 
 @router.post("/ai/foundation/memory/{memory_id}/revoke")
 def revoke(memory_id: str, ctx=Depends(get_context), db=Depends(get_session)):
+    memory = db.scalar(select(AIMemoryRecord).where(AIMemoryRecord.id == memory_id, AIMemoryRecord.tenant_id == ctx.tenant_id))
+    if not memory:
+        raise HTTPException(status_code=404, detail="AI memory not found in tenant")
+    if ctx.role not in {"owner", "admin"} and memory.owner_id != ctx.user_id:
+        raise HTTPException(status_code=403, detail="AI memory can only be revoked by its owner or an administrator")
     x = revoke_memory(db, ctx.tenant_id, memory_id)
     return {"id": x.id, "revoked_at": x.revoked_at.isoformat()}
 
