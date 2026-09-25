@@ -11,6 +11,11 @@ from app.hus.operational import compile_and_store, activate
 from uuid import uuid4
 
 router=APIRouter(tags=['ai-hus'])
+
+
+def developer_guard(ctx):
+    if ctx.role not in {'owner','admin'}:
+        raise AIError('developer or tenant administrator role required')
 class RunIn(BaseModel): purpose:str=Field(min_length=1,max_length=200); payload:dict={}; model:str|None=None
 class ActionIn(BaseModel): run_id:str; tool_code:str; arguments:dict={}
 class ApprovalIn(BaseModel): action_id:str
@@ -24,6 +29,7 @@ def tools(ctx=Depends(get_context),db=Depends(get_session)):
 
 @router.post('/ai/tools',status_code=201)
 def register_tool(body:ToolIn,ctx=Depends(get_context),db=Depends(get_session)):
+    developer_guard(ctx)
     if body.risk not in {'read','mutation','admin'}: raise AIError('invalid tool risk')
     x=AIToolDefinition(tenant_id=ctx.tenant_id,code=body.code,name=body.name,description=body.description,risk=body.risk,input_schema=body.input_schema,enabled=True)
     db.add(x); db.commit(); db.refresh(x); return {'code':x.code,'risk':x.risk,'enabled':x.enabled}
@@ -56,6 +62,7 @@ def get_run(run_id:str,ctx=Depends(get_context),db=Depends(get_session)):
 
 @router.post('/hus/compile')
 def compile_hus(body:CompileIn,ctx=Depends(get_context),db=Depends(get_session)):
+    developer_guard(ctx)
     try:
         x, result = compile_and_store(db,ctx.tenant_id,ctx.user_id,body.spec)
     except HUSCompileError as e:
@@ -64,6 +71,7 @@ def compile_hus(body:CompileIn,ctx=Depends(get_context),db=Depends(get_session))
 
 @router.post('/hus/compilations/{compilation_id}/activate')
 def activate_hus(compilation_id:str,ctx=Depends(get_context),db=Depends(get_session)):
+    developer_guard(ctx)
     x=activate(db,ctx.tenant_id,ctx.user_id,compilation_id)
     return {'id':x.id,'status':x.status,'source_hash':x.source_hash,'contract_hash':x.contract_hash}
 
