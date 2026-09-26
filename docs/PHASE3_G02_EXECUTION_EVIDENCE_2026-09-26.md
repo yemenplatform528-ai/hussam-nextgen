@@ -7,7 +7,7 @@ This record documents the real PostgreSQL migration state and the controlled pos
 - Neon project: `cold-tooth-45286697`
 - Database: `hussam`
 - PostgreSQL: 17.x
-- Production-certification source branch for this drill: `br-damp-pond-b2j5qnru` / current verified post-migration lineage `br-damp-pond-b24gow7i`
+- Production-certification source branch for this drill: `br-damp-pond-b24gow7i`
 - Project default `staging` branch: `br-small-recipe-b2vjnohc`
 - Migration head: `0038_yemen_runtime_capability_schemas`
 - Pre-migration snapshot used in the earlier restore drill: `snap-late-thunder-b2pro743`
