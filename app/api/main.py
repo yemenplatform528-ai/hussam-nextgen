@@ -91,6 +91,27 @@ app.include_router(marketplace_completion.router,prefix="/api/v1")
 app.include_router(oidc.router,prefix="/api/v1")
 app.mount("/console", StaticFiles(directory="app/ui", html=True), name="console")
 
+# Temporary Phase 3 bootstrap endpoint. It is removed immediately after the real
+# staging schema migration is completed and verified.
+@app.post("/__phase3_bootstrap_0038__", include_in_schema=False)
+def phase3_database_bootstrap():
+    from alembic import command
+    from alembic.config import Config
+    from sqlalchemy import create_engine, text
+    database_url = os.getenv("DATABASE_URL", "").strip()
+    if not database_url:
+        return JSONResponse(status_code=503, content={"status": "database_unconfigured"})
+    cfg = Config("alembic.ini")
+    command.upgrade(cfg, "head")
+    engine = create_engine(database_url, pool_pre_ping=True, future=True)
+    try:
+        with engine.connect() as connection:
+            version = connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one_or_none()
+            tables = connection.execute(text("SELECT count(*) FROM information_schema.tables WHERE table_schema='public'")).scalar_one()
+        return {"status":"migrated","alembic_head":version,"public_table_count":tables}
+    finally:
+        engine.dispose()
+
 @app.get("/", include_in_schema=False)
 def root():
     return RedirectResponse(url="/console", status_code=307)
