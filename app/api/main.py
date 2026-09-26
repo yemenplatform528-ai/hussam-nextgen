@@ -6,7 +6,7 @@ from app.core.rate_limit import RateLimiter, RedisRateLimiter
 from app.core.security.proxy import client_ip
 from sqlalchemy import create_engine, text
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from app.domains.registry import DOMAINS
 from app.api.routes import ai_foundation, inventory, commerce, procurement, payments, documents, finance, logistics, workflow, session, dashboard, operations, retail, ai_hus, marketplace, marketplace_growth, marketplace_completion, oidc, carriers, ai_commerce, ai_agents, ai_product, developer_platform, platform
@@ -90,6 +90,10 @@ app.include_router(marketplace_growth.router,prefix="/api/v1")
 app.include_router(marketplace_completion.router,prefix="/api/v1")
 app.include_router(oidc.router,prefix="/api/v1")
 app.mount("/console", StaticFiles(directory="app/ui", html=True), name="console")
+
+@app.get("/", include_in_schema=False)
+def root():
+    return RedirectResponse(url="/console", status_code=307)
 
 @app.get("/health")
 def health(): return {"status":"ok","platform":"hussam-nextgen","version":VERSION}
