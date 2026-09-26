@@ -4,7 +4,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 os.environ['HUSSAM_RELEASE_PROFILE']='full-development'
 from app.api.main import app, RELEASE_PROFILE
 
-paths={r.path for r in app.routes}
+# Use FastAPI's generated OpenAPI surface rather than assuming every mounted
+# router entry is a concrete Route object with a .path attribute.
+paths=set(app.openapi().get('paths', {}))
 required={
     '/health',
     '/api/v1/platform/manifest',
