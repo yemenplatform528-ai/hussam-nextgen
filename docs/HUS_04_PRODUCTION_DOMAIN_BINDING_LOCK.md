@@ -22,7 +22,7 @@ No dynamic import, SQL, shell, HTTP, filesystem access, or model-generated handl
 Mutation bindings are never treated as executed merely because a capability is registered. A runtime handler must exist, approval must be present, idempotency must be present, and domain invariants remain authoritative.
 
 ## Approval hardening
-HUS-04 adds an optional production approval verifier to the runtime. Production deployments should configure it so `approval_ref` is verified against an authoritative approval record before mutation execution.
+HUS-04 requires fail-closed approval verification for every mutation. The Sovereign Runtime rejects mutation execution when no approval verifier is configured, and rejects the execution when the verifier does not validate the supplied `approval_ref`. Production mutation execution therefore remains blocked until an authoritative approval-verification implementation is explicitly wired into the production execution path.
 
 ## Isolation
 Every binding receives the tenant from `RuntimeContext`; handlers do not accept a caller-supplied tenant override. Domain services remain authoritative for tenant, inventory, accounting, payment, and marketplace invariants.
