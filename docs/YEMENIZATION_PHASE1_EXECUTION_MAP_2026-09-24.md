@@ -383,3 +383,14 @@ The next controlled slice is Documents + Notifications, followed by Search/Prici
 - DeveloperExtensionVersion source-artifact-to-trusted-CI integration: OPEN.
 - G01–G10 external production evidence: OPEN.
 - Final release/baseline lock: OPEN.
+
+
+## 15. 2026-09-27 Phase 1 completion checkpoint
+
+- Yemenization Phase 1 engineering is **CLOSED**.
+- Main checkpoint: `b89742242b013250bec8ffb0fd70f11a71deec37`.
+- PR #91 closed the remaining buyer-side checkout UI/context boundary and passed the full engineering CI matrix before merge.
+- Runtime Smoke passed for `/health`, `/openapi.json`, and `/docs` on the public staging runtime.
+- Readiness probe from the external runner was blocked by the staging platform with HTTP 403; this is recorded as an access limitation, not fabricated as production readiness.
+- G01–G10 remain `PENDING_EXTERNAL`.
+- Final release lock remains intentionally deferred until real external evidence is supplied and validated.
