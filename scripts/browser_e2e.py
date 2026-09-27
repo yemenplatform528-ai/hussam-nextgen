@@ -64,7 +64,19 @@ def run():
                 page = build_page(browser, width, height)
                 try:
                     assert page.title() == "Hussam — شبكة التجارة"
-                    page.locator("h1", has_text="كل ما تحتاجه، في Hussam.").wait_for(state="visible", timeout=10000)
+                    try:
+                        page.locator("h1", has_text="كل ما تحتاجه، في Hussam.").wait_for(state="visible", timeout=10000)
+                    except Exception:
+                        print("BROWSER_DIAGNOSTICS", page.evaluate("""({
+                            readyState: document.readyState,
+                            customerHomeHidden: document.querySelector('#customerHome')?.hidden,
+                            customerHomeText: document.querySelector('#customerHome')?.textContent,
+                            renderHomeType: typeof window.renderHome,
+                            loadPublicType: typeof window.loadPublic,
+                            storage: window.__e2eStorage?._:{},
+                            bodyText: document.body.innerText
+                        })"""))
+                        raise
                     page.locator("text=E2E Phone").wait_for(state="visible", timeout=10000)
                     page.evaluate("window.__e2eOfflineReads=true")
                     page.evaluate("loadPublic()")
