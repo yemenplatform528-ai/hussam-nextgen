@@ -119,8 +119,7 @@ def run():
                     assert page.evaluate("window.__e2eCheckoutCalls") == 0
                     page.evaluate("window.dispatchEvent(new Event('online'))")
                     page.locator("#checkoutForm button").click()
-                    page.wait_for_timeout(150)
-                    assert page.locator("text=YEM-E2E-001").is_visible()
+                    page.locator("text=YEM-E2E-001").wait_for(state="visible", timeout=3000)
                     assert page.evaluate("window.__e2eCheckoutCalls") == 1
                     assert page.evaluate("window.__e2eLastCheckoutHeaders['idempotency-key']")
                     assert page.evaluate("window.__e2eLastCheckoutBody.shipping_quote_ids") == [301]
