@@ -94,6 +94,9 @@ def test_checkout_context_is_explicit_and_cod_first_class():
     }
     assert result["payments"]["cod"]["available"] is True
     assert {x["code"] for x in result["payments"]["methods"]} == {"cod", "transfer"}
+    methods = {x["code"]: x for x in result["payments"]["methods"]}
+    assert methods["cod"]["available"] is True
+    assert methods["transfer"]["available"] is False
     assert result["delivery"]["destination"]["coverage"] == "available"
     assert result["sellers"][0]["delivery"]["available"] is True
 
