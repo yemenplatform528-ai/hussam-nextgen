@@ -51,3 +51,20 @@ def test_checkout_rejects_payment_method_not_active_in_market():
     service.add_to_cart(buyer.id, listing.id, 1)
     with pytest.raises(MarketplaceError, match="payment method is not available"):
         service.checkout(buyer.id, address.id, Decimal("0"), None, None, None, payment_method_code="unknown")
+
+
+def test_checkout_rejects_provider_backed_payment_without_certified_integration():
+    db, seller, buyer, seller_user, listing, address, service = setup()
+    _add_payment_methods(db, address.market_id)
+
+    service.add_to_cart(buyer.id, listing.id, 1)
+    with pytest.raises(MarketplaceError, match="requires a certified provider integration"):
+        service.checkout(
+            buyer.id,
+            address.id,
+            Decimal("0"),
+            None,
+            None,
+            None,
+            payment_method_code="transfer",
+        )
