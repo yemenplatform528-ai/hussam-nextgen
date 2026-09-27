@@ -73,7 +73,7 @@ def run():
                             customerHomeText: document.querySelector('#customerHome')?.textContent,
                             renderHomeType: typeof window.renderHome,
                             loadPublicType: typeof window.loadPublic,
-                            storage: window.__e2eStorage?._:{},
+                            storage: window.__e2eStorage ? window.__e2eStorage._ : {},
                             bodyText: document.body.innerText
                         })"""))
                         raise
