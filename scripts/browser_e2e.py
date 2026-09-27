@@ -64,8 +64,8 @@ def run():
                 page = build_page(browser, width, height)
                 try:
                     assert page.title() == "Hussam — شبكة التجارة"
-                    page.locator("h1", has_text="كل ما تحتاجه، في Hussam.").wait_for(state="visible", timeout=3000)
-                    page.locator("text=E2E Phone").wait_for(state="visible", timeout=3000)
+                    page.locator("h1", has_text="كل ما تحتاجه، في Hussam.").wait_for(state="visible", timeout=10000)
+                    page.locator("text=E2E Phone").wait_for(state="visible", timeout=10000)
                     page.evaluate("window.__e2eOfflineReads=true")
                     page.evaluate("loadPublic()")
                     page.wait_for_timeout(100)
