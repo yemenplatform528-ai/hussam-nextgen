@@ -880,6 +880,8 @@ class MarketplaceService:
                 PaymentMethodCatalogEntry.active.is_(True),
             ))
             if method is None: raise MarketplaceError('payment method is not available in this market')
+            if method.requires_provider:
+                raise MarketplaceError('payment method requires a certified provider integration')
         if cart.status!='active': raise MarketplaceError('cart is not active')
         rows=self.db.execute(select(MarketplaceCartItem,MarketplaceListing,MarketplaceSellerProfile).join(MarketplaceListing,MarketplaceListing.id==MarketplaceCartItem.listing_id).join(MarketplaceSellerProfile,MarketplaceSellerProfile.tenant_id==MarketplaceListing.seller_tenant_id).join(MarketplaceSellerVerification,MarketplaceSellerVerification.seller_tenant_id==MarketplaceListing.seller_tenant_id).where(MarketplaceCartItem.cart_id==cart.id,MarketplaceListing.market_id==market_id,MarketplaceListing.status=='published',MarketplaceListing.moderation_status=='approved',MarketplaceSellerProfile.status=='active',MarketplaceSellerVerification.status=='approved')).all()
         if not rows: raise MarketplaceError('cart is empty')
