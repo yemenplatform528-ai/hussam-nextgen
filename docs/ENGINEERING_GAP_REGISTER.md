@@ -13,7 +13,7 @@ feature gaps and prevents external evidence from being fabricated.
 | G01–G10 | Engineering closures are complete | Closed engineering | No |
 | Production certification | 10 external gates still require real evidence | External | No |
 | Amazon public scope | Internal pre-certification audit reports 30/30 capability families represented | Engineering scope | No |
-| Yemenization | Not yet applied as the final market configuration/adapters | Planned product phase | Yes, before Yemen production release |
+| Yemenization Phase 1 | Runtime activation, checkout context, payment gates, seller context, COD/payment UX, delivery/coverage wiring and connectivity-safe buyer flow are implemented and CI-verified | Closed engineering phase | No |
 | Production identity | Real OIDC provider registration and browser flow not certified | External | No, until launch |
 | Production data | Real PostgreSQL migration/restore not certified | External | No, until launch |
 | Payments | Real provider rails/webhooks/reconciliation not certified | External | No, until launch |
@@ -33,3 +33,8 @@ or the later Yemenization phase.
 The next work should therefore deepen product capability only when it creates a
 clear user-facing value or closes a verified engineering gap; it should not
 reopen the G01–G10 foundation without evidence of regression.
+
+
+## 2026-09-27 status synchronization
+
+Yemenization Phase 1 engineering is **CLOSED** at the repository level. The runtime activation boundary, Yemen checkout context, authoritative payment gate, seller context propagation, shipping/delivery UX, and desktop/mobile browser contract are merged into `main` and covered by green CI. This does **not** certify real payment providers, carriers, production identity, production restore, external security assessment, operations, or legal approval; those remain G01–G10 external gates.
