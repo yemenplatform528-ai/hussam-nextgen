@@ -40,6 +40,7 @@ def test_runtime_failure_rolls_back_domain_transaction():
     def failing(db,ctx,args):
         raise RuntimeError('boom')
     r.register_mutation_handler('commerce.sales.create',failing)
+    r.configure_approval_verifier(lambda db,ctx: True)
     with pytest.raises(HUSRuntimeError, match='failed'):
         r.execute_step(1,'u','c','w.s',{},approval_ref='a',approved=True,idempotency_key='idem')
     rows=db.scalars(select(HUSExecutionRecord).where(HUSExecutionRecord.compilation_id=='c')).all()
