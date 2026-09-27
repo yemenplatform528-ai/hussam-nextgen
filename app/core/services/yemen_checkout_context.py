@@ -56,12 +56,20 @@ class YemenCheckoutContextService:
                 "name": item["name"],
                 "method_type": item["method_type"],
                 "requires_provider": item["requires_provider"],
-                "available": True,
+                # Provider-backed methods are catalogued for discoverability but
+                # remain unavailable until a certified/production integration
+                # is actually registered. This prevents the checkout UI from
+                # presenting an uncertified rail as executable.
+                "available": not item["requires_provider"],
             }
             for item in runtime["payments"]["methods"]
         ]
         cod_available = any(
-            item["method_type"] == "cod" or item["code"].lower() in {"cod", "cash_on_delivery"}
+            item["available"]
+            and (
+                item["method_type"] == "cod"
+                or item["code"].lower() in {"cod", "cash_on_delivery"}
+            )
             for item in methods
         )
 
