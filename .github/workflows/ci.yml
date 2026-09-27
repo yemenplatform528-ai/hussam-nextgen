@@ -142,7 +142,6 @@ jobs:
         run: python scripts/browser_e2e.py
 
   temporary-main-only-cleanup:
-    if: ${{ github.sha == '94fc74728dbf4dbc5210fa71b64943d478a99a0f' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
