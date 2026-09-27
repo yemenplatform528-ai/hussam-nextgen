@@ -146,8 +146,11 @@ class SovereignRuntime:
         read = _is_read(ctx.action)
         if not read and not approved:
             raise HUSRuntimeError("mutation execution requires explicit approval")
-        if not read and self._approval_verifier is not None and not self._approval_verifier(self.db, ctx):
-            raise HUSRuntimeError("approval evidence is invalid or expired")
+        if not read:
+            if self._approval_verifier is None:
+                raise HUSRuntimeError("mutation approval verifier is not configured")
+            if not self._approval_verifier(self.db, ctx):
+                raise HUSRuntimeError("approval evidence is invalid or expired")
         if not read and not ctx.idempotency_key:
             raise HUSRuntimeError("mutation execution requires an idempotency key")
         if ctx.idempotency_key:
