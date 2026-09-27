@@ -242,11 +242,29 @@ def checkout(body:CheckoutIn,ctx=Depends(get_context),db=Depends(get_session),id
     if market_id is not None:
         market = db.scalar(select(MarketContext).where(MarketContext.id == market_id))
         if market is not None:
+            seller_tenant_ids = sorted({
+                listing.seller_tenant_id
+                for listing in db.scalars(
+                    select(MarketplaceListing).join(
+                        MarketplaceCartItem,
+                        MarketplaceCartItem.listing_id == MarketplaceListing.id,
+                    ).join(
+                        MarketplaceCart,
+                        MarketplaceCart.id == MarketplaceCartItem.cart_id,
+                    ).where(
+                        MarketplaceCart.buyer_user_id == ctx.user_id,
+                        MarketplaceCart.status == 'active',
+                        MarketplaceCart.market_id == market_id,
+                        MarketplaceListing.market_id == market_id,
+                    )
+                ).all()
+            })
             try:
                 context = YemenCheckoutContextService(db).build(
                     market.code,
                     user_id=ctx.user_id,
                     address_id=body.shipping_address_id,
+                    seller_tenant_ids=seller_tenant_ids,
                 )
                 if body.shipping_address_id is not None and context['delivery']['destination']['coverage'] not in {'available', 'active'}:
                     raise HTTPException(status_code=409, detail='delivery coverage is not available for this address')
