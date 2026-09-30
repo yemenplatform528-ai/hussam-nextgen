@@ -13,7 +13,7 @@ from app.api.routes import ai_foundation, inventory, commerce, procurement, paym
 
 VERSION="1.0.0"
 configure_logging()
-RELEASE_PROFILE="full-development"
+RELEASE_PROFILE = os.getenv("HUSSAM_RELEASE_PROFILE", os.getenv("ENVIRONMENT", "development")).strip().lower()
 _rate_limit_limit = int(os.getenv("API_RATE_LIMIT_PER_MINUTE", "600"))
 _rate_limit_backend = os.getenv("RATE_LIMIT_BACKEND", "memory").strip().lower()
 if _rate_limit_backend == "redis" and os.getenv("RATE_LIMIT_REDIS_URL"):
