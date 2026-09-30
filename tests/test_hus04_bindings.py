@@ -38,6 +38,7 @@ def test_finance_and_payments_bindings_are_registered_reads():
 def test_mutation_binding_calls_domain_service_with_real_invariants():
     s=db(); active(s,'commerce.sales.create',risk='mutation',idem=True); r=SovereignRuntime(s)
     r.register_mutation_handler('commerce.sales.create', build_production_bindings()['commerce.sales.create'])
+    r.configure_approval_verifier(lambda db,ctx: True)
     with pytest.raises(HUSRuntimeError, match='failed'):
         r.execute_step(1,'u','c1','w.step',{'reference':'x','currency':'YER','lines':[]},approved=True,approval_ref='ap',idempotency_key='k')
 
@@ -47,4 +48,11 @@ def test_production_mutation_requires_verifiable_approval():
     r.register_mutation_handler('commerce.sales.create', build_production_bindings()['commerce.sales.create'])
     r.configure_approval_verifier(lambda db,ctx: False)
     with pytest.raises(HUSRuntimeError, match='approval evidence'):
+        r.execute_step(1,'u','c1','w.step',{'reference':'x','currency':'YER','lines':[]},approved=True,approval_ref='ap',idempotency_key='k')
+
+
+def test_production_mutation_fails_closed_without_approval_verifier():
+    s=db(); active(s,'commerce.sales.create',risk='mutation',idem=True); r=SovereignRuntime(s)
+    r.register_mutation_handler('commerce.sales.create', build_production_bindings()['commerce.sales.create'])
+    with pytest.raises(HUSRuntimeError, match='verifier is not configured'):
         r.execute_step(1,'u','c1','w.step',{'reference':'x','currency':'YER','lines':[]},approved=True,approval_ref='ap',idempotency_key='k')

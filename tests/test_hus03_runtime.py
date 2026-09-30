@@ -36,6 +36,8 @@ def test_read_handler_executes_and_records_provenance():
 
 def test_mutation_requires_approval_and_idempotency():
     s=db(); active(s); r=SovereignRuntime(s)
+    r.register_mutation_handler('commerce.sales.create', lambda db,ctx,args: {'ok': True})
+    r.configure_approval_verifier(lambda db,ctx: ctx.approval_ref == 'ap1')
     with pytest.raises(HUSRuntimeError, match='approval'):
         r.execute_step(1,'u','c1','w.write',{}, approved=False, idempotency_key='m1', approval_ref='ap1')
     with pytest.raises(HUSRuntimeError, match='idempotency'):

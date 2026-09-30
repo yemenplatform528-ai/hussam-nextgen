@@ -56,3 +56,13 @@ def test_ai_read_tool_unknown_handler_is_rejected(db):
     action=propose_action(db,1,'u1',run.id,'not.registered',{})
     from app.ai.runtime import execute_read_action
     with pytest.raises(ValueError): execute_read_action(db,1,'u1',action.id)
+
+def test_ai_mutation_internal_execution_fails_closed(db):
+    seed(db)
+    db.add(AIToolDefinition(tenant_id=1,code='stock.adjust',name='Adjust',description='adjust',risk='mutation',input_schema={},enabled=True)); db.commit()
+    run=create_run(db,1,'u1','test',{'x':1})
+    action=propose_action(db,1,'u1',run.id,'stock.adjust',{'qty':1})
+    approve_action(db,1,'u1',action.id)
+    from app.ai.runtime import execute_approved_mutation
+    with pytest.raises(AIError, match='governed HUS runtime'):
+        execute_approved_mutation(db,1,'u1',action.id,approval_ref='fake')

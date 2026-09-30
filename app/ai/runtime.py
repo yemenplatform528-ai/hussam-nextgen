@@ -56,13 +56,11 @@ def execute_read_action(db:Session,tenant_id:int,actor_id:str,action_id:str):
     db.commit(); return action
 
 def execute_approved_mutation(db:Session,tenant_id:int,actor_id:str,action_id:str,approval_ref:str|None=None):
-    from app.ai.tools import execute_mutation_tool
-    action=db.scalar(select(AIAction).where(AIAction.id==action_id,AIAction.tenant_id==tenant_id).with_for_update())
-    if not action: raise AIError('AI action not found in tenant')
-    if action.risk not in {MUTATION,ADMIN} or action.status!='approved': raise AIError('only approved mutation actions can execute')
-    run=db.scalar(select(AIRun).where(AIRun.id==action.run_id,AIRun.tenant_id==tenant_id))
-    if not run or run.actor_id!=actor_id: raise AIError('AI run actor mismatch')
-    result=execute_mutation_tool(db,tenant_id,action.tool_code,action.arguments)
-    action.result=result; action.status='completed'; run.status='completed'; run.output=result
-    _event(db,tenant_id,'ai.action.executed',action.id,{'tool':action.tool_code,'approval_ref':approval_ref})
-    db.commit(); return action
+    """Fail closed: AI mutations must use the governed HUS execution boundary.
+
+    This compatibility entry point is intentionally non-executable because it has no
+    authoritative approval verifier/domain-runtime context. Keeping it as a hard stop
+    prevents an internal caller from treating AIAction approval state or a caller-supplied
+    approval_ref as sufficient evidence for a side effect.
+    """
+    raise AIError('AI mutation execution requires the governed HUS runtime and authoritative approval verification')
