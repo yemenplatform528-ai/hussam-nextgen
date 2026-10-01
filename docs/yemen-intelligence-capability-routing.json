@@ -1,0 +1,63 @@
+{
+  "schema_version": "1.0",
+  "registry": "Yemen Intelligence Capability Routing",
+  "mission": "Yemen is the purpose; AI is a capability layer.",
+  "generated_for": "continuity-control-plane",
+  "routes": [
+    {
+      "name": "Tiniest Cloud",
+      "role": "external continuity/execution",
+      "status": "verified",
+      "primary": true,
+      "replacement": "GitHub recovery pointer + alternate execution surface"
+    },
+    {
+      "name": "GitHub",
+      "role": "versioned evidence/recovery",
+      "status": "verified",
+      "primary": false,
+      "replacement": "independent durable artifact copy"
+    },
+    {
+      "name": "Basic Memory",
+      "role": "durable knowledge",
+      "status": "verified",
+      "primary": false,
+      "replacement": "exported markdown knowledge bundle"
+    },
+    {
+      "name": "Neon",
+      "role": "database capability",
+      "status": "available",
+      "primary": false,
+      "replacement": "portable Postgres backup/alternate database"
+    },
+    {
+      "name": "ChatGPT",
+      "role": "intelligence capability",
+      "status": "available",
+      "primary": false,
+      "replacement": "other model/provider or local/open model"
+    },
+    {
+      "name": "Open/local models",
+      "role": "replaceable intelligence",
+      "status": "route-defined",
+      "primary": false,
+      "replacement": "another model surface"
+    }
+  ],
+  "substitution_protocol": [
+    "preserve-durable-state",
+    "select-available-replacement",
+    "verify-replacement",
+    "continue-from-last-checkpoint",
+    "record-substitution"
+  ],
+  "safety": [
+    "no secrets in registry",
+    "no destructive automatic restoration",
+    "irreversible/legal/financial/identity-sensitive actions require approval",
+    "verify before asserting completion"
+  ]
+}
