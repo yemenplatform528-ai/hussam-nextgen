@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - ".github/workflows/yemen-continuity-recovery.yml"
+      - "docs/yemen-intelligence-capability-routing.json"
   workflow_dispatch:
   schedule:
     - cron: "17 * * * *"
@@ -40,6 +41,19 @@ jobs:
           grep -q "Tiniest Cloud" /tmp/recovery.md
           echo "reachable=true" >> "$GITHUB_OUTPUT"
 
+      - name: Verify capability substitution registry
+        id: routing
+        shell: bash
+        run: |
+          set -e
+          code=$(curl -L --max-time 20 -sS -o /tmp/capability-routing.json -w "%{http_code}" https://raw.githubusercontent.com/yemenplatform528-ai/hussam-nextgen/main/docs/yemen-intelligence-capability-routing.json)
+          test "$code" = "200"
+          grep -q '"Yemen Intelligence Capability Routing"' /tmp/capability-routing.json
+          grep -q '"substitution_protocol"' /tmp/capability-routing.json
+          grep -q '"ChatGPT"' /tmp/capability-routing.json
+          grep -q '"Open/local models"' /tmp/capability-routing.json
+          echo "reachable=true" >> "$GITHUB_OUTPUT"
+
       - name: Execute recovery selection
         if: steps.primary.outputs.reachable != 'true'
         shell: bash
@@ -47,6 +61,7 @@ jobs:
           set -e
           echo "PRIMARY_UNAVAILABLE=true"
           echo "FALLBACK=GitHub recovery pointer"
+          echo "ROUTING_REGISTRY=${{ steps.routing.outputs.reachable }}"
           echo "ACTION=preserve-state -> select-substitute -> verify -> continue"
           echo "No destructive restoration is attempted automatically."
 
@@ -56,6 +71,7 @@ jobs:
         run: |
           echo "PRIMARY_HEALTHY=true"
           echo "FALLBACK_VERIFIED=${{ steps.fallback.outputs.reachable }}"
+          echo "ROUTING_VERIFIED=${{ steps.routing.outputs.reachable }}"
 
       - name: Open recovery issue when primary is unavailable
         if: steps.primary.outputs.reachable != 'true'
@@ -64,5 +80,5 @@ jobs:
         run: |
           gh issue create \
             --title "Continuity sentinel: primary bridge unavailable" \
-            --body "Automated recovery sentinel detected that the primary Yemen Intelligence Bridge was unavailable. Independent GitHub recovery pointer was verified. Continue from the recovery protocol; no destructive action was taken." \
+            --body "Automated recovery sentinel detected that the primary Yemen Intelligence Bridge was unavailable. Independent GitHub recovery pointer and capability substitution registry were verified. Continue from the recovery protocol; no destructive action was taken." \
             --label "continuity" || true
