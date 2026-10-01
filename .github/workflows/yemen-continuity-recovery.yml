@@ -1,0 +1,66 @@
+name: Yemen Continuity Recovery Sentinel
+
+on:
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 * * * *"
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  continuity-sentinel:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Probe primary continuity bridge
+        id: primary
+        shell: bash
+        run: |
+          set +e
+          code=$(curl -L --max-time 20 -sS -o /tmp/bridge.html -w "%{http_code}" https://yemen-intelligence-bridge.tiniestcloud.app)
+          echo "http_code=$code" >> "$GITHUB_OUTPUT"
+          if [ "$code" = "200" ]; then
+            echo "reachable=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "reachable=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Verify independent recovery pointer
+        id: fallback
+        shell: bash
+        run: |
+          set -e
+          code=$(curl -L --max-time 20 -sS -o /tmp/recovery.md -w "%{http_code}" https://raw.githubusercontent.com/yemenplatform528-ai/hussam-nextgen/continuity/recovery-2026-10-01/docs/yemen-intelligence-bridge-recovery.md)
+          test "$code" = "200"
+          grep -q "Recovery protocol" /tmp/recovery.md
+          grep -q "Tiniest Cloud" /tmp/recovery.md
+          echo "reachable=true" >> "$GITHUB_OUTPUT"
+
+      - name: Execute recovery selection
+        if: steps.primary.outputs.reachable != 'true'
+        shell: bash
+        run: |
+          set -e
+          echo "PRIMARY_UNAVAILABLE=true"
+          echo "FALLBACK=GitHub recovery pointer"
+          echo "ACTION=preserve-state -> select-substitute -> verify -> continue"
+          echo "No destructive restoration is attempted automatically."
+
+      - name: Record healthy state
+        if: steps.primary.outputs.reachable == 'true'
+        shell: bash
+        run: |
+          echo "PRIMARY_HEALTHY=true"
+          echo "FALLBACK_VERIFIED=${{ steps.fallback.outputs.reachable }}"
+
+      - name: Open recovery issue when primary is unavailable
+        if: steps.primary.outputs.reachable != 'true' && github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue create \
+            --title "Continuity sentinel: primary bridge unavailable" \
+            --body "Automated recovery sentinel detected that the primary Yemen Intelligence Bridge was unavailable. Independent GitHub recovery pointer was verified. Continue from the recovery protocol; no destructive action was taken." \
+            --label "continuity" || true
