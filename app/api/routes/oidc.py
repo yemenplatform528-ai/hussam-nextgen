@@ -72,7 +72,7 @@ def callback(request: Request, code: str = Query(""), state: str = Query(""), er
         session.close()
         engine.dispose()
 
-    token = encode_hs256({"sub": str(user.id), "tenant_id": int(tenant_id), "exp": int(__import__('time').time()) + 3600, "iss": "hussam-nextgen"}, os.getenv("JWT_SECRET", ""))
+    token = encode_hs256({"sub": str(user.id), "tenant_id": int(tenant_id), "exp": int(__import__('time').time()) + 3600, "iss": "hussam-nextgen", "auth_source": "oidc", "oidc_subject": subject, "oidc_issuer": settings.issuer}, os.getenv("JWT_SECRET", ""))
     response = RedirectResponse("/console/", status_code=303)
     response.set_cookie("hussam_token", token, max_age=3600, httponly=True, secure=_secure_cookie(request), samesite="lax", path="/")
     response.delete_cookie("hussam_oidc_state", path="/api/v1/auth/oidc")

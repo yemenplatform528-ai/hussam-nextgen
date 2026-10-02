@@ -20,4 +20,4 @@ def authenticate_context(
     """
     if requested_tenant_id is not None and requested_tenant_id != claims.tenant_id:
         raise TenantAccessDenied("requested tenant does not match authenticated tenant")
-    return resolve_active_context(session, claims.sub, claims.tenant_id)
+    return resolve_active_context(session, claims.sub, claims.tenant_id, auth_source=claims.auth_source, oidc_subject=claims.oidc_subject, oidc_issuer=claims.oidc_issuer)

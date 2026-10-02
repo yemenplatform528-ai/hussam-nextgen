@@ -3,7 +3,7 @@ from app.core.models.core import TenantMembership, User, Tenant
 from app.core.models.governance import MembershipRole, Role
 from app.core.security.context import RequestContext, TenantAccessDenied
 
-def resolve_active_context(session, user_id: str, tenant_id: int) -> RequestContext:
+def resolve_active_context(session, user_id: str, tenant_id: int, *, auth_source: str | None = None, oidc_subject: str | None = None, oidc_issuer: str | None = None) -> RequestContext:
     user = session.scalar(select(User).where(User.id == str(user_id), User.active.is_(True)))
     tenant = session.scalar(select(Tenant).where(Tenant.id == tenant_id, Tenant.status == "active"))
     membership = session.scalar(select(TenantMembership).where(
@@ -25,4 +25,5 @@ def resolve_active_context(session, user_id: str, tenant_id: int) -> RequestCont
     role = role or next((code for code in role_codes if code in {"owner", "admin"}), None)
     role = role or (role_codes[0] if role_codes else (membership.role or "member"))
     return RequestContext(user_id=str(user_id), tenant_id=tenant_id,
-                          membership_id=membership.id, role=role)
+                          membership_id=membership.id, role=role,
+                          auth_source=auth_source, oidc_subject=oidc_subject, oidc_issuer=oidc_issuer)

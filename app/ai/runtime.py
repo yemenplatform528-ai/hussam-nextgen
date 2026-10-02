@@ -27,13 +27,17 @@ def propose_action(db: Session, tenant_id:int, actor_id:str, run_id:str, tool_co
     action=AIAction(id=str(uuid4()),tenant_id=tenant_id,run_id=run_id,tool_code=tool_code,risk=tool.risk,arguments=arguments,status='approved' if tool.risk==READ else 'pending_approval')
     db.add(action); run.status='waiting_approval' if tool.risk != READ else 'running'; _event(db,tenant_id,'ai.action.proposed',action.id,{'run_id':run_id,'tool':tool_code,'risk':tool.risk}); db.commit(); return action
 
-def approve_action(db:Session,tenant_id:int,actor_id:str,action_id:str):
+def approve_action(db:Session,tenant_id:int,actor_id:str,action_id:str, *, auth_source:str|None=None, oidc_subject:str|None=None, oidc_issuer:str|None=None):
     action=db.scalar(select(AIAction).where(AIAction.id==action_id,AIAction.tenant_id==tenant_id).with_for_update())
     if not action: raise AIError('AI action not found in tenant')
     if action.status!='pending_approval': raise AIError('AI action is not awaiting approval')
     action.status='approved'; action.approved_by=actor_id
+    action.approval_provenance={'auth_source':auth_source,'oidc_subject':oidc_subject,'oidc_issuer':oidc_issuer}
     run=db.scalar(select(AIRun).where(AIRun.id==action.run_id,AIRun.tenant_id==tenant_id)); run.status='approved' if run else 'approved'
-    _event(db,tenant_id,'ai.action.approved',action.id,{'approved_by':actor_id}); db.commit(); return action
+    _event(db,tenant_id,'ai.action.approved',action.id,{'approved_by':actor_id,'auth_source':auth_source,'oidc_subject':oidc_subject,'oidc_issuer':oidc_issuer})
+    from app.ai.foundation import trace
+    trace(db,tenant_id,action.run_id,'AUTHORIZATION','HUMAN_APPROVAL_ACCEPTED',{'action_id':action.id,'approver_id':actor_id,'auth_source':auth_source,'oidc_subject':oidc_subject,'oidc_issuer':oidc_issuer})
+    db.commit(); return action
 
 def complete_read_action(db:Session,tenant_id:int,action_id:str,result:dict):
     action=db.scalar(select(AIAction).where(AIAction.id==action_id,AIAction.tenant_id==tenant_id).with_for_update())

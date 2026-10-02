@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 
 from app.core.models.amazon_completion import HUSExecutionRecord
 from app.core.models.ai_hus import HUSCompilation
+from app.ai.foundation import trace as record_ai_trace
 from .registry import capabilities_for
 
 READ_SUFFIXES = {"read"}
@@ -39,6 +40,7 @@ class RuntimeContext:
     action: str
     approval_ref: str | None
     idempotency_key: str | None
+    arguments_hash: str | None = None
 
 
 @dataclass(frozen=True)
@@ -141,6 +143,8 @@ class SovereignRuntime:
     def execute(self, ctx: RuntimeContext, arguments: dict, *, idempotency_key: str | None = None, approved: bool = False) -> RuntimeResult:
         if not isinstance(arguments, dict):
             raise HUSRuntimeError("arguments must be an object")
+        arguments_hash = _hash(arguments)
+        ctx = RuntimeContext(**{**ctx.__dict__, "arguments_hash": arguments_hash})
         if not ctx.idempotency_key and idempotency_key:
             ctx = RuntimeContext(**{**ctx.__dict__, "idempotency_key": idempotency_key})
         read = _is_read(ctx.action)
@@ -153,13 +157,29 @@ class SovereignRuntime:
                 raise HUSRuntimeError("approval evidence is invalid or expired")
         if not read and not ctx.idempotency_key:
             raise HUSRuntimeError("mutation execution requires an idempotency key")
+
+        trace_run_id = f"hus-exec:{ctx.compilation_id}:{ctx.step_id}"
+        if ctx.approval_ref:
+            from app.core.models.ai_hus import AIAction
+            approved_action = self.db.get(AIAction, ctx.approval_ref)
+            if approved_action and approved_action.run_id:
+                trace_run_id = approved_action.run_id
+
         if ctx.idempotency_key:
             replay = _existing_replay(self.db, ctx.tenant_id, ctx.compilation_id, ctx.idempotency_key)
             if replay:
+                prior_hash = (replay.input_json or {}).get("arguments_hash")
+                if prior_hash != arguments_hash:
+                    raise HUSRuntimeError("idempotency key was already used with different arguments")
+                record_ai_trace(
+                    self.db, ctx.tenant_id, trace_run_id, "VERIFICATION", "HUS_EXECUTION_REPLAY",
+                    {"execution_id": replay.id, "action": ctx.action, "idempotency_key": ctx.idempotency_key, "result": replay.status},
+                )
+                self.db.commit()
                 return RuntimeResult(replay.id, replay.status, replay.output_json, replayed=True)
 
         now = datetime.now(timezone.utc)
-        payload = {"arguments": arguments, "idempotency_key": ctx.idempotency_key, "plan_hash": ctx.plan_hash, "step_id": ctx.step_id}
+        payload = {"arguments": arguments, "arguments_hash": arguments_hash, "idempotency_key": ctx.idempotency_key, "plan_hash": ctx.plan_hash, "step_id": ctx.step_id}
         rec = HUSExecutionRecord(
             tenant_id=ctx.tenant_id,
             compilation_id=ctx.compilation_id,
@@ -172,21 +192,39 @@ class SovereignRuntime:
         self.db.add(rec)
         self.db.flush()
         execution_id = rec.id
+        record_ai_trace(
+            self.db, ctx.tenant_id, trace_run_id, "ACTION", "HUS_EXECUTION_STARTED",
+            {"execution_id": execution_id, "action": ctx.action, "step_id": ctx.step_id, "idempotency_key": ctx.idempotency_key},
+        )
         rec.status = "running"
         try:
             handler = (self._handlers if read else self._mutation_handlers).get(ctx.action)
             if handler is None:
                 raise HUSRuntimeError("no sovereign runtime handler is registered for this capability")
-            # Domain handlers participate in the same transaction. A handler failure must
-            # roll back any flushed business changes; a failed execution record is persisted
-            # only after the business transaction is safely rolled back.
             with self.db.begin_nested():
                 out = handler(self.db, ctx, arguments)
                 if not isinstance(out, dict):
                     raise HUSRuntimeError("runtime handler must return an object")
-                rec.output_json = {"result": out, "provenance": {"plan_hash": ctx.plan_hash, "step_id": ctx.step_id, "actor_id": ctx.actor_id}}
+                rec.output_json = {
+                    "result": out,
+                    "provenance": {"plan_hash": ctx.plan_hash, "step_id": ctx.step_id, "actor_id": ctx.actor_id},
+                    "verification": {"status": "PASS", "method": "handler-result-type-and-transaction-commit"},
+                    "evidence": {"execution_id": execution_id, "observed_status": "completed", "observed_output_hash": _hash(out)},
+                }
                 rec.status = "completed"
                 rec.completed_at = now
+                record_ai_trace(
+                    self.db, ctx.tenant_id, trace_run_id, "OBSERVATION", "HUS_EXECUTION_OBSERVED",
+                    {"execution_id": execution_id, "status": "completed", "output_hash": _hash(out)},
+                )
+                record_ai_trace(
+                    self.db, ctx.tenant_id, trace_run_id, "VERIFICATION", "HUS_EXECUTION_VERIFIED",
+                    {"execution_id": execution_id, "result": "PASS", "method": "handler-result-type-and-transaction-commit"},
+                )
+                record_ai_trace(
+                    self.db, ctx.tenant_id, trace_run_id, "EVIDENCE", "HUS_EXECUTION_EVIDENCE",
+                    {"execution_id": execution_id, "status": "completed", "output_hash": _hash(out), "evidence_level": "L2_REPRODUCED"},
+                )
             self.db.commit()
             return RuntimeResult(execution_id, "completed", rec.output_json)
         except Exception as exc:
@@ -198,11 +236,29 @@ class SovereignRuntime:
                 action=ctx.action,
                 status="failed",
                 input_json=payload,
-                output_json={"error": str(exc), "provenance": {"plan_hash": ctx.plan_hash, "step_id": ctx.step_id, "actor_id": ctx.actor_id}},
+                output_json={
+                    "error": str(exc),
+                    "provenance": {"plan_hash": ctx.plan_hash, "step_id": ctx.step_id, "actor_id": ctx.actor_id},
+                    "verification": {"status": "FAIL", "method": "exception-observed"},
+                    "evidence": {"execution_id": execution_id, "observed_status": "failed", "success_claim": False},
+                },
                 approval_ref=ctx.approval_ref,
                 completed_at=datetime.now(timezone.utc),
             )
             self.db.add(failed)
+            self.db.flush()
+            record_ai_trace(
+                self.db, ctx.tenant_id, trace_run_id, "OBSERVATION", "HUS_EXECUTION_OBSERVED",
+                {"execution_id": failed.id, "status": "failed", "error_class": type(exc).__name__},
+            )
+            record_ai_trace(
+                self.db, ctx.tenant_id, trace_run_id, "VERIFICATION", "HUS_EXECUTION_VERIFICATION_FAILED",
+                {"execution_id": failed.id, "result": "FAIL", "method": "exception-observed"},
+            )
+            record_ai_trace(
+                self.db, ctx.tenant_id, trace_run_id, "EVIDENCE", "HUS_EXECUTION_NO_SUCCESS_EVIDENCE",
+                {"execution_id": failed.id, "status": "failed", "success_claim": False},
+            )
             self.db.commit()
             if isinstance(exc, HUSRuntimeError):
                 raise

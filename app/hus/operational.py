@@ -44,6 +44,10 @@ def execute_compiled_action(db: Session, tenant_id: int, actor_id: str, compilat
     if len(matches) != 1:
         raise HUSRuntimeError('action must resolve to exactly one compiled execution step')
     runtime=SovereignRuntime(db)
+    from app.hus.approval import verify_ai_action_approval
+    from app.hus.bindings import register_production_bindings
+    register_production_bindings(runtime)
+    runtime.configure_approval_verifier(verify_ai_action_approval)
     if action == 'marketplace.marketplace.read':
         def handler(db, ctx, args):
             from app.ai.tools import execute_read_tool

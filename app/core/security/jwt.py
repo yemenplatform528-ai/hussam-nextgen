@@ -14,6 +14,9 @@ class TokenClaims:
     tenant_id: int
     exp: int
     issuer: str | None = None
+    auth_source: str | None = None
+    oidc_subject: str | None = None
+    oidc_issuer: str | None = None
 
 def _b64decode(value: str) -> bytes:
     return base64.urlsafe_b64decode(value + "=" * (-len(value) % 4))
@@ -48,6 +51,6 @@ def decode_hs256(token: str, secret: str, *, now: int | None = None) -> TokenCla
         exp = int(data["exp"])
         if exp <= int(time.time() if now is None else now):
             raise InvalidToken("token expired")
-        return TokenClaims(sub=sub, tenant_id=tenant_id, exp=exp, issuer=data.get("iss"))
+        return TokenClaims(sub=sub, tenant_id=tenant_id, exp=exp, issuer=data.get("iss"), auth_source=data.get("auth_source"), oidc_subject=data.get("oidc_subject"), oidc_issuer=data.get("oidc_issuer"))
     except (KeyError, ValueError, TypeError, json.JSONDecodeError):
         raise InvalidToken("malformed token")

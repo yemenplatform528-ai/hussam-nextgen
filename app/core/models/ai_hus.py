@@ -46,6 +46,7 @@ class AIAction(Base):
     status: Mapped[str] = mapped_column(String(30), nullable=False, default='proposed')
     result: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     approved_by: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    approval_provenance: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, nullable=False)
 
 class HUSCompilation(Base):
