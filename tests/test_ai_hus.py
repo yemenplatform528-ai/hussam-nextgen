@@ -9,11 +9,42 @@ import pytest
 
 @pytest.fixture
 def db():
-    _, factory = make_session_factory(); return factory()
+    _, factory = make_session_factory()
+    return factory()
 
 def seed(db, tenant_id=1):
-    db.add(Tenant(id=tenant_id,name='T',status='active')); db.add(User(id='u1',email='u@example.com',active=True)); db.add(TenantMembership(user_id='u1',tenant_id=tenant_id,role='admin',active=True));
-    db.add(HUSCompilation(id='c1',tenant_id=tenant_id,actor_id='u1',spec_version='1.0',source_hash='s'*64,contract_hash='p'*64,status='active',contract={'execution_plan':{'workflows':[{'code':'w','steps':[{'id':'w.adjust','action':{'engine':'stock','capability':'adjust'},'risk':'mutation','idempotency_required':True}]}]}}})); db.commit()
+    db.add(Tenant(id=tenant_id, name='T', status='active'))
+    db.add(User(id='u1', email='u@example.com', active=True))
+    db.add(TenantMembership(user_id='u1', tenant_id=tenant_id, role='admin', active=True))
+    db.add(
+        HUSCompilation(
+            id='c1',
+            tenant_id=tenant_id,
+            actor_id='u1',
+            spec_version='1.0',
+            source_hash='s' * 64,
+            contract_hash='p' * 64,
+            status='active',
+            contract={
+                'execution_plan': {
+                    'workflows': [
+                        {
+                            'code': 'w',
+                            'steps': [
+                                {
+                                    'id': 'w.adjust',
+                                    'action': {'engine': 'stock', 'capability': 'adjust'},
+                                    'risk': 'mutation',
+                                    'idempotency_required': True,
+                                }
+                            ],
+                        }
+                    ]
+                }
+            },
+        )
+    )
+    db.commit()
 
 def test_hus_is_deterministic():
     spec={'spec_version':'1.0','organization':{'code':'shop','name':'Shop'},'domains':[{'code':'retail','name':'Retail','engine':'retail'}],'workflows':[{'code':'sale','trigger':'sale.created','steps':[{'code':'confirm','action':'commerce.confirm','requires_approval':False}]}]}
