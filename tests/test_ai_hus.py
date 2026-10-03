@@ -12,7 +12,7 @@ def db():
     _, factory = make_session_factory(); return factory()
 
 def seed(db, tenant_id=1):
-    db.add(Tenant(id=tenant_id,name='T',status='active')); db.add(User(id='u1',email='u@example.com',active=True)); db.add(TenantMembership(user_id='u1',tenant_id=tenant_id,role='admin',active=True)); db.commit()
+    db.add(Tenant(id=tenant_id,name='T',status='active')); db.add(User(id='u1',email='u@example.com',active=True)); db.add(TenantMembership(user_id='u1',tenant_id=tenant_id,role='admin',active=True));\n    db.add(HUSCompilation(id='c1',tenant_id=tenant_id,actor_id='u1',spec_version='1.0',source_hash='s'*64,contract_hash='p'*64,status='active',contract={'execution_plan':{'workflows':[{'code':'w','steps':[{'id':'w.adjust','action':{'engine':'stock','capability':'adjust'},'risk':'mutation','idempotency_required':True}]}]}}})); db.commit()
 
 def test_hus_is_deterministic():
     spec={'spec_version':'1.0','organization':{'code':'shop','name':'Shop'},'domains':[{'code':'retail','name':'Retail','engine':'retail'}],'workflows':[{'code':'sale','trigger':'sale.created','steps':[{'code':'confirm','action':'commerce.confirm','requires_approval':False}]}]}
@@ -62,7 +62,7 @@ def test_ai_mutation_internal_execution_fails_closed(db):
     db.add(AIToolDefinition(tenant_id=1,code='stock.adjust',name='Adjust',description='adjust',risk='mutation',input_schema={},enabled=True)); db.commit()
     run=create_run(db,1,'u1','test',{'x':1})
     action=propose_action(db,1,'u1',run.id,'stock.adjust',{'qty':1})
-    approve_action(db,1,'u1',action.id)
+    approve_action(db,1,'u1',action.id,compilation_id='c1',step_id='w.adjust',idempotency_key='ai-test-2')
     from app.ai.runtime import execute_approved_mutation
     with pytest.raises(AIError, match='governed HUS runtime'):
         execute_approved_mutation(db,1,'u1',action.id,approval_ref='fake')
