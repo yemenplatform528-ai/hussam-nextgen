@@ -72,9 +72,9 @@ def test_idempotency_collision_cannot_cross_step():
     assert first.status=="completed"
 
     other=RuntimeContext(tenant_id=1,actor_id="actor-1",compilation_id="c1",plan_hash="p"*64,
-                          step_id="w.other",action="commerce.sales.update",approval_ref="approval-1",
+                          step_id="w.other",action="commerce.sales.create",approval_ref="approval-1",
                           idempotency_key="idem-1")
-    runtime.register_mutation_handler("commerce.sales.update", lambda db, ctx, args: {"ok":"other"})
+    runtime.register_mutation_handler("commerce.sales.create", lambda db, ctx, args: {"ok":"same-action"})
     with pytest.raises(HUSRuntimeError, match="different execution intent"):
         runtime.execute(other, {"reference":"bound","currency":"YER","lines":[]}, approved=True)
 
