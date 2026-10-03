@@ -108,6 +108,34 @@ def compile_spec(source: dict) -> dict:
         if x['enabled']:
             for cap in x['capabilities']: bindings.append({'domain':x['code'],'capability':cap})
     contract['bindings']=sorted(bindings,key=lambda x:(x['domain'],x['capability']))
+
+    # Emit the runtime-facing execution-plan contract from the same validated
+    # workflow definition. This keeps the legacy declarative contract compatible
+    # with SovereignRuntime without requiring a second compilation path.
+    execution_workflows=[]
+    for workflow in resolved_workflows:
+        execution_steps=[]
+        for step in workflow['steps']:
+            engine, capability = step['action'].split('.', 1)
+            is_read = capability == 'read' or capability.endswith('.read')
+            execution_steps.append({
+                'id': f"{workflow['code']}.{step['code']}",
+                'action': {'engine': engine, 'capability': capability},
+                'risk': 'read' if is_read else 'mutation',
+                'idempotency_required': not is_read,
+            })
+        execution_workflows.append({
+            'id': workflow['code'],
+            'code': workflow['code'],
+            'name': workflow['name'],
+            'trigger': workflow['trigger'],
+            'enabled': workflow['enabled'],
+            'steps': execution_steps,
+        })
+    contract['execution_plan'] = {
+        'workflows': sorted(execution_workflows, key=lambda x: x['code']),
+    }
+
     payload=canonical(contract)
     return {'stages':list(STAGES),'contract':contract,'source_hash':sha256(canonical(source).encode()).hexdigest(),'contract_hash':sha256(payload.encode()).hexdigest()}
 
