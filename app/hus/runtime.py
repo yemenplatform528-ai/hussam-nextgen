@@ -257,37 +257,28 @@ class SovereignRuntime:
             self.db.commit()
             return RuntimeResult(execution_id, "completed", rec.output_json)
         except Exception as exc:
-            self.db.rollback()
-            failed = HUSExecutionRecord(
-                tenant_id=ctx.tenant_id,
-                compilation_id=ctx.compilation_id,
-                actor_id=ctx.actor_id,
-                action=ctx.action,
-                idempotency_key=ctx.idempotency_key,
-                status="failed",
-                input_json=payload,
-                output_json={
-                    "error": str(exc),
-                    "provenance": {"plan_hash": ctx.plan_hash, "step_id": ctx.step_id, "actor_id": ctx.actor_id},
-                    "verification": {"status": "FAIL", "method": "exception-observed"},
-                    "evidence": {"execution_id": execution_id, "observed_status": "failed", "success_claim": False},
-                },
-                approval_ref=ctx.approval_ref,
-                completed_at=datetime.now(timezone.utc),
-            )
-            self.db.add(failed)
-            self.db.flush()
+            # The execution record is created before the domain handler. Keep that
+            # durable record and mark it failed; do not insert a second row with
+            # the same idempotency identity after the handler transaction rolls back.
+            rec.status = "failed"
+            rec.output_json = {
+                "error": str(exc),
+                "provenance": {"plan_hash": ctx.plan_hash, "step_id": ctx.step_id, "actor_id": ctx.actor_id},
+                "verification": {"status": "FAIL", "method": "exception-observed"},
+                "evidence": {"execution_id": execution_id, "observed_status": "failed", "success_claim": False},
+            }
+            rec.completed_at = datetime.now(timezone.utc)
             record_ai_trace(
                 self.db, ctx.tenant_id, trace_run_id, "OBSERVATION", "HUS_EXECUTION_OBSERVED",
-                {"execution_id": failed.id, "status": "failed", "error_class": type(exc).__name__},
+                {"execution_id": execution_id, "status": "failed", "error_class": type(exc).__name__},
             )
             record_ai_trace(
                 self.db, ctx.tenant_id, trace_run_id, "VERIFICATION", "HUS_EXECUTION_VERIFICATION_FAILED",
-                {"execution_id": failed.id, "result": "FAIL", "method": "exception-observed"},
+                {"execution_id": execution_id, "result": "FAIL", "method": "exception-observed"},
             )
             record_ai_trace(
                 self.db, ctx.tenant_id, trace_run_id, "EVIDENCE", "HUS_EXECUTION_NO_SUCCESS_EVIDENCE",
-                {"execution_id": failed.id, "status": "failed", "success_claim": False},
+                {"execution_id": execution_id, "status": "failed", "success_claim": False},
             )
             self.db.commit()
             if isinstance(exc, HUSRuntimeError):
