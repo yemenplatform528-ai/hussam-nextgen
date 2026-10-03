@@ -48,3 +48,24 @@ def test_registered_capability_without_handler_fails_closed():
     s=db(); active(s); r=SovereignRuntime(s)
     with pytest.raises(HUSRuntimeError, match='handler'):
         r.execute_step(1,'u','c1','w.read',{})
+
+
+def test_mutation_idempotency_replay_does_not_invoke_handler_twice():
+    s=db(); active(s); r=SovereignRuntime(s)
+    calls=[]
+    r.register_mutation_handler('commerce.sales.create', lambda db,ctx,args: calls.append(args) or {'ok': True, 'n': len(calls)})
+    r.configure_approval_verifier(lambda db,ctx: ctx.approval_ref == 'ap1')
+    first=r.execute_step(1,'u','c1','w.write',{'x':1}, approved=True, approval_ref='ap1', idempotency_key='m1')
+    second=r.execute_step(1,'u','c1','w.write',{'x':1}, approved=True, approval_ref='ap1', idempotency_key='m1')
+    assert first.status=='completed'
+    assert second.replayed is True and second.execution_id==first.execution_id
+    assert len(calls)==1
+
+
+def test_mutation_idempotency_rejects_different_arguments():
+    s=db(); active(s); r=SovereignRuntime(s)
+    r.register_mutation_handler('commerce.sales.create', lambda db,ctx,args: {'ok': True})
+    r.configure_approval_verifier(lambda db,ctx: True)
+    r.execute_step(1,'u','c1','w.write',{'x':1}, approved=True, approval_ref='ap1', idempotency_key='m1')
+    with pytest.raises(HUSRuntimeError, match='different arguments'):
+        r.execute_step(1,'u','c1','w.write',{'x':2}, approved=True, approval_ref='ap1', idempotency_key='m1')

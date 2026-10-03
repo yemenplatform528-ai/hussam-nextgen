@@ -14,6 +14,7 @@ import json
 from typing import Callable
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.models.amazon_completion import HUSExecutionRecord
@@ -91,14 +92,11 @@ def _active_compilation(db: Session, tenant_id: int, compilation_id: str) -> HUS
 
 
 def _existing_replay(db: Session, tenant_id: int, compilation_id: str, idempotency_key: str) -> HUSExecutionRecord | None:
-    rows = db.scalars(select(HUSExecutionRecord).where(
+    return db.scalar(select(HUSExecutionRecord).where(
         HUSExecutionRecord.tenant_id == tenant_id,
         HUSExecutionRecord.compilation_id == compilation_id,
-    )).all()
-    for row in rows:
-        if isinstance(row.input_json, dict) and row.input_json.get("idempotency_key") == idempotency_key:
-            return row
-    return None
+        HUSExecutionRecord.idempotency_key == idempotency_key,
+    ))
 
 
 class SovereignRuntime:
@@ -185,12 +183,28 @@ class SovereignRuntime:
             compilation_id=ctx.compilation_id,
             actor_id=ctx.actor_id,
             action=ctx.action,
+            idempotency_key=ctx.idempotency_key,
             status="approved" if approved else "authorized",
             input_json=payload,
             approval_ref=ctx.approval_ref,
         )
         self.db.add(rec)
-        self.db.flush()
+        try:
+            self.db.flush()
+        except IntegrityError:
+            self.db.rollback()
+            replay = _existing_replay(self.db, ctx.tenant_id, ctx.compilation_id, ctx.idempotency_key) if ctx.idempotency_key else None
+            if replay is None:
+                raise
+            prior_hash = (replay.input_json or {}).get("arguments_hash")
+            if prior_hash != arguments_hash:
+                raise HUSRuntimeError("idempotency key was already used with different arguments")
+            record_ai_trace(
+                self.db, ctx.tenant_id, trace_run_id, "VERIFICATION", "HUS_EXECUTION_REPLAY",
+                {"execution_id": replay.id, "action": ctx.action, "idempotency_key": ctx.idempotency_key, "result": replay.status, "race_recovered": True},
+            )
+            self.db.commit()
+            return RuntimeResult(replay.id, replay.status, replay.output_json, replayed=True)
         execution_id = rec.id
         record_ai_trace(
             self.db, ctx.tenant_id, trace_run_id, "ACTION", "HUS_EXECUTION_STARTED",
@@ -234,6 +248,7 @@ class SovereignRuntime:
                 compilation_id=ctx.compilation_id,
                 actor_id=ctx.actor_id,
                 action=ctx.action,
+                idempotency_key=ctx.idempotency_key,
                 status="failed",
                 input_json=payload,
                 output_json={

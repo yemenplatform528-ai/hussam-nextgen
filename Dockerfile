@@ -5,6 +5,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libpcre2-8-0 \
+    && rm -rf /var/lib/apt/lists/*
+
 RUN addgroup --system hussam && adduser --system --ingroup hussam hussam
 
 COPY pyproject.toml requirements.lock README.md ./
