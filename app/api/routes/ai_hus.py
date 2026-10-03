@@ -18,7 +18,11 @@ def developer_guard(ctx):
         raise HTTPException(status_code=403, detail='developer or tenant administrator role required')
 class RunIn(BaseModel): purpose:str=Field(min_length=1,max_length=200); payload:dict={}; model:str|None=None
 class ActionIn(BaseModel): run_id:str; tool_code:str; arguments:dict={}
-class ApprovalIn(BaseModel): action_id:str
+class ApprovalIn(BaseModel):
+    action_id:str
+    compilation_id:str|None=None
+    step_id:str|None=None
+    idempotency_key:str|None=None
 class ToolIn(BaseModel): code:str; name:str; description:str; risk:str='read'; input_schema:dict={}
 class CompileIn(BaseModel): spec:dict
 
@@ -45,9 +49,9 @@ def action(body:ActionIn,ctx=Depends(get_context),db=Depends(get_session)):
     return {'id':x.id,'status':x.status,'risk':x.risk,'tool_code':x.tool_code}
 
 @router.post('/ai/actions/{action_id}/approve')
-def approve(action_id:str,ctx=Depends(get_context),db=Depends(get_session)):
+def approve(action_id:str,body:ApprovalIn,ctx=Depends(get_context),db=Depends(get_session)):
     developer_guard(ctx)
-    x=approve_action(db,ctx.tenant_id,ctx.user_id,action_id,auth_source=ctx.auth_source,oidc_subject=ctx.oidc_subject,oidc_issuer=ctx.oidc_issuer); return {'id':x.id,'status':x.status,'approved_by':x.approved_by}
+    x=approve_action(db,ctx.tenant_id,ctx.user_id,action_id,compilation_id=body.compilation_id,step_id=body.step_id,idempotency_key=body.idempotency_key,auth_source=ctx.auth_source,oidc_subject=ctx.oidc_subject,oidc_issuer=ctx.oidc_issuer); return {'id':x.id,'status':x.status,'approved_by':x.approved_by}
 
 @router.post('/ai/actions/{action_id}/execute')
 def execute(action_id:str,ctx=Depends(get_context),db=Depends(get_session)):
