@@ -91,12 +91,20 @@ def _active_compilation(db: Session, tenant_id: int, compilation_id: str) -> HUS
     return x
 
 
-def _existing_replay(db: Session, tenant_id: int, compilation_id: str, idempotency_key: str) -> HUSExecutionRecord | None:
-    return db.scalar(select(HUSExecutionRecord).where(
-        HUSExecutionRecord.tenant_id == tenant_id,
-        HUSExecutionRecord.compilation_id == compilation_id,
-        HUSExecutionRecord.idempotency_key == idempotency_key,
+def _existing_replay(db: Session, ctx: RuntimeContext) -> HUSExecutionRecord | None:
+    replay = db.scalar(select(HUSExecutionRecord).where(
+        HUSExecutionRecord.tenant_id == ctx.tenant_id,
+        HUSExecutionRecord.compilation_id == ctx.compilation_id,
+        HUSExecutionRecord.idempotency_key == ctx.idempotency_key,
+        HUSExecutionRecord.actor_id == ctx.actor_id,
+        HUSExecutionRecord.action == ctx.action,
     ))
+    if replay is None:
+        return None
+    payload = replay.input_json or {}
+    if payload.get("step_id") != ctx.step_id or payload.get("plan_hash") != ctx.plan_hash:
+        raise HUSRuntimeError("idempotency key is bound to a different execution intent")
+    return replay
 
 
 class SovereignRuntime:
@@ -164,7 +172,7 @@ class SovereignRuntime:
                 trace_run_id = approved_action.run_id
 
         if ctx.idempotency_key:
-            replay = _existing_replay(self.db, ctx.tenant_id, ctx.compilation_id, ctx.idempotency_key)
+            replay = _existing_replay(self.db, ctx)
             if replay:
                 prior_hash = (replay.input_json or {}).get("arguments_hash")
                 if prior_hash != arguments_hash:
