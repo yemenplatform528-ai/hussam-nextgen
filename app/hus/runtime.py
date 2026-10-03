@@ -91,12 +91,20 @@ def _active_compilation(db: Session, tenant_id: int, compilation_id: str) -> HUS
     return x
 
 
-def _existing_replay(db: Session, tenant_id: int, compilation_id: str, idempotency_key: str) -> HUSExecutionRecord | None:
-    return db.scalar(select(HUSExecutionRecord).where(
-        HUSExecutionRecord.tenant_id == tenant_id,
-        HUSExecutionRecord.compilation_id == compilation_id,
-        HUSExecutionRecord.idempotency_key == idempotency_key,
+def _existing_replay(db: Session, ctx: RuntimeContext) -> HUSExecutionRecord | None:
+    replay = db.scalar(select(HUSExecutionRecord).where(
+        HUSExecutionRecord.tenant_id == ctx.tenant_id,
+        HUSExecutionRecord.compilation_id == ctx.compilation_id,
+        HUSExecutionRecord.idempotency_key == ctx.idempotency_key,
+        HUSExecutionRecord.actor_id == ctx.actor_id,
+        HUSExecutionRecord.action == ctx.action,
     ))
+    if replay is None:
+        return None
+    payload = replay.input_json or {}
+    if payload.get("step_id") != ctx.step_id or payload.get("plan_hash") != ctx.plan_hash:
+        raise HUSRuntimeError("idempotency key is bound to a different execution intent")
+    return replay
 
 
 class SovereignRuntime:
@@ -164,7 +172,7 @@ class SovereignRuntime:
                 trace_run_id = approved_action.run_id
 
         if ctx.idempotency_key:
-            replay = _existing_replay(self.db, ctx.tenant_id, ctx.compilation_id, ctx.idempotency_key)
+            replay = _existing_replay(self.db, ctx)
             if replay:
                 prior_hash = (replay.input_json or {}).get("arguments_hash")
                 if prior_hash != arguments_hash:
@@ -188,15 +196,22 @@ class SovereignRuntime:
             input_json=payload,
             approval_ref=ctx.approval_ref,
         )
-        self.db.add(rec)
         try:
-            self.db.flush()
+            with self.db.begin_nested():
+                self.db.add(rec)
+                self.db.flush()
         except IntegrityError:
-            self.db.rollback()
-            replay = _existing_replay(self.db, ctx.tenant_id, ctx.compilation_id, ctx.idempotency_key) if ctx.idempotency_key else None
+            replay = self.db.scalar(select(HUSExecutionRecord).where(
+                HUSExecutionRecord.tenant_id == ctx.tenant_id,
+                HUSExecutionRecord.compilation_id == ctx.compilation_id,
+                HUSExecutionRecord.idempotency_key == ctx.idempotency_key,
+            ))
             if replay is None:
                 raise
-            prior_hash = (replay.input_json or {}).get("arguments_hash")
+            payload = replay.input_json or {}
+            if replay.actor_id != ctx.actor_id or replay.action != ctx.action or payload.get("step_id") != ctx.step_id or payload.get("plan_hash") != ctx.plan_hash:
+                raise HUSRuntimeError("idempotency key is bound to a different execution intent")
+            prior_hash = payload.get("arguments_hash")
             if prior_hash != arguments_hash:
                 raise HUSRuntimeError("idempotency key was already used with different arguments")
             record_ai_trace(
@@ -242,37 +257,28 @@ class SovereignRuntime:
             self.db.commit()
             return RuntimeResult(execution_id, "completed", rec.output_json)
         except Exception as exc:
-            self.db.rollback()
-            failed = HUSExecutionRecord(
-                tenant_id=ctx.tenant_id,
-                compilation_id=ctx.compilation_id,
-                actor_id=ctx.actor_id,
-                action=ctx.action,
-                idempotency_key=ctx.idempotency_key,
-                status="failed",
-                input_json=payload,
-                output_json={
-                    "error": str(exc),
-                    "provenance": {"plan_hash": ctx.plan_hash, "step_id": ctx.step_id, "actor_id": ctx.actor_id},
-                    "verification": {"status": "FAIL", "method": "exception-observed"},
-                    "evidence": {"execution_id": execution_id, "observed_status": "failed", "success_claim": False},
-                },
-                approval_ref=ctx.approval_ref,
-                completed_at=datetime.now(timezone.utc),
-            )
-            self.db.add(failed)
-            self.db.flush()
+            # The execution record is created before the domain handler. Keep that
+            # durable record and mark it failed; do not insert a second row with
+            # the same idempotency identity after the handler transaction rolls back.
+            rec.status = "failed"
+            rec.output_json = {
+                "error": str(exc),
+                "provenance": {"plan_hash": ctx.plan_hash, "step_id": ctx.step_id, "actor_id": ctx.actor_id},
+                "verification": {"status": "FAIL", "method": "exception-observed"},
+                "evidence": {"execution_id": execution_id, "observed_status": "failed", "success_claim": False},
+            }
+            rec.completed_at = datetime.now(timezone.utc)
             record_ai_trace(
                 self.db, ctx.tenant_id, trace_run_id, "OBSERVATION", "HUS_EXECUTION_OBSERVED",
-                {"execution_id": failed.id, "status": "failed", "error_class": type(exc).__name__},
+                {"execution_id": execution_id, "status": "failed", "error_class": type(exc).__name__},
             )
             record_ai_trace(
                 self.db, ctx.tenant_id, trace_run_id, "VERIFICATION", "HUS_EXECUTION_VERIFICATION_FAILED",
-                {"execution_id": failed.id, "result": "FAIL", "method": "exception-observed"},
+                {"execution_id": execution_id, "result": "FAIL", "method": "exception-observed"},
             )
             record_ai_trace(
                 self.db, ctx.tenant_id, trace_run_id, "EVIDENCE", "HUS_EXECUTION_NO_SUCCESS_EVIDENCE",
-                {"execution_id": failed.id, "status": "failed", "success_claim": False},
+                {"execution_id": execution_id, "status": "failed", "success_claim": False},
             )
             self.db.commit()
             if isinstance(exc, HUSRuntimeError):
