@@ -1,7 +1,7 @@
 from uuid import uuid4
 from app.ai.runtime import create_run, propose_action, approve_action, AIError
 from app.hus.compiler import compile_spec, HUSCompileError
-from app.core.models.ai_hus import AIToolDefinition, AIRun, AIAction
+from app.core.models.ai_hus import AIToolDefinition, AIRun, AIAction, HUSCompilation
 from app.core.models.core import Tenant, User, TenantMembership
 from app.core.persistence import make_session_factory
 
@@ -30,7 +30,7 @@ def test_ai_mutation_requires_approval(db):
     run=create_run(db,1,'u1','test',{'x':1})
     action=propose_action(db,1,'u1',run.id,'stock.adjust',{'qty':1})
     assert action.status=='pending_approval'
-    approve_action(db,1,'u1',action.id)
+    approve_action(db,1,'u1',action.id,compilation_id='c1',step_id='w.adjust',idempotency_key='ai-test-1')
     assert db.get(AIAction,action.id).status=='approved'
 
 def test_ai_cross_tenant_action_denied(db):
