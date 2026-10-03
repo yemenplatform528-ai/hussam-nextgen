@@ -9,7 +9,7 @@ from app.core.models.amazon_completion import HUSExecutionRecord
 from app.core.models.ai_foundation import AITraceEvent
 from app.core.persistence import Base
 from app.hus.operational import execute_compiled_action
-from app.hus.runtime import HUSRuntimeError, SovereignRuntime
+from app.hus.runtime import HUSRuntimeError, SovereignRuntime, _hash
 
 
 def db():
@@ -24,7 +24,7 @@ def seed(s, *, approval_status="approved", approver_role="owner", approval_args=
     s.add(TenantMembership(user_id="owner-1", tenant_id=1, role=approver_role, active=True))
     s.add(OIDCIdentity(user_id="owner-1", issuer="https://issuer.example", subject="oidc-owner-1"))
     s.add(AIRun(id="run-1", tenant_id=1, actor_id="actor-1", purpose="test", status="approved", input_hash="h" * 64))
-    s.add(AIAction(id="approval-1", tenant_id=1, run_id="run-1", tool_code="commerce.sales.create", risk="mutation", arguments=approval_args or args(), status=approval_status, approved_by="owner-1", approval_provenance={"auth_source":"oidc","oidc_issuer":"https://issuer.example","oidc_subject":"oidc-owner-1"}))
+    approval_payload = approval_args or args()\n    s.add(AIAction(id="approval-1", tenant_id=1, run_id="run-1", tool_code="commerce.sales.create", risk="mutation", arguments=approval_payload, status=approval_status, approved_by="owner-1", approval_provenance={"auth_source":"oidc","oidc_issuer":"https://issuer.example","oidc_subject":"oidc-owner-1","execution_binding":{"compilation_id":"c1","step_id":"w.create","plan_hash":"p"*64,"action":"commerce.sales.create","idempotency_key":"idem-1","arguments_hash":_hash(approval_payload)}}))
     s.add(HUSCompilation(
         id="c1", tenant_id=1, actor_id="owner-1", spec_version="1.0",
         source_hash="s" * 64, contract_hash="p" * 64, status="active",
