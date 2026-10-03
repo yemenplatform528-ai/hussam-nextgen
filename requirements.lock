@@ -9,7 +9,7 @@ SQLAlchemy==2.0.50
 uvicorn==0.48.0
 # psycopg[binary] is intentionally installed from pyproject in CI because the
 # binary subdependency is platform-specific.
-PyJWT==2.13.0
+PyJWT==2.15.0
 cryptography==50.0.1
 
 redis==6.4.0
