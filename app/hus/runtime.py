@@ -196,15 +196,22 @@ class SovereignRuntime:
             input_json=payload,
             approval_ref=ctx.approval_ref,
         )
-        self.db.add(rec)
         try:
-            self.db.flush()
+            with self.db.begin_nested():
+                self.db.add(rec)
+                self.db.flush()
         except IntegrityError:
-            self.db.rollback()
-            replay = _existing_replay(self.db, ctx.tenant_id, ctx.compilation_id, ctx.idempotency_key) if ctx.idempotency_key else None
+            replay = self.db.scalar(select(HUSExecutionRecord).where(
+                HUSExecutionRecord.tenant_id == ctx.tenant_id,
+                HUSExecutionRecord.compilation_id == ctx.compilation_id,
+                HUSExecutionRecord.idempotency_key == ctx.idempotency_key,
+            ))
             if replay is None:
                 raise
-            prior_hash = (replay.input_json or {}).get("arguments_hash")
+            payload = replay.input_json or {}
+            if replay.actor_id != ctx.actor_id or replay.action != ctx.action or payload.get("step_id") != ctx.step_id or payload.get("plan_hash") != ctx.plan_hash:
+                raise HUSRuntimeError("idempotency key is bound to a different execution intent")
+            prior_hash = payload.get("arguments_hash")
             if prior_hash != arguments_hash:
                 raise HUSRuntimeError("idempotency key was already used with different arguments")
             record_ai_trace(
