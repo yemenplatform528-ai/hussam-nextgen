@@ -22,7 +22,7 @@ jobs:
         shell: bash
         run: |
           set +e
-          code=$(curl -L --max-time 20 -sS -o /tmp/bridge.html -w "%{http_code}" https://yemen-intelligence-bridge.tiniestcloud.app)
+          code=$(curl -L --max-time 20 -sS -o /tmp/bridge.html -w "%{http_code}" https://yemen-intelligence-bridge--hosam.tiniestcloud.app)
           echo "http_code=$code" >> "$GITHUB_OUTPUT"
           if [ "$code" = "200" ]; then
             echo "reachable=true" >> "$GITHUB_OUTPUT"
