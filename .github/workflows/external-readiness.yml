@@ -17,7 +17,7 @@ jobs:
 
       - name: Probe public staging readiness
         env:
-          READINESS_URL: https://hussam-nextgen.fastapicloud.dev/ready
+          READINESS_URL: https://hussam-nextgen.fastapicloud.dev/ready?deep=true
         run: |
           set -eu
           mkdir -p evidence/external-readiness
