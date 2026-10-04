@@ -21,9 +21,9 @@
     {
       "name": "Basic Memory",
       "role": "durable knowledge",
-      "status": "verified",
+      "status": "READ_BLOCKED_CURRENTLY",
       "primary": false,
-      "replacement": "exported markdown knowledge bundle"
+      "replacement": "exported markdown knowledge bundle or alternate durable knowledge store"
     },
     {
       "name": "Neon",
