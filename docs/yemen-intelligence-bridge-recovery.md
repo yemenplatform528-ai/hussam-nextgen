@@ -1,18 +1,18 @@
 # Yemen Intelligence Bridge — External Recovery Pointer
 
 Status: recovery-copy
-Date: 2026-10-01
+Date: 2026-10-05
 Mission: Yemen is the purpose; AI is a capability layer.
 
 ## Primary continuity surface
-https://yemen-intelligence-bridge.tiniestcloud.app
+https://yemen-intelligence-bridge--hosam.tiniestcloud.app
 
 ## Recovery protocol
 UNDERSTAND → RESEARCH → PLAN → SELECT_CAPABILITIES → EXECUTE → VERIFY → RECORD → RECOVER → EVOLVE
 
 ## Verified recovery surfaces
 - Tiniest Cloud: external continuity bridge, machine-readable state, checkpoints, resume packet, heartbeat, recovery snapshot.
-- Basic Memory: durable capability/operating knowledge.
+- Basic Memory: durable capability/operating knowledge (current connector read access unavailable; do not treat as live-verified).
 - GitHub: versioned software/evidence and this independent recovery pointer.
 
 ## Current bridge state
