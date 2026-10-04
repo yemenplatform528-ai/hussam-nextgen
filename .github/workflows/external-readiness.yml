@@ -30,7 +30,7 @@ jobs:
           from datetime import datetime, timezone
 
           url = os.environ["READINESS_URL"]
-          req = urllib.request.Request(url, headers={"Accept": "application/json"})
+          req = urllib.request.Request(url, headers={"Accept": "application/json", "User-Agent": "hussam-nextgen-readiness/1"})
           started = time.time()
           status = None
           body = ""
