@@ -1,13 +1,14 @@
 # YIB Operational Truth — Single Active Line
 
-Recorded: 2026-10-05
+Recorded: 2026-10-06
 Operational rule: ONE ACTIVE LINE
-Live YIB baseline: Tiniest Cloud v30
+Live YIB baseline: Tiniest Cloud v33 (ACTIVE)
+Access: private / restricted
 Truth authority: live runtime evidence + readback
 
 ## Current verified state
 
-- system:truth-contract: schema 1.1 — present/readable.
+- Main repository head: 8b6b85ba734fc7c198083b8113934e8eebe65c10.
 - system:capability-registry-v2: schema 2.0 — present/readable.
 - system:runtime-capability: schema 2.1 — present/readable.
 - system:execution-state-machine: schema 1.0 — present/readable.
@@ -15,9 +16,12 @@ Truth authority: live runtime evidence + readback
 - system:substitution-contract: schema 1.0 — present/readable.
 - system:anti-drift-contract: schema 1.0 — present/readable.
 - system:portable-recovery-manifest: schema 1.0 — present/readable.
-- evidence:runtime-capability-test:1791158770635: verified local runtime execution and explicit external BLOCKED results.
-- evidence:reconciliation:1791158770104: verified reconciliation of legacy declarations against live runtime evidence.
-- recovery:YIB-KERNEL-001:0001: READY / checkpoint-preserved.
+- latest recorded runtime-capability test: 2026-10-05T01:52:40.518Z.
+- latest runtime evidence verifies tiny.ai=EXECUTABLE, tiny.db=EXECUTABLE, tiny.fetch=BOUNDED and the five external connections as BLOCKED.
+- current persisted system:truth-contract readback is schema 1.0 from the pre-v33 runtime self-test.
+- v33 source contains the corrected schema 1.1 truth-contract write path, but post-v33 execution/readback of that write is NOT independently verified.
+- recovery checkpoint is preserved; recovery state is resumable/route-ready.
+- high-risk approval remains WAITING; external execution remains disabled.
 
 ## Runtime truth
 
@@ -40,15 +44,19 @@ Recovery contract: PRESERVE → CHECKPOINT → SUBSTITUTE → VERIFY → RESUME 
 
 Automatic destructive restore is disabled.
 
+Provider substitution is required by the continuity contract. Real outage/failover execution is not yet independently verified.
+
 ## Human boundary
 
 High-risk writes and irreversible, financial, identity, legal, secret-bearing, or ownership-sensitive actions remain fail-closed and require human authority.
 
-## Known drift
+## External certification gates
 
-The live v30 source currently contains a UI label that says YIB v29. This is a source/UI truth-drift defect, not a reason to create a parallel operational release.
+G01–G10 remain open because their closure requires real external evidence, not code inspection alone. Browser E2E is not independently verified, current main CI status is NOT ASSERTED, Basic Memory connector read access is currently blocked, and legal/compliance decisions remain human-controlled.
 
-A corrective deployment was not claimed because the deployment/preview path was blocked by a security gate. The live operational baseline remains v30.
+## Recovery branch
+
+continuity/recovery-2026-10-01 remains a preserved recovery/historical branch. It is diverged from main and is not an active development line. It is not merged or deleted automatically.
 
 ## Single-line operating rule
 
