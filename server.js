@@ -9,6 +9,10 @@ fs.mkdirSync(data, { recursive: true });
 const stateFile = path.join(data, 'canonical.json');
 const chatFile = path.join(data, 'chat.jsonl');
 
+const MODEL_CONFIGURED = Boolean(process.env.OPENAI_API_KEY);
+const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-5.6-luna';
+const OPENAI_BASE_URL = (process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1').replace(/\\/$/, '');
+
 const defaultState = {
   schema: 'YIB-WORLD-INDEPENDENT-v1',
   world: 'Yemen Intelligence Bridge / WORLD',
@@ -28,7 +32,7 @@ const defaultState = {
   },
   truth: {
     externalDeployment: 'OBSERVED',
-    modelConnection: 'UNKNOWN',
+    modelConnection: MODEL_CONFIGURED ? 'CONFIGURED' : 'NOT_CONFIGURED',
     persistence: 'LOCAL_FILE',
     ownership: 'OWNER_CONTROLLED'
   }
@@ -41,6 +45,30 @@ const json = (res, status, body) => {
   res.writeHead(status, { 'content-type': 'application/json; charset=utf-8' });
   res.end(JSON.stringify(body));
 };
+
+async function callLiveModel(userMessage) {
+  if (!MODEL_CONFIGURED) return { ok:false, truth:'BLOCKED', reason:'MODEL_NOT_CONFIGURED' };
+  const raw = fs.readFileSync(chatFile, 'utf8').trim();
+  const history = raw ? raw.split('\\n').map(JSON.parse).filter(x => x.role === 'user' || x.role === 'assistant').slice(-24) : [];
+  const input = [
+    {
+      role: 'developer',
+      content: 'You are the live AI capability layer for YIB/WORLD — الحسام اليمني ⚔️🇾🇪. Yemen is the purpose; AI is a capability layer, not authority. Preserve truth categories and never claim an external action unless verified. Continue the user context from the supplied conversation history.'
+    },
+    ...history,
+    { role:'user', content:userMessage }
+  ];
+  const response = await fetch(OPENAI_BASE_URL + '/responses', {
+    method:'POST',
+    headers:{'content-type':'application/json','authorization':'Bearer '+process.env.OPENAI_API_KEY},
+    body:JSON.stringify({model:OPENAI_MODEL,input,reasoning:{effort:'low'}})
+  });
+  const body = await response.json().catch(()=>({}));
+  if (!response.ok) return {ok:false,truth:'BLOCKED',reason:'MODEL_HTTP_'+response.status,detail:body?.error?.message || 'MODEL_REQUEST_FAILED'};
+  const text = String(body.output_text || '').trim();
+  if (!text) return {ok:false,truth:'BLOCKED',reason:'EMPTY_MODEL_RESPONSE'};
+  return {ok:true,truth:'OBSERVED',content:text,model:OPENAI_MODEL,responseId:body.id};
+}
 
 const page = () => `<!doctype html>
 <html lang="ar" dir="rtl">
@@ -90,7 +118,7 @@ const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, 'http://localhost');
 
     if (url.pathname === '/api/health')
-      return json(res, 200, { status:'PASS', service:'YIB/WORLD Independent Core', truth:'OBSERVED', model:'ADAPTER_NOT_CONFIGURED' });
+      return json(res, 200, { status:'PASS', service:'YIB/WORLD Independent Core', truth:'OBSERVED', model:MODEL_CONFIGURED ? OPENAI_MODEL : 'ADAPTER_NOT_CONFIGURED' });
 
     if (url.pathname === '/')
       return (res.writeHead(200, {'content-type':'text/html; charset=utf-8'}), res.end(page()));
