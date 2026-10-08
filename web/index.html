@@ -1,1 +1,65 @@
-<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>الحسام اليمني ⚔️🇾🇪</title><style>body{margin:0;background:#0b1020;color:#eef2ff;font-family:system-ui,sans-serif}main{max-width:920px;margin:auto;padding:22px 16px}.card{background:#121a30;border:1px solid #273352;border-radius:16px;padding:15px;margin:12px 0}.muted{color:#aab3cc}.chat{max-height:50vh;overflow:auto}.msg{padding:10px;margin:8px 0;border-radius:12px;background:#18233d}.composer{display:flex;gap:8px}.composer input{flex:1;padding:12px;background:#0b1020;color:#fff;border:1px solid #354260;border-radius:10px}button{padding:10px 14px;background:#18233d;color:#fff;border:1px solid #354260;border-radius:10px}#login{position:fixed;inset:0;background:#080d19ee;display:grid;place-items:center;padding:20px}#login .box{max-width:420px;width:100%;background:#121a30;border:1px solid #354260;border-radius:18px;padding:20px;box-sizing:border-box}#token{width:100%;box-sizing:border-box;padding:12px;background:#0b1020;color:#fff;border:1px solid #354260;border-radius:10px;margin:10px 0}</style></head><body><div id="login"><div class="box"><h2>دخول المالك</h2><p class="muted">النواة المستقلة تعمل بوضع محمي. أدخل رمز الوصول المضبوط على الخادم.</p><input id="token" type="password" placeholder="رمز الوصول"><button onclick="login()">دخول</button><p id="err"></p></div></div><main><h1>الحسام اليمني ⚔️🇾🇪</h1><p class="muted">Yemen Intelligence Bridge — WORLD · Independent Core</p><div class="card"><b>TRUTH-FIRST · FAIL-CLOSED</b><p class="muted">اليمن هو الغاية؛ الذكاء الاصطناعي طبقة قدرة قابلة للاستبدال.</p><pre id="state">جارٍ التحقق…</pre></div><div class="card"><h3>المحادثة والاستمرارية</h3><div id="chat" class="chat"></div><div class="composer"><input id="input" placeholder="اكتب رسالتك…"><button onclick="send()">إرسال</button><button onclick="exportState()">تصدير</button></div></div></main><script>let auth=sessionStorage.getItem('yib_access_token')||'';const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));const api=(p,o={})=>{o.headers={...(o.headers||{}),Authorization:'Bearer '+auth};return fetch(p,o)};async function login(){const v=document.getElementById('token').value.trim();if(!v)return;auth=v;const r=await api('/api/state');if(r.status!==200){auth='';document.getElementById('err').textContent='رمز الوصول غير صحيح.';return}sessionStorage.setItem('yib_access_token',auth);document.getElementById('login').style.display='none';refresh()}async function refresh(){if(!auth)return;const r=await api('/api/state');if(r.status===401){sessionStorage.removeItem('yib_access_token');auth='';document.getElementById('login').style.display='grid';return}const s=await r.json();document.getElementById('state').textContent=JSON.stringify(s,null,2);const c=await (await api('/api/chat')).json();document.getElementById('chat').innerHTML=(c.messages||[]).map(x=>'<div class="msg"><b>'+esc(x.role)+'</b><br>'+esc(x.content)+'</div>').join('')}async function send(){const i=document.getElementById('input'),v=i.value.trim();if(!v)return;await api('/api/chat',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({content:v})});i.value='';refresh()}async function exportState(){const r=await api('/api/export');const b=new Blob([JSON.stringify(await r.json(),null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='YIB-WORLD-handoff.json';a.click()}if(auth){document.getElementById('login').style.display='none';refresh()}</script></body></html>
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>الحسام اليمني ⚔️🇾🇪 — YIB/WORLD</title>
+<style>
+body{margin:0;background:#0b1020;color:#eef2ff;font-family:system-ui,-apple-system,Segoe UI,Tahoma,sans-serif}
+main{max-width:960px;margin:auto;padding:22px 16px}
+h1{margin:0}.muted{color:#aab3cc}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;margin:16px 0}
+.card{background:#121a30;border:1px solid #273352;border-radius:16px;padding:15px;margin:12px 0}
+.badge{display:inline-block;border-radius:999px;padding:4px 8px;background:#1d2945;font-size:12px}
+.ok{background:#17372d}.warn{background:#40311b}
+.chat{min-height:220px;max-height:52vh;overflow:auto}
+.msg{padding:10px;margin:8px 0;border-radius:12px;background:#18233d;white-space:pre-wrap}
+.composer{display:flex;gap:8px;margin-top:10px}.composer input{flex:1;background:#0b1020;color:white;border:1px solid #354260;border-radius:10px;padding:12px}
+button{border:1px solid #354260;background:#18233d;color:#fff;padding:10px 14px;border-radius:10px;cursor:pointer}
+pre{white-space:pre-wrap;overflow:auto}.small{font-size:13px}
+</style></head>
+<body>
+<main>
+<h1>الحسام اليمني ⚔️🇾🇪</h1>
+<div class="muted">Yemen Intelligence Bridge — WORLD · Independent Core</div>
+<div class="grid">
+<div class="card"><span class="badge ok">CORE</span><h3>النواة</h3><div class="muted">مستقلة وقابلة للنقل والاسترداد.</div></div>
+<div class="card"><span class="badge">TRUTH-FIRST</span><h3>الحقيقة</h3><div class="muted">لا نرفع UNKNOWN إلى VERIFIED دون دليل.</div></div>
+<div class="card"><span class="badge warn">FAIL-CLOSED</span><h3>الأثر الخارجي</h3><div class="muted">الآثار عالية المخاطر لا تُنفذ تلقائيًا.</div></div>
+</div>
+<div class="card"><h3>الحالة الحية</h3><pre id="state">جارٍ التحقق…</pre></div>
+<div class="card"><h3>المحادثة والاستمرارية</h3>
+<div id="chat" class="chat"></div>
+<div class="composer"><input id="input" placeholder="اكتب رسالتك…"><button onclick="send()">إرسال</button><button onclick="refresh()">تحديث</button><button onclick="exportState()">تصدير</button></div>
+<div id="error" class="small muted"></div>
+</div>
+</main>
+<script>
+let auth=sessionStorage.getItem('yib_access_token')||'';
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const api=(p,o={})=>{o.headers={...(o.headers||{}),...(auth?{Authorization:'Bearer '+auth}:{})};return fetch(p,o)};
+async function refresh(){
+  const h=await fetch('/api/health'); const hs=await h.json();
+  const p=await fetch('/api/provider'); const ps=await p.json();
+  let state={health:hs,provider:ps};
+  const sr=await api('/api/state');
+  if(sr.ok){state.canonical=await sr.json();}
+  document.getElementById('state').textContent=JSON.stringify(state,null,2);
+  const cr=await api('/api/chat');
+  if(cr.ok){const c=await cr.json();document.getElementById('chat').innerHTML=(c.messages||[]).map(x=>'<div class="msg"><b>'+esc(x.role)+' · '+esc(x.truth||'')+'</b><br>'+esc(x.content)+'</div>').join('');document.getElementById('chat').scrollTop=999999;}
+}
+async function send(){
+  const i=document.getElementById('input'),v=i.value.trim(); if(!v)return;
+  document.getElementById('error').textContent='جارٍ التنفيذ…';
+  const r=await api('/api/chat',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({content:v})});
+  if(r.status===401){document.getElementById('error').textContent='الخادم يطلب رمز مالك. لا يوجد رمز محفوظ في هذه الجلسة.';return;}
+  if(!r.ok){document.getElementById('error').textContent='فشل الطلب: HTTP '+r.status;return;}
+  i.value='';document.getElementById('error').textContent='';await refresh();
+}
+async function exportState(){
+ const r=await api('/api/export'); if(!r.ok)return;
+ const b=new Blob([JSON.stringify(await r.json(),null,2)],{type:'application/json'});
+ const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='YIB-WORLD-handoff.json';a.click();
+}
+document.getElementById('input').addEventListener('keydown',e=>{if(e.key==='Enter')send()});
+refresh();
+</script></body></html>
