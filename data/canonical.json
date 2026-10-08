@@ -1,0 +1,16 @@
+{
+  "schema":"YIB-WORLD-INDEPENDENT-v1",
+  "world":"Yemen Intelligence Bridge / WORLD",
+  "identity":"الحسام اليمني ⚔️🇾🇪",
+  "task":"YIB-KERNEL-001",
+  "checkpoint":"YIB-KERNEL-001:0001",
+  "versionRef":"independent-local-v1",
+  "tiniestPortal":"OBSERVED_V68",
+  "verification":"PASS",
+  "evidence":"OBSERVED",
+  "recovery":"VERIFIED-SIMULATION",
+  "nextAction":"resume-from-checkpoint",
+  "approval":{"task":"YIB-APPROVAL-001","risk":"HIGH_RISK_WRITE","status":"WAITING","externalSideEffect":"DISABLED"},
+  "truth":{"externalDeployment":"OBSERVED","modelConnection":"UNKNOWN","persistence":"LOCAL_FILE","ownership":"OWNER_CONTROLLED"},
+  "capabilities":{"localPersistence":"EXECUTABLE","localContinuity":"EXECUTABLE","aiAdapter":"NOT_CONFIGURED","externalFetch":"UNKNOWN","highRiskEffects":"FAIL-CLOSED"}
+}
