@@ -9,12 +9,34 @@ fs.mkdirSync(data, { recursive: true });
 const stateFile = path.join(data, 'canonical.json');
 const chatFile = path.join(data, 'chat.jsonl');
 
-const MODEL_CONFIGURED = Boolean(process.env.OPENAI_API_KEY);
-const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-5.6-luna';
-const OPENAI_BASE_URL = (process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1').replace(/\\/$/, '');
+const REQUIRE_AUTH = process.env.REQUIRE_AUTH === 'true';
+const ACCESS_TOKEN = process.env.YIB_ACCESS_TOKEN || '';
+const MODEL_PROVIDER = (process.env.MODEL_PROVIDER || 'auto').toLowerCase();
+const GEMINI_KEY = process.env.GEMINI_API_KEY || '';
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash-lite';
+const GROQ_KEY = process.env.GROQ_API_KEY || '';
+const GROQ_MODEL = process.env.GROQ_MODEL || 'openai/gpt-oss-120b';
+const HF_KEY = process.env.HF_TOKEN || '';
+const HF_MODEL = process.env.HF_MODEL || 'deepseek-ai/DeepSeek-V3-0324';
+const OPENAI_KEY = process.env.OPENAI_API_KEY || '';
+const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-6-luna';
+const OPENAI_BASE_URL = (process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1').replace(/\/$/, '');
+
+function configuredProviders() {
+  const p = [];
+  if (GEMINI_KEY) p.push('gemini');
+  if (GROQ_KEY) p.push('groq');
+  if (HF_KEY) p.push('huggingface');
+  if (OPENAI_KEY) p.push('openai');
+  return p;
+}
+function selectedProvider() {
+  if (MODEL_PROVIDER !== 'auto') return configuredProviders().includes(MODEL_PROVIDER) ? MODEL_PROVIDER : 'none';
+  return configuredProviders()[0] || 'none';
+}
 
 const defaultState = {
-  schema: 'YIB-WORLD-INDEPENDENT-v1',
+  schema: 'YIB-WORLD-INDEPENDENT-v2',
   world: 'Yemen Intelligence Bridge / WORLD',
   identity: 'الحسام اليمني ⚔️🇾🇪',
   task: 'YIB-KERNEL-001',
@@ -32,9 +54,14 @@ const defaultState = {
   },
   truth: {
     externalDeployment: 'OBSERVED',
-    modelConnection: MODEL_CONFIGURED ? 'CONFIGURED' : 'NOT_CONFIGURED',
+    modelConnection: selectedProvider() === 'none' ? 'NOT_CONFIGURED' : 'CONFIGURED',
     persistence: 'LOCAL_FILE',
     ownership: 'OWNER_CONTROLLED'
+  },
+  model: {
+    provider: selectedProvider(),
+    configuredProviders: configuredProviders(),
+    liveVerified: false
   }
 };
 
@@ -42,110 +69,98 @@ if (!fs.existsSync(stateFile)) fs.writeFileSync(stateFile, JSON.stringify(defaul
 if (!fs.existsSync(chatFile)) fs.writeFileSync(chatFile, '');
 
 const json = (res, status, body) => {
-  res.writeHead(status, { 'content-type': 'application/json; charset=utf-8' });
+  res.writeHead(status, {'content-type':'application/json; charset=utf-8'});
   res.end(JSON.stringify(body));
 };
+const authorized = req => !REQUIRE_AUTH || (!!ACCESS_TOKEN && req.headers.authorization === 'Bearer ' + ACCESS_TOKEN);
+
+function readHistory() {
+  const raw = fs.readFileSync(chatFile, 'utf8').trim();
+  if (!raw) return [];
+  return raw.split('\n').map(JSON.parse).filter(x => x.role === 'user' || x.role === 'assistant').slice(-24);
+}
+function saveMessage(role, content, extra = {}) {
+  fs.appendFileSync(chatFile, JSON.stringify({role, content, at:new Date().toISOString(), ...extra}) + '\n');
+}
+
+const SYSTEM = 'You are the AI capability layer for YIB/WORLD — الحسام اليمني ⚔️🇾🇪. Yemen is the purpose; AI is a capability layer, not authority. Preserve truth categories VERIFIED/OBSERVED/REPORTED/INFERRED/BLOCKED/UNKNOWN. Never claim an external action unless it is verified. Maintain continuity from the supplied history.';
+
+async function callGemini(history) {
+  const contents = history.map(x => ({role:x.role === 'assistant' ? 'model' : 'user', parts:[{text:String(x.content)}]}));
+  const url = 'https://generativelanguage.googleapis.com/v1beta/models/' + encodeURIComponent(GEMINI_MODEL) + ':generateContent?key=' + encodeURIComponent(GEMINI_KEY);
+  const r = await fetch(url,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({
+    systemInstruction:{parts:[{text:SYSTEM}]},
+    contents,
+    generationConfig:{temperature:0.2}
+  })});
+  const b = await r.json().catch(()=>({}));
+  if (!r.ok) return {ok:false,provider:'gemini',reason:'MODEL_HTTP_'+r.status,detail:b?.error?.message || 'GEMINI_REQUEST_FAILED'};
+  const text = String(b?.candidates?.[0]?.content?.parts?.map(p=>p.text||'').join('') || '').trim();
+  return text ? {ok:true,provider:'gemini',model:GEMINI_MODEL,content:text,truth:'OBSERVED'} : {ok:false,provider:'gemini',reason:'EMPTY_MODEL_RESPONSE'};
+}
+
+async function callOpenAICompatible(baseUrl, key, model, provider, history) {
+  const messages = [{role:'system',content:SYSTEM}, ...history.map(x => ({role:x.role,content:String(x.content)}))];
+  const r = await fetch(baseUrl + '/chat/completions',{method:'POST',headers:{'content-type':'application/json','authorization':'Bearer '+key},body:JSON.stringify({model,messages,temperature:0.2})});
+  const b = await r.json().catch(()=>({}));
+  if (!r.ok) return {ok:false,provider,reason:'MODEL_HTTP_'+r.status,detail:b?.error?.message || 'MODEL_REQUEST_FAILED'};
+  const text = String(b?.choices?.[0]?.message?.content || '').trim();
+  return text ? {ok:true,provider,model,content:text,truth:'OBSERVED'} : {ok:false,provider,reason:'EMPTY_MODEL_RESPONSE'};
+}
 
 async function callLiveModel(userMessage) {
-  if (!MODEL_CONFIGURED) return { ok:false, truth:'BLOCKED', reason:'MODEL_NOT_CONFIGURED' };
-  const raw = fs.readFileSync(chatFile, 'utf8').trim();
-  const history = raw ? raw.split('\\n').map(JSON.parse).filter(x => x.role === 'user' || x.role === 'assistant').slice(-24) : [];
-  const input = [
-    {
-      role: 'developer',
-      content: 'You are the live AI capability layer for YIB/WORLD — الحسام اليمني ⚔️🇾🇪. Yemen is the purpose; AI is a capability layer, not authority. Preserve truth categories and never claim an external action unless verified. Continue the user context from the supplied conversation history.'
-    },
-    ...history,
-    { role:'user', content:userMessage }
-  ];
-  const response = await fetch(OPENAI_BASE_URL + '/responses', {
-    method:'POST',
-    headers:{'content-type':'application/json','authorization':'Bearer '+process.env.OPENAI_API_KEY},
-    body:JSON.stringify({model:OPENAI_MODEL,input,reasoning:{effort:'low'}})
-  });
-  const body = await response.json().catch(()=>({}));
-  if (!response.ok) return {ok:false,truth:'BLOCKED',reason:'MODEL_HTTP_'+response.status,detail:body?.error?.message || 'MODEL_REQUEST_FAILED'};
-  const text = String(body.output_text || '').trim();
-  if (!text) return {ok:false,truth:'BLOCKED',reason:'EMPTY_MODEL_RESPONSE'};
-  return {ok:true,truth:'OBSERVED',content:text,model:OPENAI_MODEL,responseId:body.id};
-}
-
-const page = () => `<!doctype html>
-<html lang="ar" dir="rtl">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>الحسام اليمني ⚔️🇾🇪</title>
-<style>
-body{margin:0;background:#0b1020;color:#eef2ff;font-family:system-ui,-apple-system,sans-serif;padding:22px}
-main{max-width:900px;margin:auto}.card{background:#121a30;border:1px solid #273352;border-radius:16px;padding:16px;margin:12px 0}
-input,button{padding:12px;border-radius:10px;border:1px solid #354260;background:#18233d;color:white}
-input{width:68%}.msg{padding:9px;margin:6px 0;background:#18233d;border-radius:10px;white-space:pre-wrap}
-small{opacity:.7}.status{font-weight:700}
-</style>
-</head>
-<body>
-<main>
-<h1>الحسام اليمني ⚔️🇾🇪</h1>
-<p>Yemen Intelligence Bridge — WORLD · Independent Core</p>
-<div class="card"><div class="status">الحالة التشغيلية</div><pre id="s">جارٍ التحقق…</pre></div>
-<div class="card">
-<h3>المحادثة والاستمرارية</h3>
-<div id="c"></div>
-<form id="f"><input id="i" autocomplete="off" placeholder="اكتب رسالتك…"><button>إرسال</button></form>
-<small>النواة تحفظ الرسائل. اتصال النموذج الحي غير مُثبت، لذلك لا يتم الادعاء بوجوده.</small>
-</div>
-</main>
-<script>
-async function refresh(){
-  const state=await (await fetch('/api/state')).json();
-  document.getElementById('s').textContent=JSON.stringify(state,null,2);
-  const data=await (await fetch('/api/chat')).json();
-  document.getElementById('c').innerHTML=(data.messages||[]).map(x=>'<div class="msg"><b>'+x.role+'</b><br>'+escapeHtml(x.content)+'</div>').join('');
-}
-function escapeHtml(v){return String(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
-document.getElementById('f').addEventListener('submit',async e=>{
-  e.preventDefault(); const input=document.getElementById('i'); const v=input.value.trim(); if(!v)return;
-  await fetch('/api/chat',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({content:v})});
-  input.value=''; await refresh();
-});
-refresh();
-</script>
-</body></html>`;
-
-const server = http.createServer(async (req, res) => {
-  try {
-    const url = new URL(req.url, 'http://localhost');
-
-    if (url.pathname === '/api/health')
-      return json(res, 200, { status:'PASS', service:'YIB/WORLD Independent Core', truth:'OBSERVED', model:MODEL_CONFIGURED ? OPENAI_MODEL : 'ADAPTER_NOT_CONFIGURED' });
-
-    if (url.pathname === '/')
-      return (res.writeHead(200, {'content-type':'text/html; charset=utf-8'}), res.end(page()));
-
-    if (url.pathname === '/api/state')
-      return json(res, 200, JSON.parse(fs.readFileSync(stateFile, 'utf8')));
-
-    if (url.pathname === '/api/chat' && req.method === 'GET') {
-      const raw = fs.readFileSync(chatFile, 'utf8').trim();
-      return json(res, 200, { messages: raw ? raw.split('\n').map(JSON.parse) : [] });
-    }
-
-    if (url.pathname === '/api/chat' && req.method === 'POST') {
-      let body = '';
-      for await (const chunk of req) body += chunk;
-      const message = String(JSON.parse(body || '{}').content || '').trim();
-      if (!message) return json(res, 400, { error:'EMPTY_MESSAGE' });
-      const now = new Date().toISOString();
-      fs.appendFileSync(chatFile, JSON.stringify({role:'user',content:message,at:now})+'\n');
-      fs.appendFileSync(chatFile, JSON.stringify({role:'system',content:'تم حفظ الرسالة داخل النواة المستقلة. الاستمرارية محفوظة؛ طبقة النموذج الحي غير مثبتة.',truth:'OBSERVED',at:new Date().toISOString()})+'\n');
-      return json(res, 200, { status:'SAVED', truth:'OBSERVED' });
-    }
-
-    return json(res, 404, { error:'NOT_FOUND' });
-  } catch (error) {
-    return json(res, 500, { error:'INTERNAL_ERROR' });
+  const history = [...readHistory(), {role:'user',content:userMessage}].slice(-24);
+  const provider = selectedProvider();
+  if (provider === 'none') return {ok:false,truth:'BLOCKED',reason:'NO_FREE_MODEL_CREDENTIAL_CONFIGURED'};
+  if (provider === 'gemini') return callGemini(history);
+  if (provider === 'groq') return callOpenAICompatible('https://api.groq.com/openai/v1',GROQ_KEY,GROQ_MODEL,'groq',history);
+  if (provider === 'huggingface') return callOpenAICompatible('https://router.huggingface.co/v1',HF_KEY,HF_MODEL,'huggingface',history);
+  if (provider === 'openai') {
+    const r = await fetch(OPENAI_BASE_URL + '/responses',{method:'POST',headers:{'content-type':'application/json','authorization':'Bearer '+OPENAI_KEY},body:JSON.stringify({model:OPENAI_MODEL,input:[{role:'developer',content:SYSTEM},...history],reasoning:{effort:'low'}})});
+    const b = await r.json().catch(()=>({}));
+    if (!r.ok) return {ok:false,provider:'openai',reason:'MODEL_HTTP_'+r.status,detail:b?.error?.message || 'MODEL_REQUEST_FAILED'};
+    const text = String(b.output_text || '').trim();
+    return text ? {ok:true,provider:'openai',model:OPENAI_MODEL,content:text,truth:'OBSERVED'} : {ok:false,provider:'openai',reason:'EMPTY_MODEL_RESPONSE'};
   }
-});
+  return {ok:false,truth:'BLOCKED',reason:'PROVIDER_NOT_SUPPORTED'};
+}
 
-server.listen(process.env.PORT || 3000, '0.0.0.0');
+function updateState(patch) {
+  const current = JSON.parse(fs.readFileSync(stateFile,'utf8'));
+  const next = {...current,...patch,truth:{...current.truth,...(patch.truth||{})},model:{...current.model,...(patch.model||{})}};
+  fs.writeFileSync(stateFile,JSON.stringify(next,null,2));
+  return next;
+}
+
+const page = () => `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>الحسام اليمني ⚔️🇾🇪</title><style>
+body{margin:0;background:#08111f;color:#edf4ff;font-family:system-ui,-apple-system,sans-serif;padding:18px}main{max-width:920px;margin:auto}.card{background:#101c2e;border:1px solid #263953;border-radius:18px;padding:16px;margin:12px 0;box-shadow:0 8px 30px #0004}h1{margin-bottom:4px}input,button{padding:13px;border-radius:11px;border:1px solid #39506f;background:#14243b;color:#fff;font-size:16px}input{width:68%}button{cursor:pointer}.msg{padding:10px;margin:7px 0;background:#162a43;border-radius:12px;white-space:pre-wrap}.meta{opacity:.7;font-size:12px}.ok{font-weight:700}.warn{font-weight:700}pre{white-space:pre-wrap;word-break:break-word}</style></head><body><main>
+<h1>الحسام اليمني ⚔️🇾🇪</h1><div class="meta">Yemen Intelligence Bridge — WORLD · Independent Core</div>
+<div class="card"><div class="ok">الحالة التشغيلية</div><pre id="s">جارٍ التحقق…</pre></div>
+<div class="card"><h3>المحادثة والاستمرارية</h3><div id="c"></div><form id="f"><input id="i" autocomplete="off" placeholder="اكتب رسالتك…"><button>إرسال</button></form><div class="meta" id="m"></div></div>
+</main><script>
+async function refresh(){const [sr,cr]=await Promise.all([fetch('/api/state'),fetch('/api/chat')]);const state=await sr.json();const data=await cr.json();document.getElementById('s').textContent=JSON.stringify(state,null,2);document.getElementById('c').innerHTML=(data.messages||[]).map(x=>'<div class="msg"><b>'+x.role+'</b><br>'+escapeHtml(x.content)+'<div class="meta">'+(x.provider||x.truth||'')+'</div></div>').join('');document.getElementById('m').textContent=state.model?.liveVerified?'النموذج الحي: مُثبت بمشاهدة استجابة ناجحة.':'النواة والاستمرارية تعملان؛ النموذج الحي لن يُدّعى إلا بعد نجاح حقيقي.';}
+function escapeHtml(v){return String(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+document.getElementById('f').addEventListener('submit',async e=>{e.preventDefault();const input=document.getElementById('i');const v=input.value.trim();if(!v)return;input.disabled=true;await fetch('/api/chat',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({content:v})});input.value='';input.disabled=false;await refresh();});refresh();
+</script></body></html>`;
+
+const server=http.createServer(async(req,res)=>{
+  try{
+    const url=new URL(req.url,'http://localhost');
+    if(!authorized(req)) return json(res,401,{error:'UNAUTHORIZED'});
+    if(url.pathname==='/api/health') return json(res,200,{status:'PASS',service:'YIB/WORLD Independent Core',truth:'OBSERVED',model:selectedProvider()==='none'?'MODEL_NOT_CONFIGURED':selectedProvider(),liveVerified:false});
+    if(url.pathname==='/') return (res.writeHead(200,{'content-type':'text/html; charset=utf-8'}),res.end(page()));
+    if(url.pathname==='/api/capabilities') return json(res,200,{truth:'OBSERVED',independentCore:true,continuity:true,providers:{configured:configuredProviders(),selected:selectedProvider()},liveModelVerified:false,externalSideEffects:'FAIL_CLOSED'});
+    if(url.pathname==='/api/state') return json(res,200,JSON.parse(fs.readFileSync(stateFile,'utf8')));
+    if(url.pathname==='/api/chat'&&req.method==='GET'){const raw=fs.readFileSync(chatFile,'utf8').trim();return json(res,200,{messages:raw?raw.split('\n').map(JSON.parse):[]});}
+    if(url.pathname==='/api/chat'&&req.method==='POST'){
+      let body='';for await(const chunk of req)body+=chunk;const message=String(JSON.parse(body||'{}').content||'').trim();if(!message)return json(res,400,{error:'EMPTY_MESSAGE'});
+      saveMessage('user',message);
+      const result=await callLiveModel(message);
+      if(result.ok){saveMessage('assistant',result.content,{provider:result.provider,model:result.model,truth:'OBSERVED'});updateState({truth:{modelConnection:'LIVE_VERIFIED'},model:{provider:result.provider,liveVerified:true,lastVerifiedAt:new Date().toISOString()}});return json(res,200,{status:'RESPONDED',truth:'OBSERVED',provider:result.provider,content:result.content});}
+      saveMessage('system','تم حفظ رسالتك داخل النواة. لم تُثبت استجابة نموذج حي، لذلك لن أدّعي وجودها.',{truth:'BLOCKED',reason:result.reason});
+      return json(res,200,{status:'SAVED_ONLY',truth:'BLOCKED',reason:result.reason,detail:result.detail||null});
+    }
+    return json(res,404,{error:'NOT_FOUND'});
+  }catch(error){return json(res,500,{error:'INTERNAL_ERROR'});}
+});
+server.listen(process.env.PORT||3000,'0.0.0.0');
