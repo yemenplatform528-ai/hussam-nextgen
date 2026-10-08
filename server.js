@@ -13,7 +13,7 @@ const REQUIRE_AUTH = process.env.REQUIRE_AUTH === 'true';
 const ACCESS_TOKEN = process.env.YIB_ACCESS_TOKEN || '';
 const MODEL_PROVIDER = (process.env.MODEL_PROVIDER || 'auto').toLowerCase();
 const GEMINI_KEY = process.env.GEMINI_API_KEY || '';
-const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash-lite';
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
 const GROQ_KEY = process.env.GROQ_API_KEY || '';
 const GROQ_MODEL = process.env.GROQ_MODEL || 'openai/gpt-oss-120b';
 const HF_KEY = process.env.HF_TOKEN || '';
@@ -55,7 +55,7 @@ const defaultState = {
   truth: {
     externalDeployment: 'OBSERVED',
     modelConnection: selectedProvider() === 'none' ? 'NOT_CONFIGURED' : 'CONFIGURED',
-    persistence: 'LOCAL_FILE',
+    persistence: 'EPHEMERAL_RUNTIME_WITH_EXPORT',
     ownership: 'OWNER_CONTROLLED'
   },
   model: {
@@ -135,7 +135,7 @@ function updateState(patch) {
 const page = () => `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>الحسام اليمني ⚔️🇾🇪</title><style>
 body{margin:0;background:#08111f;color:#edf4ff;font-family:system-ui,-apple-system,sans-serif;padding:18px}main{max-width:920px;margin:auto}.card{background:#101c2e;border:1px solid #263953;border-radius:18px;padding:16px;margin:12px 0;box-shadow:0 8px 30px #0004}h1{margin-bottom:4px}input,button{padding:13px;border-radius:11px;border:1px solid #39506f;background:#14243b;color:#fff;font-size:16px}input{width:68%}button{cursor:pointer}.msg{padding:10px;margin:7px 0;background:#162a43;border-radius:12px;white-space:pre-wrap}.meta{opacity:.7;font-size:12px}.ok{font-weight:700}.warn{font-weight:700}pre{white-space:pre-wrap;word-break:break-word}</style></head><body><main>
 <h1>الحسام اليمني ⚔️🇾🇪</h1><div class="meta">Yemen Intelligence Bridge — WORLD · Independent Core</div>
-<div class="card"><div class="ok">الحالة التشغيلية</div><pre id="s">جارٍ التحقق…</pre></div>
+<div class="card"><div class="ok">الحالة التشغيلية</div><pre id="s">جارٍ التحقق…</pre><div class="meta">نسخة الاستمرارية: WORLD v2 · التأثيرات الخارجية: مغلقة افتراضيًا · تصدير الاستعادة متاح من /api/export</div></div>
 <div class="card"><h3>المحادثة والاستمرارية</h3><div id="c"></div><form id="f"><input id="i" autocomplete="off" placeholder="اكتب رسالتك…"><button>إرسال</button></form><div class="meta" id="m"></div></div>
 </main><script>
 async function refresh(){const [sr,cr]=await Promise.all([fetch('/api/state'),fetch('/api/chat')]);const state=await sr.json();const data=await cr.json();document.getElementById('s').textContent=JSON.stringify(state,null,2);document.getElementById('c').innerHTML=(data.messages||[]).map(x=>'<div class="msg"><b>'+x.role+'</b><br>'+escapeHtml(x.content)+'<div class="meta">'+(x.provider||x.truth||'')+'</div></div>').join('');document.getElementById('m').textContent=state.model?.liveVerified?'النموذج الحي: مُثبت بمشاهدة استجابة ناجحة.':'النواة والاستمرارية تعملان؛ النموذج الحي لن يُدّعى إلا بعد نجاح حقيقي.';}
@@ -147,10 +147,11 @@ const server=http.createServer(async(req,res)=>{
   try{
     const url=new URL(req.url,'http://localhost');
     if(!authorized(req)) return json(res,401,{error:'UNAUTHORIZED'});
-    if(url.pathname==='/api/health') return json(res,200,{status:'PASS',service:'YIB/WORLD Independent Core',truth:'OBSERVED',model:selectedProvider()==='none'?'MODEL_NOT_CONFIGURED':selectedProvider(),liveVerified:false});
+    if(url.pathname==='/api/health'){const s=JSON.parse(fs.readFileSync(stateFile,'utf8'));return json(res,200,{status:'PASS',service:'YIB/WORLD Independent Core',truth:'OBSERVED',model:selectedProvider()==='none'?'MODEL_NOT_CONFIGURED':selectedProvider(),liveVerified:Boolean(s.model?.liveVerified),persistence:s.truth?.persistence||'UNKNOWN'});}
     if(url.pathname==='/') return (res.writeHead(200,{'content-type':'text/html; charset=utf-8'}),res.end(page()));
-    if(url.pathname==='/api/capabilities') return json(res,200,{truth:'OBSERVED',independentCore:true,continuity:true,providers:{configured:configuredProviders(),selected:selectedProvider()},liveModelVerified:false,externalSideEffects:'FAIL_CLOSED'});
+    if(url.pathname==='/api/capabilities'){const s=JSON.parse(fs.readFileSync(stateFile,'utf8'));return json(res,200,{truth:'OBSERVED',independentCore:true,continuity:true,providers:{configured:configuredProviders(),selected:selectedProvider()},liveModelVerified:Boolean(s.model?.liveVerified),externalSideEffects:'FAIL_CLOSED',ownerRecoveryExport:'/api/export'});}
     if(url.pathname==='/api/state') return json(res,200,JSON.parse(fs.readFileSync(stateFile,'utf8')));
+    if(url.pathname==='/api/export'&&req.method==='GET'){const state=JSON.parse(fs.readFileSync(stateFile,'utf8'));const raw=fs.readFileSync(chatFile,'utf8');const payload={exportedAt:new Date().toISOString(),state,chat:raw?raw.split('\n').filter(Boolean).map(JSON.parse):[],manifest:'YIB-WORLD-INDEPENDENT-v2'};res.writeHead(200,{'content-type':'application/json; charset=utf-8','content-disposition':'attachment; filename="yib-world-export.json"'});return res.end(JSON.stringify(payload,null,2));}
     if(url.pathname==='/api/chat'&&req.method==='GET'){const raw=fs.readFileSync(chatFile,'utf8').trim();return json(res,200,{messages:raw?raw.split('\n').map(JSON.parse):[]});}
     if(url.pathname==='/api/chat'&&req.method==='POST'){
       let body='';for await(const chunk of req)body+=chunk;const message=String(JSON.parse(body||'{}').content||'').trim();if(!message)return json(res,400,{error:'EMPTY_MESSAGE'});
