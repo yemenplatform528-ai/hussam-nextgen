@@ -1,0 +1,58 @@
+{
+  "schema": "YIB-WORLD-OWNER-MANIFEST-v1",
+  "identity": "الحسام اليمني ⚔️🇾🇪",
+  "mission": "Yemen is the purpose; AI is a capability layer, not authority.",
+  "truthCategories": [
+    "VERIFIED",
+    "OBSERVED",
+    "REPORTED",
+    "INFERRED",
+    "BLOCKED",
+    "UNKNOWN"
+  ],
+  "safeguards": [
+    "high-risk external effects fail-closed",
+    "human approval required for consequential writes",
+    "never claim an external action without evidence",
+    "no secrets in source or records"
+  ],
+  "independentCore": {
+    "repository": "yemenplatform528-ai/hussam-nextgen",
+    "branch": "yib-world-independent",
+    "runtime": "Node.js",
+    "publicHost": "Render",
+    "url": "https://yib-world-independent.onrender.com",
+    "autoDeploy": true
+  },
+  "continuity": {
+    "canonicalState": "data/canonical.json",
+    "conversationLog": "data/chat.jsonl",
+    "exportEndpoint": "/api/export",
+    "recoveryDocs": [
+      "README.md",
+      "RECOVERY.md"
+    ],
+    "externalMemoryAuthority": "https://hussam-memory-core.tiniestcloud.app/"
+  },
+  "capabilityLayers": [
+    "reasoning/model adapter",
+    "persistent project context",
+    "canonical state",
+    "truth/evidence ledger",
+    "human approval gate",
+    "recovery/export",
+    "provider replacement"
+  ],
+  "knownBoundaries": [
+    "ChatGPT itself is not transferred into the external site",
+    "Render Free filesystem is ephemeral and can lose local data on restart/redeploy/spin-down",
+    "a live model requires a configured provider credential",
+    "free Render is suitable for testing/hobby use, not guaranteed production durability"
+  ],
+  "legacySystems": [
+    "Hussam NextGen FastAPI platform",
+    "YIB/Tiniest prototype",
+    "Vercel prototype (legacy only; not final target)"
+  ],
+  "status": "OBSERVED"
+}
