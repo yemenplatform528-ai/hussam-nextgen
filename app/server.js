@@ -10,7 +10,7 @@ fs.mkdirSync(dataDir, {recursive:true});
 const stateFile = path.join(dataDir, 'canonical.json');
 const chatFile = path.join(dataDir, 'chat.jsonl');
 
-const requireAuth = process.env.REQUIRE_AUTH === 'true';
+const requireAuth = process.env.YIB_AUTH_MODE === 'required';
 const accessToken = process.env.YIB_ACCESS_TOKEN || '';
 const openaiApiKey = process.env.OPENAI_API_KEY || '';
 const openaiModel = process.env.OPENAI_MODEL || 'gpt-6-astra';
@@ -87,6 +87,7 @@ const server=http.createServer(async(req,res)=>{
    fs.appendFileSync(chatFile,JSON.stringify(reply)+'\\n');return json(res,200,reply);
   }
   if(req.method==='GET'&&u.pathname==='/api/export') return json(res,200,{exportedAt:new Date().toISOString(),state:readJson(stateFile),messages:messages(),truth:'OBSERVED',manifest:'YIB-WORLD-INDEPENDENT-v1'});
+  if(req.method==='GET'&&u.pathname==='/api/provider') return json(res,200,{truth:'OBSERVED',provider:openaiApiKey?'OPENAI':'NONE',model:openaiApiKey?openaiModel:null,liveModelVerified:false,reason:openaiApiKey?'NOT_TESTED':'NO_PROVIDER_CREDENTIAL'});
   return json(res,404,{error:'NOT_FOUND'});
  }catch(e){return json(res,500,{error:'INTERNAL_ERROR'});}
 });
