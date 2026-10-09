@@ -10,7 +10,7 @@ fs.mkdirSync(dataDir, {recursive:true});
 const stateFile = path.join(dataDir, 'canonical.json');
 const chatFile = path.join(dataDir, 'chat.jsonl');
 
-const requireAuth = process.env.YIB_AUTH_MODE === 'required';
+const requireAuth = process.env.YIB_AUTH_MODE !== 'disabled';
 const accessToken = process.env.YIB_ACCESS_TOKEN || '';
 const openaiApiKey = process.env.OPENAI_API_KEY || '';
 const openaiModel = process.env.OPENAI_MODEL || 'gpt-6-astra';
