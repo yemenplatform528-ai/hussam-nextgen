@@ -39,6 +39,7 @@ let auth=sessionStorage.getItem('yib_access_token')||'';
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const api=(p,o={})=>{o.headers={...(o.headers||{}),...(auth?{Authorization:'Bearer '+auth}:{})};return fetch(p,o)};
 async function refresh(){
+ try {
   const h=await fetch('/api/health'); const hs=await h.json();
   const p=await fetch('/api/provider'); const ps=await p.json();
   let state={health:hs,provider:ps};
@@ -49,6 +50,7 @@ async function refresh(){
   const cr=await api('/api/chat');
   if(cr.ok){const c=await cr.json();document.getElementById('chat').innerHTML=(c.messages||[]).map(x=>'<div class="msg"><b>'+esc(x.role)+' · '+esc(x.truth||'')+'</b><br>'+esc(x.content)+'</div>').join('');document.getElementById('chat').scrollTop=999999;}
   else if(cr.status===401){document.getElementById('chat').innerHTML='<div class="msg">المحادثة الخاصة مقفلة حتى فتح جلسة المالك.</div>';}
+ } catch(e) { document.getElementById('state').textContent='تعذر الاتصال بالخادم. تحقق من الاتصال ثم اضغط تحديث.'; document.getElementById('error').textContent='تعذر جلب الحالة الحية.'; }
 }
 async function saveToken(){
   const field=document.getElementById('token'),candidate=field.value.trim();
@@ -59,12 +61,14 @@ async function saveToken(){
 }
 function clearToken(){auth='';sessionStorage.removeItem('yib_access_token');document.getElementById('token').value='';document.getElementById('error').textContent='تم إنهاء جلسة المالك.';refresh();}
 async function send(){
+ try {
   const i=document.getElementById('input'),v=i.value.trim(); if(!v)return;
   document.getElementById('error').textContent='جارٍ التنفيذ…';
   const r=await api('/api/chat',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({content:v})});
   if(r.status===401){document.getElementById('error').textContent='الخادم يطلب رمز مالك. لا يوجد رمز محفوظ في هذه الجلسة.';return;}
   if(!r.ok){document.getElementById('error').textContent='فشل الطلب: HTTP '+r.status;return;}
   i.value='';document.getElementById('error').textContent='';await refresh();
+ } catch(e) { document.getElementById('error').textContent='تعذر إرسال الرسالة بسبب مشكلة اتصال. لم يتم تأكيد الحفظ.'; }
 }
 async function exportState(){
  const r=await api('/api/export'); if(!r.ok)return;
