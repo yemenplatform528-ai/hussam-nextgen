@@ -10,7 +10,7 @@ fs.mkdirSync(dataDir, {recursive:true});
 const stateFile = path.join(dataDir, 'canonical.json');
 const chatFile = path.join(dataDir, 'chat.jsonl');
 
-const requireAuth = process.env.YIB_AUTH_MODE === 'required';
+const requireAuth = process.env.YIB_AUTH_MODE !== 'disabled';
 const accessToken = process.env.YIB_ACCESS_TOKEN || '';
 const openaiApiKey = process.env.OPENAI_API_KEY || '';
 const openaiModel = process.env.OPENAI_MODEL || 'gpt-6-astra';
@@ -36,7 +36,7 @@ if(!fs.existsSync(stateFile)) fs.writeFileSync(stateFile,JSON.stringify(initial,
 if(!fs.existsSync(chatFile)) fs.writeFileSync(chatFile,'');
 
 const json=(res,status,obj)=>{res.writeHead(status,{'content-type':'application/json; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff','x-frame-options':'DENY'});res.end(JSON.stringify(obj));};
-const auth=req=>!requireAuth || (!!accessToken && req.headers.authorization===`Bearer ${accessToken}`);
+const auth=req=>((req.method==='GET' && !new URL(req.url,'http://localhost').pathname.startsWith('/api/')) || !requireAuth || (!!accessToken && req.headers.authorization===`Bearer ${accessToken}`));
 const readJson=f=>JSON.parse(fs.readFileSync(f,'utf8'));
 const messages=()=>fs.readFileSync(chatFile,'utf8').trim().split('\\n').filter(Boolean).map(JSON.parse);
 
