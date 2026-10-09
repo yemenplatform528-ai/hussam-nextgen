@@ -62,7 +62,7 @@ const localResponse=content=>{
 };
 
 const modelResponse=async(history)=>{
- if(!openaiApiKey) return {content:localResponse(history.at(-1)?.content||''),truth:'OBSERVED',model:'ADAPTER_NOT_CONFIGURED'};
+ if(!openaiApiKey || process.env.YIB_ALLOW_BILLABLE_AI !== 'true') return {content:localResponse(history.at(-1)?.content||''),truth:'OBSERVED',model:openaiApiKey?'BILLABLE_AI_DISABLED':'ADAPTER_NOT_CONFIGURED'};
  const input=history.slice(-20).map(m=>({role:m.role==='system'?'assistant':m.role,content:m.content}));
  const instructions='أنت طبقة الذكاء القابلة للاستبدال داخل YIB/WORLD. اليمن هو الغاية؛ الذكاء الاصطناعي طبقة قدرة. كن دقيقًا. لا تدّع تنفيذًا خارجيًا لم يحدث، وافصل VERIFIED عن OBSERVED وUNKNOWN. لا تنفذ آثارًا عالية المخاطر تلقائيًا. أجب بالعربية افتراضيًا.';
  const r=await fetch('https://api.openai.com/v1/responses',{method:'POST',headers:{'content-type':'application/json','authorization':`Bearer ${openaiApiKey}`},body:JSON.stringify({model:openaiModel,instructions,input})});
@@ -84,7 +84,7 @@ const serveStatic=(u,res)=>{
 const server=http.createServer(async(req,res)=>{
  try{
   const u=new URL(req.url,'http://localhost');
-  if(req.method==='GET'&&u.pathname==='/api/health') return json(res,200,{status:'PASS',service:'YIB/WORLD Independent Core',truth:'OBSERVED',model:openaiApiKey?'OPENAI_CONFIGURED_UNVERIFIED':'ADAPTER_NOT_CONFIGURED',modelTarget:openaiApiKey?openaiModel:null,auth:requireAuth?'REQUIRED':'DISABLED',persistence:pool?'POSTGRES_DURABLE':'LOCAL_FILE_ONLY',highRisk:'FAIL-CLOSED',time:new Date().toISOString()});
+  if(req.method==='GET'&&u.pathname==='/api/health') return json(res,200,{status:'PASS',service:'YIB/WORLD Independent Core',truth:'OBSERVED',model:openaiApiKey?'OPENAI_CONFIGURED_UNVERIFIED':'ADAPTER_NOT_CONFIGURED',modelTarget:openaiApiKey?openaiModel:null,auth:requireAuth?'REQUIRED':'DISABLED',persistence:pool?'POSTGRES_DURABLE':'LOCAL_FILE_ONLY',generationAllowed:process.env.YIB_ALLOW_BILLABLE_AI==='true',highRisk:'FAIL-CLOSED',time:new Date().toISOString()});
   if(req.method==='GET'&&u.pathname==='/api/capabilities') return json(res,200,{truth:'OBSERVED',capabilities:{localPersistence:'EXECUTABLE',localContinuity:'EXECUTABLE',aiAdapter:openaiApiKey?'OPENAI_CONFIGURED_UNVERIFIED':'NOT_CONFIGURED',externalFetch:'UNKNOWN',highRiskEffects:'FAIL-CLOSED'}});
   if(req.method==='GET'&&u.pathname==='/api/provider') return json(res,200,{truth:'OBSERVED',provider:openaiApiKey?'OPENAI':'NONE',model:openaiApiKey?openaiModel:null,liveModelVerified:false,reason:openaiApiKey?'NOT_TESTED':'NO_PROVIDER_CREDENTIAL'});
   if(req.method==='GET'&&!u.pathname.startsWith('/api/')) return serveStatic(u,res);
