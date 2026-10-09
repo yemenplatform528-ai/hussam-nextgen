@@ -77,6 +77,16 @@ const server=http.createServer(async(req,res)=>{
   if(req.method==='GET'&&u.pathname==='/api/provider') return json(res,200,{truth:'OBSERVED',provider:openaiApiKey?'OPENAI':'NONE',model:openaiApiKey?openaiModel:null,liveModelVerified:false,reason:openaiApiKey?'NOT_TESTED':'NO_PROVIDER_CREDENTIAL'});
   if(req.method==='GET'&&!u.pathname.startsWith('/api/')) return serveStatic(u,res);
   if(!auth(req)) return json(res,401,{error:'AUTH_REQUIRED'});
+  if(req.method==='GET'&&u.pathname==='/api/provider/check'){
+   if(!openaiApiKey) return json(res,200,{truth:'VERIFIED',provider:'NONE',configuredModelAvailable:false,reason:'NO_PROVIDER_CREDENTIAL',generationTested:false});
+   try{
+    const check=await fetch('https://api.openai.com/v1/models',{headers:{authorization:`Bearer ${openaiApiKey}`},signal:AbortSignal.timeout(8000)});
+    if(!check.ok) return json(res,200,{truth:'OBSERVED',provider:'OPENAI',credentialAccepted:check.status!==401,providerStatus:check.status,model:openaiModel,configuredModelAvailable:null,generationTested:false,reason:check.status===401?'CREDENTIAL_REJECTED':check.status===429?'RATE_LIMIT_OR_QUOTA':'PROVIDER_CHECK_FAILED'});
+    const catalog=await check.json();
+    const found=Array.isArray(catalog.data)&&catalog.data.some(m=>m.id===openaiModel);
+    return json(res,200,{truth:'VERIFIED',provider:'OPENAI',credentialAccepted:true,model:openaiModel,configuredModelAvailable:found,generationTested:false,check:'GET /v1/models; no generation request'});
+   }catch(e){return json(res,200,{truth:'OBSERVED',provider:'OPENAI',model:openaiModel,configuredModelAvailable:null,generationTested:false,reason:'NETWORK_OR_TIMEOUT'});}
+  }
   if(req.method==='GET'&&u.pathname==='/api/state') return json(res,200,readJson(stateFile));
   if(req.method==='GET'&&u.pathname==='/api/chat') return json(res,200,{messages:messages()});
   if(req.method==='POST'&&u.pathname==='/api/chat'){
