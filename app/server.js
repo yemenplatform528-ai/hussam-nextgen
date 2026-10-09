@@ -74,7 +74,7 @@ const server=http.createServer(async(req,res)=>{
   const u=new URL(req.url,'http://localhost');
   if(req.method==='GET'&&u.pathname==='/api/health') return json(res,200,{status:'PASS',service:'YIB/WORLD Independent Core',truth:'OBSERVED',model:openaiApiKey?'OPENAI_CONFIGURED_UNVERIFIED':'ADAPTER_NOT_CONFIGURED',modelTarget:openaiApiKey?openaiModel:null,auth:requireAuth?'REQUIRED':'DISABLED',persistence:'EXECUTABLE',highRisk:'FAIL-CLOSED',time:new Date().toISOString()});
   if(req.method==='GET'&&u.pathname==='/api/capabilities') return json(res,200,{truth:'OBSERVED',capabilities:{localPersistence:'EXECUTABLE',localContinuity:'EXECUTABLE',aiAdapter:openaiApiKey?'OPENAI_CONFIGURED_UNVERIFIED':'NOT_CONFIGURED',externalFetch:'UNKNOWN',highRiskEffects:'FAIL-CLOSED'}});
-  if(req.method==='GET'&&!u.pathname.startsWith('/api/')) {if(!auth(req)) return json(res,401,{error:'AUTH_REQUIRED'});return serveStatic(u,res);}
+  if(req.method==='GET'&&!u.pathname.startsWith('/api/')) return serveStatic(u,res);
   if(!auth(req)) return json(res,401,{error:'AUTH_REQUIRED'});
   if(req.method==='GET'&&u.pathname==='/api/state') return json(res,200,readJson(stateFile));
   if(req.method==='GET'&&u.pathname==='/api/chat') return json(res,200,{messages:messages()});
