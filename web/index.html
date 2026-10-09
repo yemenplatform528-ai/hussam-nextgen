@@ -27,6 +27,7 @@ pre{white-space:pre-wrap;overflow:auto}.small{font-size:13px}
 <div class="card"><span class="badge warn">FAIL-CLOSED</span><h3>الأثر الخارجي</h3><div class="muted">الآثار عالية المخاطر لا تُنفذ تلقائيًا.</div></div>
 </div>
 <div class="card"><h3>الحالة الحية</h3><pre id="state">جارٍ التحقق…</pre></div>
+<div class="card"><h3>وصول المالك</h3><div class="muted">بيانات الحالة والمحادثة والتصدير محمية برمز مالك. لا تحفظ الرمز في ملفات المشروع.</div><div class="composer"><input id="token" type="password" autocomplete="current-password" placeholder="رمز الوصول الخاص بك"><button onclick="saveToken()">فتح الجلسة</button><button onclick="clearToken()">إنهاء الجلسة</button></div></div>
 <div class="card"><h3>المحادثة والاستمرارية</h3>
 <div id="chat" class="chat"></div>
 <div class="composer"><input id="input" placeholder="اكتب رسالتك…"><button onclick="send()">إرسال</button><button onclick="refresh()">تحديث</button><button onclick="exportState()">تصدير</button></div>
@@ -43,10 +44,20 @@ async function refresh(){
   let state={health:hs,provider:ps};
   const sr=await api('/api/state');
   if(sr.ok){state.canonical=await sr.json();}
+  else if(sr.status===401){state.privateData='رمز المالك مطلوب لعرض الحالة الخاصة.';}
   document.getElementById('state').textContent=JSON.stringify(state,null,2);
   const cr=await api('/api/chat');
   if(cr.ok){const c=await cr.json();document.getElementById('chat').innerHTML=(c.messages||[]).map(x=>'<div class="msg"><b>'+esc(x.role)+' · '+esc(x.truth||'')+'</b><br>'+esc(x.content)+'</div>').join('');document.getElementById('chat').scrollTop=999999;}
+  else if(cr.status===401){document.getElementById('chat').innerHTML='<div class="msg">المحادثة الخاصة مقفلة حتى فتح جلسة المالك.</div>';}
 }
+async function saveToken(){
+  const field=document.getElementById('token'),candidate=field.value.trim();
+  if(!candidate){document.getElementById('error').textContent='أدخل رمز المالك أولًا.';return;}
+  auth=candidate;const r=await api('/api/state');
+  if(!r.ok){auth='';sessionStorage.removeItem('yib_access_token');document.getElementById('error').textContent='الرمز غير صحيح أو الوصول غير متاح.';return;}
+  sessionStorage.setItem('yib_access_token',candidate);field.value='';document.getElementById('error').textContent='تم فتح جلسة المالك في علامة التبويب الحالية.';await refresh();
+}
+function clearToken(){auth='';sessionStorage.removeItem('yib_access_token');document.getElementById('token').value='';document.getElementById('error').textContent='تم إنهاء جلسة المالك.';refresh();}
 async function send(){
   const i=document.getElementById('input'),v=i.value.trim(); if(!v)return;
   document.getElementById('error').textContent='جارٍ التنفيذ…';
