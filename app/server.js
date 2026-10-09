@@ -2,6 +2,7 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
+import pg from 'pg';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, '..');
@@ -9,6 +10,7 @@ const dataDir = path.join(root, 'data');
 fs.mkdirSync(dataDir, {recursive:true});
 const stateFile = path.join(dataDir, 'canonical.json');
 const chatFile = path.join(dataDir, 'chat.jsonl');
+const pool=process.env.DATABASE_URL?new pg.Pool({connectionString:process.env.DATABASE_URL,max:2,idleTimeoutMillis:30000}):null;
 
 const requireAuth = process.env.YIB_AUTH_MODE === 'required';
 const accessToken = process.env.YIB_ACCESS_TOKEN || '';
@@ -29,7 +31,7 @@ const initial = {
   nextAction:'resume-from-checkpoint',
   approval:{task:'YIB-APPROVAL-001',risk:'HIGH_RISK_WRITE',status:'WAITING',externalSideEffect:'DISABLED'},
   truth:{externalDeployment:'UNKNOWN',modelConnection:'UNKNOWN',persistence:'LOCAL_FILE',ownership:'OWNER_CONTROLLED'},
-  capabilities:{localPersistence:'EXECUTABLE',localContinuity:'EXECUTABLE',aiAdapter:openaiApiKey?'OPENAI_CONFIGURED_UNVERIFIED':'NOT_CONFIGURED',externalFetch:'UNKNOWN',highRiskEffects:'FAIL-CLOSED'},
+  capabilities:{localPersistence:pool?'POSTGRES_DURABLE':'LOCAL_FILE_ONLY',localContinuity:'EXECUTABLE',aiAdapter:openaiApiKey?'OPENAI_CONFIGURED_UNVERIFIED':'NOT_CONFIGURED',externalFetch:'UNKNOWN',highRiskEffects:'FAIL-CLOSED'},
   updatedAt:new Date().toISOString()
 };
 if(!fs.existsSync(stateFile)) fs.writeFileSync(stateFile,JSON.stringify(initial,null,2));
@@ -38,7 +40,21 @@ if(!fs.existsSync(chatFile)) fs.writeFileSync(chatFile,'');
 const json=(res,status,obj)=>{res.writeHead(status,{'content-type':'application/json; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff','x-frame-options':'DENY'});res.end(JSON.stringify(obj));};
 const auth=req=>!requireAuth || (!!accessToken && req.headers.authorization===`Bearer ${accessToken}`);
 const readJson=f=>JSON.parse(fs.readFileSync(f,'utf8'));
-const messages=()=>fs.readFileSync(chatFile,'utf8').trim().split('\\n').filter(Boolean).map(JSON.parse);
+const localMessages=()=>fs.readFileSync(chatFile,'utf8').trim().split('\\n').filter(Boolean).map(JSON.parse);
+const getState=async()=>{if(!pool)return readJson(stateFile);const r=await pool.query("SELECT value FROM public.yib_runtime_state WHERE key='canonical'");return r.rows[0]?.value||initial;};
+const getMessages=async()=>{if(!pool)return localMessages();const r=await pool.query('SELECT role,content,truth,model,at FROM public.yib_chat_messages ORDER BY id');return r.rows;};
+const saveMessage=async m=>{if(pool){await pool.query('INSERT INTO public.yib_chat_messages(role,content,truth,model,at) VALUES($1,$2,$3,$4,$5)',[m.role,m.content,m.truth||null,m.model||null,m.at||new Date().toISOString()]);return;}fs.appendFileSync(chatFile,JSON.stringify(m)+'\\n');};
+async function initPersistence(){
+ if(!pool)return;
+ await pool.query('CREATE TABLE IF NOT EXISTS public.yib_runtime_state (key text PRIMARY KEY, value jsonb NOT NULL, updated_at timestamptz NOT NULL DEFAULT now())');
+ await pool.query('CREATE TABLE IF NOT EXISTS public.yib_chat_messages (id bigserial PRIMARY KEY, role text NOT NULL, content text NOT NULL, truth text, model text, at timestamptz NOT NULL DEFAULT now())');
+ await pool.query('CREATE INDEX IF NOT EXISTS idx_yib_chat_messages_at ON public.yib_chat_messages(at,id)');
+ const state=await pool.query("SELECT key FROM public.yib_runtime_state WHERE key='canonical'");
+ if(!state.rowCount){const seed=fs.existsSync(stateFile)?readJson(stateFile):initial;await pool.query('INSERT INTO public.yib_runtime_state(key,value) VALUES($1,$2::jsonb)',['canonical',JSON.stringify(seed)]);}
+ const count=await pool.query('SELECT count(*)::int AS n FROM public.yib_chat_messages');
+ if(count.rows[0].n===0){for(const m of localMessages())await saveMessage(m);}
+}
+
 
 const localResponse=content=>{
  const q=content.trim().toLowerCase();
@@ -72,7 +88,7 @@ const serveStatic=(u,res)=>{
 const server=http.createServer(async(req,res)=>{
  try{
   const u=new URL(req.url,'http://localhost');
-  if(req.method==='GET'&&u.pathname==='/api/health') return json(res,200,{status:'PASS',service:'YIB/WORLD Independent Core',truth:'OBSERVED',model:openaiApiKey?'OPENAI_CONFIGURED_UNVERIFIED':'ADAPTER_NOT_CONFIGURED',modelTarget:openaiApiKey?openaiModel:null,auth:requireAuth?'REQUIRED':'DISABLED',persistence:'EXECUTABLE',highRisk:'FAIL-CLOSED',time:new Date().toISOString()});
+  if(req.method==='GET'&&u.pathname==='/api/health') return json(res,200,{status:'PASS',service:'YIB/WORLD Independent Core',truth:'OBSERVED',model:openaiApiKey?'OPENAI_CONFIGURED_UNVERIFIED':'ADAPTER_NOT_CONFIGURED',modelTarget:openaiApiKey?openaiModel:null,auth:requireAuth?'REQUIRED':'DISABLED',persistence:pool?'POSTGRES_DURABLE':'LOCAL_FILE_ONLY',highRisk:'FAIL-CLOSED',time:new Date().toISOString()});
   if(req.method==='GET'&&u.pathname==='/api/capabilities') return json(res,200,{truth:'OBSERVED',capabilities:{localPersistence:'EXECUTABLE',localContinuity:'EXECUTABLE',aiAdapter:openaiApiKey?'OPENAI_CONFIGURED_UNVERIFIED':'NOT_CONFIGURED',externalFetch:'UNKNOWN',highRiskEffects:'FAIL-CLOSED'}});
   if(req.method==='GET'&&u.pathname==='/api/provider') return json(res,200,{truth:'OBSERVED',provider:openaiApiKey?'OPENAI':'NONE',model:openaiApiKey?openaiModel:null,liveModelVerified:false,reason:openaiApiKey?'NOT_TESTED':'NO_PROVIDER_CREDENTIAL'});
   if(req.method==='GET'&&!u.pathname.startsWith('/api/')) return serveStatic(u,res);
@@ -87,18 +103,18 @@ const server=http.createServer(async(req,res)=>{
     return json(res,200,{truth:'VERIFIED',provider:'OPENAI',credentialAccepted:true,model:openaiModel,configuredModelAvailable:found,generationTested:false,check:'GET /v1/models; no generation request'});
    }catch(e){return json(res,200,{truth:'OBSERVED',provider:'OPENAI',model:openaiModel,configuredModelAvailable:null,generationTested:false,reason:'NETWORK_OR_TIMEOUT'});}
   }
-  if(req.method==='GET'&&u.pathname==='/api/state') return json(res,200,readJson(stateFile));
-  if(req.method==='GET'&&u.pathname==='/api/chat') return json(res,200,{messages:messages()});
+  if(req.method==='GET'&&u.pathname==='/api/state') return json(res,200,await getState());
+  if(req.method==='GET'&&u.pathname==='/api/chat') return json(res,200,{messages:await getMessages()});
   if(req.method==='POST'&&u.pathname==='/api/chat'){
    let s='';for await(const c of req)s+=c;let b={};try{b=JSON.parse(s||'{}')}catch{return json(res,400,{error:'INVALID_JSON'})}
    const content=String(b.content||'').trim();if(!content)return json(res,400,{error:'EMPTY_MESSAGE'});
-   const now=new Date().toISOString();fs.appendFileSync(chatFile,JSON.stringify({role:'user',content,at:now})+'\\n');
-   const replyData=await modelResponse(messages());
+   const now=new Date().toISOString();await saveMessage({role:'user',content,at:now});
+   const replyData=await modelResponse(await getMessages());
    const reply={role:'system',content:replyData.content,truth:replyData.truth,model:replyData.model,at:new Date().toISOString()};
-   fs.appendFileSync(chatFile,JSON.stringify(reply)+'\\n');return json(res,200,reply);
+   await saveMessage(reply);return json(res,200,reply);
   }
-  if(req.method==='GET'&&u.pathname==='/api/export') return json(res,200,{exportedAt:new Date().toISOString(),state:readJson(stateFile),messages:messages(),truth:'OBSERVED',manifest:'YIB-WORLD-INDEPENDENT-v1'});
+  if(req.method==='GET'&&u.pathname==='/api/export') return json(res,200,{exportedAt:new Date().toISOString(),state:await getState(),messages:await getMessages(),truth:'OBSERVED',manifest:'YIB-WORLD-INDEPENDENT-v1'});
   return json(res,404,{error:'NOT_FOUND'});
  }catch(e){return json(res,500,{error:'INTERNAL_ERROR'});}
 });
-server.listen(process.env.PORT||3000,'0.0.0.0',()=>console.log('YIB/WORLD Independent Core listening'));
+initPersistence().then(()=>server.listen(process.env.PORT||3000,'0.0.0.0',()=>console.log('YIB/WORLD Independent Core listening; persistence='+(pool?'POSTGRES_DURABLE':'LOCAL_FILE_ONLY')))).catch(e=>{console.error('Persistence initialization failed',e.message);process.exit(1);});
