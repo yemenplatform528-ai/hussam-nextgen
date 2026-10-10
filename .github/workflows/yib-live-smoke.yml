@@ -17,30 +17,75 @@ permissions:
 jobs:
   live-smoke:
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 4
     steps:
-      - name: Verify public health, provider, and capability endpoints
+      - name: Verify public endpoints, UI, and fail-closed private routes
         env:
           YIB_BASE_URL: https://yib-world-independent.onrender.com
         run: |
           python - <<'PY'
           import json
           import os
+          import urllib.error
           import urllib.request
 
           base = os.environ["YIB_BASE_URL"].rstrip("/")
-          endpoints = {
-              "/api/health": lambda d: d.get("status") == "PASS" and d.get("service") == "YIB/WORLD Independent Core",
-              "/api/provider": lambda d: d.get("truth") == "OBSERVED" and "provider" in d and "liveModelVerified" in d,
-              "/api/capabilities": lambda d: d.get("truth") == "OBSERVED" and "capabilities" in d,
-          }
-          for path, validate in endpoints.items():
-              req = urllib.request.Request(base + path, headers={"Accept": "application/json", "User-Agent": "YIB-Live-Smoke/1.0"})
-              with urllib.request.urlopen(req, timeout=20) as response:
-                  if response.status != 200:
-                      raise SystemExit(f"{path}: unexpected HTTP {response.status}")
-                  data = json.loads(response.read().decode("utf-8"))
+          headers = {"Accept": "application/json", "User-Agent": "YIB-Live-Smoke/1.1"}
+
+          def get(path):
+              req = urllib.request.Request(base + path, headers=headers)
+              with urllib.request.urlopen(req, timeout=25) as response:
+                  body = response.read().decode("utf-8")
+                  return response.status, response.headers.get("content-type", ""), body
+
+          def check_json(path, validate):
+              status, ctype, body = get(path)
+              if status != 200:
+                  raise SystemExit(f"FAIL {path}: HTTP {status}")
+              if "application/json" not in ctype:
+                  raise SystemExit(f"FAIL {path}: unexpected content type {ctype}")
+              data = json.loads(body)
               if not validate(data):
-                  raise SystemExit(f"{path}: response contract failed: {json.dumps(data, ensure_ascii=False)}")
+                  raise SystemExit(f"FAIL {path}: contract mismatch: {json.dumps(data, ensure_ascii=False)}")
               print(f"PASS {path}: " + json.dumps(data, ensure_ascii=False, separators=(",", ":")))
+              return data
+
+          status, ctype, body = get("/")
+          if status != 200 or "text/html" not in ctype or "الحسام اليمني" not in body:
+              raise SystemExit("FAIL /: public Arabic portal is missing or not HTML")
+          print("PASS /: Arabic portal served")
+
+          health = check_json(
+              "/api/health",
+              lambda d: d.get("status") == "PASS"
+              and d.get("service") == "YIB/WORLD Independent Core"
+              and d.get("persistence") in ("POSTGRES_DURABLE", "LOCAL_FILE_ONLY")
+              and isinstance(d.get("liveModelVerified"), bool),
+          )
+          provider = check_json(
+              "/api/provider",
+              lambda d: d.get("truth") == "OBSERVED"
+              and "provider" in d
+              and isinstance(d.get("liveModelVerified"), bool),
+          )
+          check_json(
+              "/api/capabilities",
+              lambda d: d.get("truth") == "OBSERVED" and "capabilities" in d,
+          )
+
+          if provider.get("provider") == "NONE" and provider.get("liveModelVerified") is True:
+              raise SystemExit("FAIL /api/provider: claims live generation without an enabled provider")
+          if health.get("provider") == "NONE" and health.get("liveModelVerified") is True:
+              raise SystemExit("FAIL /api/health: claims live generation without an enabled provider")
+
+          for path in ("/api/state", "/api/chat", "/api/export"):
+              req = urllib.request.Request(base + path, headers=headers)
+              try:
+                  with urllib.request.urlopen(req, timeout=25) as response:
+                      code = response.status
+              except urllib.error.HTTPError as exc:
+                  code = exc.code
+              if code != 401:
+                  raise SystemExit(f"FAIL {path}: expected unauthenticated HTTP 401, got {code}")
+              print(f"PASS {path}: unauthenticated access denied (HTTP 401)")
           PY
