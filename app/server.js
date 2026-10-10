@@ -122,9 +122,9 @@ const server=http.createServer(async(req,res)=>{
    if(!p) return json(res,200,{truth:'OBSERVED',provider:'NONE',configuredModelAvailable:false,reason:geminiApiKey?'GEMINI_FREE_TIER_GATE_DISABLED':'NO_ENABLED_PROVIDER',generationTested:false});
    try {
     const endpoint=p.name==='GEMINI'
-     ? 'https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(p.model)+'?key='+encodeURIComponent(geminiApiKey)
+     ? 'https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(p.model)
      : 'https://api.openai.com/v1/models';
-    const check=await fetch(endpoint,{headers:p.name==='OPENAI'?{authorization:`Bearer ${openaiApiKey}`}:{},signal:AbortSignal.timeout(8000)});
+    const check=await fetch(endpoint,{headers:p.name==='OPENAI'?{authorization:`Bearer ${openaiApiKey}`}:{'x-goog-api-key':geminiApiKey},signal:AbortSignal.timeout(8000)});
     if(!check.ok) return json(res,200,{truth:'OBSERVED',provider:p.name,model:p.model,credentialAccepted:check.status!==401&&check.status!==403,providerStatus:check.status,configuredModelAvailable:null,generationTested:false,reason:check.status===429?'RATE_LIMIT_OR_QUOTA':'PROVIDER_CHECK_FAILED'});
     const catalog=await check.json();
     const found=p.name==='GEMINI' ? catalog.name?.endsWith('/'+p.model)===true : Array.isArray(catalog.data)&&catalog.data.some(m=>m.id===p.model);
