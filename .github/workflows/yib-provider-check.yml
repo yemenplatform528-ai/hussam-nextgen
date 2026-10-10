@@ -1,0 +1,29 @@
+name: YIB provider adapter syntax check
+
+on:
+  pull_request:
+    branches: [yib-world-independent]
+    paths:
+      - "app/server.js"
+      - "docs/YIB_FREE_TIER_AI_ADAPTER.md"
+      - ".github/workflows/yib-provider-check.yml"
+  push:
+    branches: [feat/yib-free-gemini-runtime]
+    paths:
+      - "app/server.js"
+      - "docs/YIB_FREE_TIER_AI_ADAPTER.md"
+      - ".github/workflows/yib-provider-check.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Validate ESM syntax
+        run: node --input-type=module --check < app/server.js
