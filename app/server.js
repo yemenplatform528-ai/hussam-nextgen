@@ -51,6 +51,20 @@ const getMessages=async()=>{if(!pool)return localMessages();const r=await pool.q
 const saveMessage=async m=>{if(pool){await pool.query('INSERT INTO public.yib_chat_messages(role,content,truth,model,at) VALUES($1,$2,$3,$4,$5)',[m.role,m.content,m.truth||null,m.model||null,m.at||new Date().toISOString()]);return;}fs.appendFileSync(chatFile,JSON.stringify(m)+'\n');};
 async function initPersistence(){
  if(!pool)return;
+ // Bootstrap the minimal schema idempotently so a fresh durable database can start safely.
+ // CREATE TABLE IF NOT EXISTS preserves existing rows and does not rewrite an existing schema.
+ await pool.query(`CREATE TABLE IF NOT EXISTS public.yib_runtime_state (
+  key TEXT PRIMARY KEY,
+  value JSONB NOT NULL
+ )`);
+ await pool.query(`CREATE TABLE IF NOT EXISTS public.yib_chat_messages (
+  id BIGSERIAL PRIMARY KEY,
+  role TEXT NOT NULL,
+  content TEXT NOT NULL,
+  truth TEXT,
+  model TEXT,
+  at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+ )`);
  const state=await pool.query("SELECT key FROM public.yib_runtime_state WHERE key='canonical'");
  if(!state.rowCount){const seed=fs.existsSync(stateFile)?readJson(stateFile):initial;await pool.query('INSERT INTO public.yib_runtime_state(key,value) VALUES($1,$2::jsonb)',['canonical',JSON.stringify(seed)]);}
  const count=await pool.query('SELECT count(*)::int AS n FROM public.yib_chat_messages');
