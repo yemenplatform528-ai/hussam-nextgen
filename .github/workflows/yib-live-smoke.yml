@@ -1,6 +1,12 @@
 name: YIB live endpoint smoke test
 
 on:
+  push:
+    branches: [yib-world-independent]
+    paths:
+      - ".github/workflows/yib-live-smoke.yml"
+      - "app/server.js"
+      - "web/**"
   workflow_dispatch:
   schedule:
     - cron: "17 */6 * * *"
