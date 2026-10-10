@@ -51,19 +51,19 @@ class LocalIntelligenceKernel:
 
     @staticmethod
     def _normalize(text: str) -> str:
-        return re.sub(r"\\s+", " ", text.strip().lower())
+        return re.sub(r"\s+", " ", text.strip().lower())
 
     def route(self, text: str) -> str:
         q = self._normalize(text)
         if not q:
             return "empty"
-        if re.search(r"\\b(status|truth|health|الحقيقة|الحالة|اختبر|تحقق)\\b", q):
+        if re.search(r"\b(status|truth|health|الحقيقة|الحالة|اختبر|تحقق)\b", q):
             return "status"
-        if re.search(r"\\b(resume|continue|اكمل|أكمل|استمر)\\b", q):
+        if re.search(r"\b(resume|continue|اكمل|أكمل|استمر)\b", q):
             return "resume"
-        if re.search(r"\\b(memory|remember|ذاكرة|تذكر|استرجع)\\b", q):
+        if re.search(r"\b(memory|remember|ذاكرة|تذكر|استرجع)\b", q):
             return "memory"
-        if re.search(r"\\b(plan|steps|خطة|خطوات|كيف)\\b", q):
+        if re.search(r"\b(plan|steps|خطة|خطوات|كيف)\b", q):
             return "plan"
         return "general"
 
