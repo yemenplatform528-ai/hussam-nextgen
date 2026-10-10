@@ -27,7 +27,7 @@ After configuring the private environment, redeploy the branch and check:
 3. Send an ordinary test message through the authenticated `POST /api/chat` route. A non-empty successful provider response is the first evidence of live generation; inspect the returned `model` and `truth: "VERIFIED"`.
 4. Repeat with a nonsense/Arabic question, then refresh and confirm the user message and answer remain in chat history.
 5. Test a bad/expired key in a staging environment only; expect an explicit provider error, never a fabricated AI answer.
-6. Check `GET /api/provider` again. Its current `liveModelVerified` flag is intentionally conservative and remains false; a successful chat response is the evidence of generation, not this metadata endpoint.
+6. Check `GET /api/provider` again. After a successful provider generation in the current server process, `liveModelVerified` and `generationTested` become true. A metadata-only check never flips these flags.
 
 ## Truth and limitations
 
