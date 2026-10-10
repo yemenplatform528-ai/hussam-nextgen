@@ -20,6 +20,7 @@ const geminiApiKey = process.env.GEMINI_API_KEY || '';
 const geminiModel = process.env.GEMINI_MODEL || 'gemini-2.5-flash-lite';
 const geminiFreeTierEnabled = process.env.YIB_GEMINI_FREE_TIER_ENABLED === 'true';
 const geminiEnabled = Boolean(geminiApiKey && geminiFreeTierEnabled);
+let lastGenerationVerified = false;
 
 const initial = {
   schema:'YIB-WORLD-INDEPENDENT-v1',
@@ -68,6 +69,7 @@ const localResponse=content=>{
 const configuredProvider=()=>geminiEnabled?{name:'GEMINI',model:geminiModel}:((openaiApiKey && process.env.YIB_ALLOW_BILLABLE_AI === 'true')?{name:'OPENAI',model:openaiModel}:null);
 
 const modelResponse=async(history)=>{
+ lastGenerationVerified=false;
  const provider=configuredProvider();
  if(!provider) return {content:localResponse(history.at(-1)?.content||''),truth:'OBSERVED',model:openaiApiKey?'BILLABLE_AI_DISABLED':'ADAPTER_NOT_CONFIGURED'};
  const instructions='أنت طبقة الذكاء القابلة للاستبدال داخل YIB/WORLD. اليمن هو الغاية؛ الذكاء الاصطناعي طبقة قدرة. كن دقيقًا. لا تدّع تنفيذًا خارجيًا لم يحدث، وافصل VERIFIED عن OBSERVED وUNKNOWN. لا تنفذ آثارًا عالية المخاطر تلقائيًا. أجب بالعربية افتراضيًا.';
@@ -82,6 +84,7 @@ const modelResponse=async(history)=>{
    const data=await r.json();
    const content=(data.candidates?.[0]?.content?.parts||[]).map(p=>p.text||'').join('').trim();
    if(!content) return {content:'وصل رد من مزود Gemini لكنه لا يحتوي على نص قابل للعرض. لم يتم ادعاء نجاح التوليد.',truth:'OBSERVED',model:provider.model};
+   lastGenerationVerified=true;
    return {content,truth:'VERIFIED',model:provider.model,provider:'GEMINI'};
   }
   const input=history.slice(-20).map(m=>({role:m.role==='system'?'assistant':m.role,content:m.content}));
@@ -89,6 +92,7 @@ const modelResponse=async(history)=>{
   if(!r.ok) return {content:'تعذّر الحصول على إجابة من مزود OpenAI (HTTP '+r.status+'). لم يتم اختلاق إجابة.',truth:'OBSERVED',model:provider.model,providerStatus:r.status};
   const data=await r.json();
   if(!String(data.output_text||'').trim()) return {content:'وصل رد من مزود OpenAI دون نص قابل للعرض. لم يتم ادعاء نجاح التوليد.',truth:'OBSERVED',model:provider.model};
+  lastGenerationVerified=true;
   return {content:data.output_text,truth:'VERIFIED',model:provider.model,provider:'OPENAI'};
  } catch(e) {
   return {content:'تعذّر الاتصال بمزود الذكاء الاصطناعي أو انتهت مهلة الانتظار. لم يتم اختلاق إجابة؛ يمكنك إعادة المحاولة.',truth:'OBSERVED',model:provider.model,reason:e?.name==='TimeoutError'?'TIMEOUT':'NETWORK_ERROR'};
@@ -108,9 +112,9 @@ const serveStatic=(u,res)=>{
 const server=http.createServer(async(req,res)=>{
  try{
   const u=new URL(req.url,'http://localhost');
-  if(req.method==='GET'&&u.pathname==='/api/health') {const p=configuredProvider();return json(res,200,{status:'PASS',service:'YIB/WORLD Independent Core',truth:'OBSERVED',provider:p?.name||'NONE',model:p?.model||null,modelConfigured:Boolean(p),liveModelVerified:false,auth:requireAuth?'REQUIRED':'DISABLED',persistence:pool?'POSTGRES_DURABLE':'LOCAL_FILE_ONLY',freeTierGate:geminiFreeTierEnabled,paidOpenAIAllowed:process.env.YIB_ALLOW_BILLABLE_AI==='true',highRisk:'FAIL-CLOSED',time:new Date().toISOString()});}
+  if(req.method==='GET'&&u.pathname==='/api/health') {const p=configuredProvider();return json(res,200,{status:'PASS',service:'YIB/WORLD Independent Core',truth:'OBSERVED',provider:p?.name||'NONE',model:p?.model||null,modelConfigured:Boolean(p),liveModelVerified:lastGenerationVerified,auth:requireAuth?'REQUIRED':'DISABLED',persistence:pool?'POSTGRES_DURABLE':'LOCAL_FILE_ONLY',freeTierGate:geminiFreeTierEnabled,paidOpenAIAllowed:process.env.YIB_ALLOW_BILLABLE_AI==='true',highRisk:'FAIL-CLOSED',time:new Date().toISOString()});}
   if(req.method==='GET'&&u.pathname==='/api/capabilities') {const p=configuredProvider();return json(res,200,{truth:'OBSERVED',capabilities:{localPersistence:pool?'POSTGRES_DURABLE':'LOCAL_FILE_ONLY',localContinuity:'EXECUTABLE',aiAdapter:p?(p.name+'_CONFIGURED_UNVERIFIED'):'NOT_CONFIGURED',generationTested:false,externalFetch:'UNKNOWN',highRiskEffects:'FAIL-CLOSED'}});}
-  if(req.method==='GET'&&u.pathname==='/api/provider') {const p=configuredProvider();return json(res,200,{truth:'OBSERVED',provider:p?.name||'NONE',model:p?.model||null,liveModelVerified:false,generationTested:false,reason:p?'NOT_TESTED':(geminiApiKey?'GEMINI_FREE_TIER_GATE_DISABLED':'NO_ENABLED_PROVIDER')});}
+  if(req.method==='GET'&&u.pathname==='/api/provider') {const p=configuredProvider();return json(res,200,{truth:'OBSERVED',provider:p?.name||'NONE',model:p?.model||null,liveModelVerified:lastGenerationVerified,generationTested:lastGenerationVerified,reason:p?'NOT_TESTED':(geminiApiKey?'GEMINI_FREE_TIER_GATE_DISABLED':'NO_ENABLED_PROVIDER')});}
   if(req.method==='GET'&&!u.pathname.startsWith('/api/')) return serveStatic(u,res);
   if(!auth(req)) return json(res,401,{error:'AUTH_REQUIRED'});
   if(req.method==='GET'&&u.pathname==='/api/provider/check'){
@@ -134,7 +138,7 @@ const server=http.createServer(async(req,res)=>{
    const content=String(b.content||'').trim();if(!content)return json(res,400,{error:'EMPTY_MESSAGE'});
    const now=new Date().toISOString();await saveMessage({role:'user',content,at:now});
    const replyData=await modelResponse(await getMessages());
-   const reply={role:'system',content:replyData.content,truth:replyData.truth,model:replyData.model,at:new Date().toISOString()};
+   const reply={role:'system',content:replyData.content,truth:replyData.truth,model:replyData.model,provider:replyData.provider||null,providerStatus:replyData.providerStatus||null,reason:replyData.reason||null,liveModelVerified:replyData.truth==='VERIFIED'&&Boolean(replyData.provider),at:new Date().toISOString()};
    await saveMessage(reply);return json(res,200,reply);
   }
   if(req.method==='GET'&&u.pathname==='/api/export') return json(res,200,{exportedAt:new Date().toISOString(),state:await getState(),messages:await getMessages(),truth:'OBSERVED',manifest:'YIB-WORLD-INDEPENDENT-v1'});
