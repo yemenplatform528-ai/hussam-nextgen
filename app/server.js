@@ -12,7 +12,7 @@ const stateFile = path.join(dataDir, 'canonical.json');
 const chatFile = path.join(dataDir, 'chat.jsonl');
 const pool=process.env.DATABASE_URL?new pg.Pool({connectionString:process.env.DATABASE_URL,max:2,idleTimeoutMillis:30000}):null;
 
-const requireAuth = process.env.YIB_AUTH_MODE === 'required';
+const requireAuth = process.env.YIB_AUTH_MODE !== 'disabled';
 const accessToken = process.env.YIB_ACCESS_TOKEN || '';
 const openaiApiKey = process.env.OPENAI_API_KEY || '';
 const openaiModel = process.env.OPENAI_MODEL || 'gpt-6-astra';
@@ -40,10 +40,10 @@ if(!fs.existsSync(chatFile)) fs.writeFileSync(chatFile,'');
 const json=(res,status,obj)=>{res.writeHead(status,{'content-type':'application/json; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff','x-frame-options':'DENY'});res.end(JSON.stringify(obj));};
 const auth=req=>!requireAuth || (!!accessToken && req.headers.authorization===`Bearer ${accessToken}`);
 const readJson=f=>JSON.parse(fs.readFileSync(f,'utf8'));
-const localMessages=()=>fs.readFileSync(chatFile,'utf8').trim().split('\\n').filter(Boolean).map(JSON.parse);
+const localMessages=()=>fs.readFileSync(chatFile,'utf8').trim().split('\n').filter(Boolean).map(JSON.parse);
 const getState=async()=>{if(!pool)return readJson(stateFile);const r=await pool.query("SELECT value FROM public.yib_runtime_state WHERE key='canonical'");return r.rows[0]?.value||initial;};
 const getMessages=async()=>{if(!pool)return localMessages();const r=await pool.query('SELECT role,content,truth,model,at FROM public.yib_chat_messages ORDER BY id');return r.rows;};
-const saveMessage=async m=>{if(pool){await pool.query('INSERT INTO public.yib_chat_messages(role,content,truth,model,at) VALUES($1,$2,$3,$4,$5)',[m.role,m.content,m.truth||null,m.model||null,m.at||new Date().toISOString()]);return;}fs.appendFileSync(chatFile,JSON.stringify(m)+'\\n');};
+const saveMessage=async m=>{if(pool){await pool.query('INSERT INTO public.yib_chat_messages(role,content,truth,model,at) VALUES($1,$2,$3,$4,$5)',[m.role,m.content,m.truth||null,m.model||null,m.at||new Date().toISOString()]);return;}fs.appendFileSync(chatFile,JSON.stringify(m)+'\n');};
 async function initPersistence(){
  if(!pool)return;
  const state=await pool.query("SELECT key FROM public.yib_runtime_state WHERE key='canonical'");
