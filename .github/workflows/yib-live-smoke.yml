@@ -1,0 +1,40 @@
+name: YIB live endpoint smoke test
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 */6 * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  live-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Verify public health, provider, and capability endpoints
+        env:
+          YIB_BASE_URL: https://yib-world-independent.onrender.com
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import urllib.request
+
+          base = os.environ["YIB_BASE_URL"].rstrip("/")
+          endpoints = {
+              "/api/health": lambda d: d.get("status") == "PASS" and d.get("service") == "YIB/WORLD Independent Core",
+              "/api/provider": lambda d: d.get("truth") == "OBSERVED" and "provider" in d and "liveModelVerified" in d,
+              "/api/capabilities": lambda d: d.get("truth") == "OBSERVED" and "capabilities" in d,
+          }
+          for path, validate in endpoints.items():
+              req = urllib.request.Request(base + path, headers={"Accept": "application/json", "User-Agent": "YIB-Live-Smoke/1.0"})
+              with urllib.request.urlopen(req, timeout=20) as response:
+                  if response.status != 200:
+                      raise SystemExit(f"{path}: unexpected HTTP {response.status}")
+                  data = json.loads(response.read().decode("utf-8"))
+              if not validate(data):
+                  raise SystemExit(f"{path}: response contract failed: {json.dumps(data, ensure_ascii=False)}")
+              print(f"PASS {path}: " + json.dumps(data, ensure_ascii=False, separators=(",", ":")))
+          PY
