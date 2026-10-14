@@ -54,7 +54,7 @@ start.addEventListener('click',async()=>{if(engine||busy)return;busy=true;start.
 try{
  if(!('gpu'in navigator))throw new Error('المتصفح لا يعلن دعم WebGPU. لم يتم تشغيل نموذج؛ لا يمكن تأكيد التوافق على هذا الجهاز.');
  let webllm;const failures=[];
- for(const url of ['https://esm.sh/@mlc-ai/web-llm@0.2.80','https://cdn.jsdelivr.net/npm/@mlc-ai/web-llm@0.2.80/+esm']){try{webllm=await import(url);if(webllm?.CreateMLCEngine)break;throw new Error('لم يظهر محرك CreateMLCEngine')}catch(e){failures.push(url+' — '+String(e?.message||e))}}
+ for(const url of ['https://esm.run/@mlc-ai/web-llm@0.2.80','https://esm.run/@mlc-ai/web-llm']){try{webllm=await import(url);if(webllm?.CreateMLCEngine)break;throw new Error('لم يظهر محرك CreateMLCEngine')}catch(e){failures.push(url+' — '+String(e?.message||e))}}
  if(!webllm?.CreateMLCEngine)throw new Error('تعذر تحميل مكتبة التشغيل من مصدري التوزيع. '+failures.join(' | '));
  engine=await webllm.CreateMLCEngine('Qwen2.5-0.5B-Instruct-q4f16_1-MLC',{initProgressCallback:p=>{const v=typeof p.progress==='number'?p.progress:0;$('progress').value=v;$('progressText').textContent=p.text||Math.round(v*100)+'%';setStatus('تحميل ملفات النموذج',p.text||Math.round(v*100)+'%')}});
  setStatus('النموذج المحلي جاهز','اكتملت التهيئة. أرسل رسالة لاختبار توليد رد فعلي.');$('modelState').textContent='جاهز';$('modelState').className='green';promptBox.disabled=false;send.disabled=false;start.textContent='النموذج جاهز';start.disabled=true;promptBox.focus();
