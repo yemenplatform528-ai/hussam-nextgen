@@ -35,11 +35,17 @@ start.addEventListener('click',async()=>{
  if(engine||busy)return;busy=true;start.disabled=true;$('progressWrap').classList.remove('hidden');setStatus('جارٍ تهيئة النموذج المحلي','لا يحتاج مفتاح API، لكنه يحتاج تنزيل النموذج ودعم WebGPU.');
  try{
   if(!('gpu' in navigator)){throw new Error('هذا المتصفح لا يعلن دعم WebGPU. جرّب Chrome حديثًا على جهاز يدعم WebGPU؛ لن نعرض المحادثة كأنها متصلة.')}
-  const {CreateMLCEngine}=await import('https://esm.run/@mlc-ai/web-llm@0.2.80');
+  let webllm; let importErrors=[];
+  for (const url of ['https://esm.sh/@mlc-ai/web-llm@0.2.80','https://cdn.jsdelivr.net/npm/@mlc-ai/web-llm@0.2.80/+esm']) {
+   try { webllm=await import(url); if(webllm?.CreateMLCEngine) break; throw new Error('المكتبة لم تعرض CreateMLCEngine'); }
+   catch(importError){importErrors.push(url+': '+String(importError?.message||importError));}
+  }
+  if(!webllm?.CreateMLCEngine) throw new Error('تعذر تنزيل مكتبة تشغيل النموذج من مصدري CDN. '+importErrors.join(' | '));
+  const {CreateMLCEngine}=webllm;
   engine=await CreateMLCEngine('Qwen2.5-0.5B-Instruct-q4f16_1-MLC',{initProgressCallback:p=>{const v=typeof p.progress==='number'?p.progress:0;$('progress').value=v;$('progressText').textContent=p.text||'تحميل النموذج...';setStatus('تحميل النموذج المحلي',p.text||Math.round(v*100)+'%')}}); 
   setStatus('النموذج المحلي جاهز','تم تهيئة المحرك بنجاح. أرسل رسالة لاختبار توليد رد حي.');
   promptBox.disabled=false;send.disabled=false;start.textContent='النموذج جاهز';start.disabled=true;promptBox.focus();
- }catch(e){engine=null;setStatus('تعذر تشغيل النموذج',String(e?.message||e).slice(0,700),true);start.disabled=false;start.textContent='إعادة المحاولة'}finally{busy=false}
+ }catch(e){engine=null;const raw=String(e?.message||e);const detail=/Cache\.add|network error|fetch failed|Failed to fetch|NetworkError/i.test(raw)?'فشل تنزيل أحد ملفات المكتبة أو النموذج بسبب اتصال الشبكة أو حظر CDN. جرّب شبكة أخرى أو أوقف VPN/مانع المحتوى إن وُجد، ثم أعد المحاولة. لم يتم إنشاء اتصال نموذج بعد. التفاصيل: '+raw:raw;setStatus('تعذر تشغيل النموذج',detail.slice(0,1000),true);start.disabled=false;start.textContent='إعادة المحاولة'}finally{busy=false}
 });
 $('form').addEventListener('submit',async e=>{
  e.preventDefault();const text=promptBox.value.trim();if(!text||!engine||busy)return;
