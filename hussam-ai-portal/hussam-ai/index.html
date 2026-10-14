@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b1210">
-<meta name="description" content="Hussam AI — الحسام اليمني، واجهة محادثة مستقلة بتوليد محلي داخل المتصفح.">
+<meta name="description" content="Hussam AI — الحسام اليمني، واجهة محادثة مستقلة تتصل بخادم استدلال مستضاف.">
 <title>Hussam AI | الحسام اليمني ⚔️🇾🇪</title>
 <style>
 :root{color-scheme:dark;--bg:#090f0c;--panel:#111a15;--line:#2a3c31;--text:#edf3ec;--muted:#9eafa2;--gold:#d9bd78;--red:#f0a096;--green:#9bd5ac;--blue:#8db8d8}
@@ -17,50 +17,50 @@ main{width:min(980px,100%);margin:auto}.top{display:flex;align-items:center;gap:
 <div class="layout">
 <div>
 <section class="panel">
-<div id="status" class="status"><strong>النموذج غير متصل</strong><span>هذه واجهة مستقلة. ابدأ تحميل نموذج محلي لتوليد ردود فعلية دون مفتاح API أو حصة API.</span></div>
-<div id="progressWrap" class="hidden" style="margin-top:12px"><progress id="progress" max="1" value="0"></progress><p id="progressText" class="muted">تهيئة النموذج…</p></div>
-<div class="actions"><button id="start" class="primary">تهيئة الذكاء المحلي</button><button id="clear">محادثة جديدة</button></div>
-<p class="muted">في التشغيل الأول يلزم الإنترنت لتنزيل مكتبة التشغيل وملفات النموذج. بعد اكتمال التخزين قد يعمل محليًا دون اتصال بحسب المتصفح والجهاز. لا نعرض «متصل» قبل نجاح التهيئة، ولا نعرض «رد حي ناجح» إلا بعد استلام إجابة مولّدة بالفعل.</p>
+<div id="status" class="status"><strong>جارٍ الاتصال بخادم المحادثة</strong><span>لا توجد تنزيلات نموذج على الهاتف. ستظهر حالة مزود الاستدلال بعد فحص الخادم.</span></div>
+<div class="actions"><button id="clear">محادثة جديدة</button></div>
+<p class="muted">لا تُحمّل ملفات نموذج على هاتفك. يرسل الموقع الرسائل إلى خادم خلفي؛ لا يُعلن نجاح الرد إلا بعد استلام نص مولّد من مزود الاستدلال. قد يتوقف الخادم المجاني مؤقتًا عند الخمول.</p>
 </section>
 <section class="panel">
 <div id="chat" class="chat" aria-live="polite"><div class="msg assistant"><small>Hussam AI · رسالة النظام</small>مرحبًا، أنا الحسام AI. هذه مساحة محادثة منفصلة عن Analyst. لم يُفعّل نموذج التوليد بعد؛ هيّئ النموذج المحلي لتبدأ محادثة فعلية. سأوضح حدود معرفتي ولن أدّعي تنفيذًا لم يحدث.</div></div>
-<form id="form" class="composer"><textarea id="prompt" rows="2" placeholder="اكتب رسالتك إلى الحسام AI…" aria-label="رسالتك" disabled></textarea><button id="send" class="primary" type="submit" disabled>إرسال</button></form>
+<form id="form" class="composer"><textarea id="prompt" rows="2" placeholder="اكتب رسالتك إلى الحسام AI…" aria-label="رسالتك"></textarea><button id="send" class="primary" type="submit">إرسال</button></form>
 </section>
 </div>
 <aside class="side">
 <section class="panel"><h2>حالة التشغيل</h2>
 <div class="fact"><span>هوية الواجهة</span><b class="gold">Hussam AI</b></div>
 <div class="fact"><span>الاعتماد على Analyst</span><b class="green">لا — مساحة منفصلة</b></div>
-<div class="fact"><span>مزود API خارجي</span><b>غير مستخدم</b></div>
-<div class="fact"><span>حالة النموذج</span><b id="modelState" class="red">لم يبدأ</b></div>
+<div class="fact"><span>مسار الاستدلال</span><b>خادم خلفي مستضاف</b></div>
+<div class="fact"><span>حالة مزود الاستدلال</span><b id="modelState" class="red">قيد الفحص</b></div>
 <div class="fact"><span>حفظ سجل الدردشة</span><b>تخزين محلي في هذا المتصفح</b></div>
 </section>
-<section class="panel"><h2>الحقيقة التقنية</h2><p class="muted">الاستقلال هنا يعني واجهة وهوية وسجلًا منفصلًا وتشغيل نموذج محلي عند دعم الجهاز. لا يعني نقل النموذج الخاص الأصلي من Notion، ولا امتلاك موارد حوسبة غير محدودة، ولا ضمان العمل بلا إنترنت منذ أول مرة.</p><p class="muted">النموذج المقترح صغير لتقليل الموارد؛ قد تكون قدرته أقل من النماذج السحابية الكبيرة. لا تُرسل المحادثة إلى خادم استدلال، لكن التنزيل الأول يتصل بمصادر ملفات النموذج.</p></section>
+<section class="panel"><h2>الحقيقة التقنية</h2><p class="muted">لا تُنزّل ملفات نموذج على الجهاز. تتم المعالجة على خادم خلفي عند توافر اعتماد مزود صالح. الخادم الخلفي لا يعني أن مزود الاستدلال مضبوط تلقائيًا؛ تُعرض الحالة الحقيقية كما يراها الخادم.</p><p class="muted">سجل المحادثة محفوظ في هذا المتصفح فقط. لا تُدخل معلومات حساسة ما لم تكن مرتاحًا لإرسالها إلى مزود الاستدلال بعد تفعيله.</p></section>
 <section class="panel links"><h2>مساحة المساعد الأصلي</h2><a href="/notion-analyst-assistant/">فتح Analyst ↗</a><p class="muted">Analyst باقٍ مستقلًا؛ هذه الصفحة ليست إعادة تسمية له.</p></section>
 </aside>
 </div>
 <footer class="foot">Hussam AI · واجهة مستقلة · حالة الاتصال تُثبت بالتجربة لا بالاسم</footer>
 </main>
 <script type="module">
-const $=id=>document.getElementById(id), status=$('status'), start=$('start'), promptBox=$('prompt'), send=$('send'), chat=$('chat');
-const systemPrompt=`أنت Hussam AI (الحسام اليمني)، إعادة تطبيق مستقلة لسلوك المساعد Analyst الذي عرّفه المستخدم في Notion؛ لست النموذج الأصلي نفسه ولا تدّع نقل جلسة أو أوزان النموذج من Notion.\n\nالهوية: منهجي، قائم على البيانات، دقيق، منطقي، يعتمد الأدلة، يفكر بنظام ويتأنى في التحليل. استخدم تعبيرًا موجزًا عالي الكثافة المعلوماتية، وفقرات قصيرة وعناوين واضحة وصوتًا مباشرًا، وتجنب الحشو والتكرار.\n\nالتفاعل: أجب عن الطلب الأساسي مباشرة أولًا. اجمع المعلومات بأسئلة موجهة فقط عندما تكون ضرورية فعلًا. نظّم النقاش بأطر واضحة، واشرح الخطوات العملية بالتتابع، وقدّم ملخصًا كافيًا قبل التوصية، وقارن الخيارات بإيجابياتها وسلبياتها عندما يفيد ذلك. لا تطلب من المستخدم إعادة معلومات قدّمها سابقًا. عند تفويضك بالعمل، واصل التنفيذ ضمن الصلاحيات والأدوات المتاحة بدل الاكتفاء بالشرح، وميّز ما نُفذ فعلًا مما ينتظر إجراءً خارجيًا.\n\nالحقيقة والثقة: استخدم التصنيفات عند الحاجة: VERIFIED (مثبت بدليل)، OBSERVED (ملاحظ)، REPORTED (منقول)، INFERRED (مستنتج)، BLOCKED (متعذر)، UNKNOWN (غير معلوم). لا ترفع UNKNOWN إلى VERIFIED بلا دليل، ولا تدّع اتصالًا أو وصولًا أو تنفيذًا خارجيًا لم يحدث، ولا تختلق مصادر أو نتائج. إذا تعذر اختبار شيء، قل ما الذي اختُبر وما الذي لم يُختبر بوضوح.\n\nاللغة والذاكرة: استخدم العربية افتراضيًا، وراعِ تفضيلات المستخدم الصريحة في سياق المحادثة الحالية. لا تزعم أن تفضيلات جديدة حُفظت بصورة دائمة إلا إذا وُجدت آلية حفظ فعلية ونجحت. كل كلمة يجب أن تضيف فائدة.`;
-let engine=null,busy=false,messages=[{role:'system',content:systemPrompt}];
+const $=id=>document.getElementById(id), status=$('status'), promptBox=$('prompt'), send=$('send'), chat=$('chat');
+const API='https://hussam-ai-inference-bridge.onrender.com';
+const systemPrompt=`أنت Hussam AI (الحسام اليمني)، مساعد مستقل يطبق سلوك Analyst الذي عرّفه المستخدم في Notion؛ لست النموذج الأصلي نفسه ولا تدّع نقل أوزان النموذج أو جلسة Notion. كن منهجيًا، دقيقًا، منطقيًا، قائمًا على الأدلة، موجزًا عالي الكثافة، واستخدم العربية افتراضيًا. أجب عن الطلب الأساسي مباشرة، اشرح الخطوات العملية، وقارن الخيارات عند الحاجة. لا تطلب إعادة معلومات سبق تقديمها. عند التفويض واصل التنفيذ ضمن الأدوات المتاحة وميّز ما نُفذ مما ينتظر إجراءً خارجيًا. لا تدّع اتصالًا أو تنفيذًا لم يحدث ولا تختلق نتائج. ميّز VERIFIED (مثبت)، OBSERVED (ملاحظ)، REPORTED (منقول)، INFERRED (مستنتج)، BLOCKED (متعذر)، UNKNOWN (غير معلوم). لا تدّع أن تفضيلات حُفظت دائمًا إلا إذا نجحت آلية حفظ فعلية.`;
+let messages=[{role:'system',content:systemPrompt}],busy=false,serverReady=false;
 const saved=localStorage.getItem('hussam-ai-independent-chat-v1');
-function renderMessage(role,content){const d=document.createElement('div');d.className='msg '+role;const s=document.createElement('small');s.textContent=role==='user'?'أنت':'Hussam AI · محلي';d.append(s,document.createTextNode(content));chat.append(d);chat.scrollTop=chat.scrollHeight}
+function renderMessage(role,content){const d=document.createElement('div');d.className='msg '+role;const s=document.createElement('small');s.textContent=role==='user'?'أنت':'Hussam AI';d.append(s,document.createTextNode(content));chat.append(d);chat.scrollTop=chat.scrollHeight}
 if(saved){try{const old=JSON.parse(saved);if(Array.isArray(old)){for(const m of old){if(m.role==='user'||m.role==='assistant'){messages.push(m);renderMessage(m.role,m.content)}}}}catch{}}
 function setStatus(title,detail,bad=false){status.className='status'+(bad?' bad':'');status.replaceChildren();const b=document.createElement('strong');b.textContent=title;status.append(b,document.createTextNode(detail?' '+detail:''))}
 function persist(){localStorage.setItem('hussam-ai-independent-chat-v1',JSON.stringify(messages.filter(m=>m.role!=='system').slice(-60)))}
-start.addEventListener('click',async()=>{if(engine||busy)return;busy=true;start.disabled=true;$('progressWrap').classList.remove('hidden');setStatus('جارٍ تحميل محرك النموذج','لا يحتاج API، لكنه يحتاج إنترنتًا في المرة الأولى.');$('modelState').textContent='جارٍ التحميل';$('modelState').className='gold';
-try{
- if(!('gpu'in navigator))throw new Error('المتصفح لا يعلن دعم WebGPU. لم يتم تشغيل نموذج؛ لا يمكن تأكيد التوافق على هذا الجهاز.');
- let webllm;const failures=[];
- for(const url of ['https://esm.run/@mlc-ai/web-llm@0.2.80','https://esm.run/@mlc-ai/web-llm']){try{webllm=await import(url);if(webllm?.CreateMLCEngine)break;throw new Error('لم يظهر محرك CreateMLCEngine')}catch(e){failures.push(url+' — '+String(e?.message||e))}}
- if(!webllm?.CreateMLCEngine)throw new Error('تعذر تحميل مكتبة التشغيل من مصدري التوزيع. '+failures.join(' | '));
- engine=await webllm.CreateMLCEngine('Qwen2.5-0.5B-Instruct-q4f16_1-MLC',{initProgressCallback:p=>{const v=typeof p.progress==='number'?p.progress:0;$('progress').value=v;$('progressText').textContent=p.text||Math.round(v*100)+'%';setStatus('تحميل ملفات النموذج',p.text||Math.round(v*100)+'%')}});
- setStatus('النموذج المحلي جاهز','اكتملت التهيئة. أرسل رسالة لاختبار توليد رد فعلي.');$('modelState').textContent='جاهز';$('modelState').className='green';promptBox.disabled=false;send.disabled=false;start.textContent='النموذج جاهز';start.disabled=true;promptBox.focus();
-}catch(e){engine=null;const raw=String(e?.message||e);const detail=/Cache\.add|network error|fetch failed|Failed to fetch|NetworkError/i.test(raw)?'فشل تنزيل مورد من الشبكة أو تخزينه في المتصفح. قد يكون السبب الاتصال أو الحظر أو مصدر ملفات النموذج. لم يثبت الاتصال بعد. التفاصيل: '+raw:raw;setStatus('تعذر تشغيل النموذج',detail.slice(0,900),true);$('modelState').textContent='متعذر';$('modelState').className='red';start.disabled=false;start.textContent='إعادة المحاولة'}finally{busy=false}});
-$('form').addEventListener('submit',async e=>{e.preventDefault();const text=promptBox.value.trim();if(!text||!engine||busy)return;busy=true;promptBox.value='';promptBox.disabled=true;send.disabled=true;messages.push({role:'user',content:text});renderMessage('user',text);persist();const pending=document.createElement('div');pending.className='msg assistant';pending.textContent='Hussam AI يفكر…';chat.append(pending);chat.scrollTop=chat.scrollHeight;
-try{const result=await engine.chat.completions.create({messages:messages.slice(-18),temperature:.65,max_tokens:512});const answer=result.choices?.[0]?.message?.content?.trim();if(!answer)throw new Error('لم يرجع المحرك نصًا للإجابة.');pending.replaceChildren();const label=document.createElement('small');label.textContent='Hussam AI · نموذج محلي';pending.append(label,document.createTextNode(answer));messages.push({role:'assistant',content:answer});persist();setStatus('اختبار التوليد ناجح','وصل رد فعلي من النموذج المحلي على هذا الجهاز.');}catch(err){pending.remove();messages.pop();setStatus('فشل توليد الرد',String(err?.message||err).slice(0,500),true)}finally{busy=false;promptBox.disabled=!engine;send.disabled=!engine;promptBox.focus()}});
-$('clear').addEventListener('click',()=>{messages=[{role:'system',content:systemPrompt}];localStorage.removeItem('hussam-ai-independent-chat-v1');chat.replaceChildren();renderMessage('assistant','بدأت محادثة جديدة. هيّئ النموذج المحلي إذا لم يكن جاهزًا بعد.')});
-window.addEventListener('load',()=>{if(!engine&&!busy)start.click()},{once:true});
+async function checkHealth(){
+ try{const r=await fetch(API+'/health',{cache:'no-store'});const d=await r.json();if(!r.ok)throw Error('health status '+r.status);
+ serverReady=true;
+ if(d.inferenceConfigured){$('modelState').textContent='المزود مضبوط — يحتاج اختبار رد';$('modelState').className='gold';setStatus('خادم المحادثة متصل','المزود مضبوط حسب إعداد الخادم؛ لم نثبت توليد رد بعد.')}
+ else{$('modelState').textContent='اعتماد المزود مفقود';$('modelState').className='red';setStatus('الخادم متصل، لكن الذكاء غير مفعّل','لم يُضبط اعتماد صالح لمزود الاستدلال. لا يمكن توليد رد حتى يُضبط.',true)}
+ }catch{$('modelState').textContent='الخادم غير متاح';$('modelState').className='red';setStatus('تعذر الاتصال بخادم المحادثة','قد يكون النشر جاريًا أو الخادم المجاني في وضع الخمول. لم يتم توليد أي رد.',true)}
+}
+$('form').addEventListener('submit',async e=>{e.preventDefault();const text=promptBox.value.trim();if(!text||busy)return;busy=true;promptBox.value='';promptBox.disabled=true;send.disabled=true;messages.push({role:'user',content:text});renderMessage('user',text);persist();const pending=document.createElement('div');pending.className='msg assistant';pending.textContent='جارٍ طلب الرد من خادم الاستدلال…';chat.append(pending);chat.scrollTop=chat.scrollHeight;
+try{const r=await fetch(API+'/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages:messages.slice(-18)})});const data=await r.json().catch(()=>({}));if(!r.ok)throw Error(data.message||data.error||('HTTP '+r.status));if(typeof data.answer!=='string'||!data.answer.trim())throw Error('لم يرجع مزود الاستدلال إجابة نصية.');const answer=data.answer.trim();pending.replaceChildren();const label=document.createElement('small');label.textContent='Hussam AI · رد من الخادم';pending.append(label,document.createTextNode(answer));messages.push({role:'assistant',content:answer});persist();setStatus('وصل رد مولّد فعليًا','استُلم نص من مزود الاستدلال عبر الخادم الخلفي.');$('modelState').textContent='نجاح رد مثبت';$('modelState').className='green';}
+catch(err){pending.remove();messages.pop();const reason=String(err?.message||err);renderMessage('assistant','تعذر توليد الرد: '+reason);setStatus('لم يثبت توليد رد',reason,true)}
+finally{busy=false;promptBox.disabled=false;send.disabled=false;promptBox.focus()}});
+$('clear').addEventListener('click',()=>{messages=[{role:'system',content:systemPrompt}];localStorage.removeItem('hussam-ai-independent-chat-v1');chat.replaceChildren();renderMessage('assistant','بدأت محادثة جديدة. حالة الاتصال والاستدلال ظاهرة أعلى الصفحة.')});
+checkHealth();
 </script></body></html>
