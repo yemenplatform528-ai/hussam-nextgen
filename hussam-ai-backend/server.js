@@ -65,8 +65,7 @@ async function generateWithGemini(messages, model) {
         // If the configured model has exhausted its quota, try the other dashboard-confirmed
         // free-tier Flash models once in order. Do not keep cycling after a fallback model is quota-limited.
         const canFallback = response.status === 503 || response.status === 404 ||
-          error.providerStatus === "UNAVAILABLE" || error.providerStatus === "NOT_FOUND" ||
-          response.status === 429;
+          error.providerStatus === "UNAVAILABLE" || error.providerStatus === "NOT_FOUND";
         if (canFallback) continue;
         throw error;
       }
@@ -81,7 +80,7 @@ async function generateWithGemini(messages, model) {
       return { answer, model: candidateModel };
     } catch (error) {
       if (error?.message === "GEMINI_REQUEST_FAILED" &&
-          (error.status === 503 || error.status === 404 || error.status === 429 ||
+          (error.status === 503 || error.status === 404 ||
            error.providerStatus === "UNAVAILABLE" || error.providerStatus === "NOT_FOUND")) {
         lastError = error;
         continue;
