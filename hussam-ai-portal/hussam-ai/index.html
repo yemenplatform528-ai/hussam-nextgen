@@ -22,7 +22,7 @@ main{width:min(980px,100%);margin:auto}.top{display:flex;align-items:center;gap:
 <p class="muted">لا تُحمّل ملفات نموذج على هاتفك. يرسل الموقع الرسائل إلى خادم خلفي؛ لا يُعلن نجاح الرد إلا بعد استلام نص مولّد من مزود الاستدلال. قد يتوقف الخادم المجاني مؤقتًا عند الخمول.</p>
 </section>
 <section class="panel">
-<div id="chat" class="chat" aria-live="polite"><div class="msg assistant"><small>Hussam AI · رسالة النظام</small>مرحبًا، أنا الحسام AI. هذه مساحة محادثة منفصلة عن Analyst. لم يُفعّل نموذج التوليد بعد؛ اضبط اعتماد مزود الاستدلال على الخادم لتبدأ محادثة فعلية. سأوضح حدود معرفتي ولن أدّعي تنفيذًا لم يحدث.</div></div>
+<div id="chat" class="chat" aria-live="polite"><div class="msg assistant"><small>Hussam AI · رسالة النظام</small>مرحبًا، أنا الحسام AI. هذه مساحة محادثة مستقلة عن Analyst. الاتصال بمزود الاستدلال مضبوط، وسأتحقق من كل رد عند إرساله. سأوضح حدود معرفتي ولن أدّعي تنفيذًا لم يحدث.</div></div>
 <form id="form" class="composer"><textarea id="prompt" rows="2" placeholder="اكتب رسالتك إلى الحسام AI…" aria-label="رسالتك"></textarea><button id="send" class="primary" type="submit">إرسال</button></form>
 </section>
 </div>
@@ -34,7 +34,7 @@ main{width:min(980px,100%);margin:auto}.top{display:flex;align-items:center;gap:
 <div class="fact"><span>حالة مزود الاستدلال</span><b id="modelState" class="red">قيد الفحص</b></div>
 <div class="fact"><span>حفظ سجل الدردشة</span><b>تخزين محلي في هذا المتصفح</b></div>
 </section>
-<section class="panel"><h2>الحقيقة التقنية</h2><p class="muted">لا تُنزّل ملفات نموذج على الجهاز. تتم المعالجة على خادم خلفي عند توافر اعتماد مزود صالح. الخادم الخلفي لا يعني أن مزود الاستدلال مضبوط تلقائيًا؛ تُعرض الحالة الحقيقية كما يراها الخادم.</p><p class="muted">سجل المحادثة محفوظ في هذا المتصفح فقط. لا تُدخل معلومات حساسة ما لم تكن مرتاحًا لإرسالها إلى مزود الاستدلال بعد تفعيله.</p></section>
+<section class="panel"><h2>الحقيقة التقنية</h2><p class="muted">لا تُنزّل ملفات نموذج على الجهاز. تتم المعالجة على خادم خلفي عند توافر اعتماد مزود صالح. تستخدم هذه الواجهة خادم استدلال خلفيًا. يُعرض نجاح التوليد فقط بعد استلام رد فعلي. لا تدخل معلومات حساسة في المحادثة.</p><p class="muted">سجل المحادثة محفوظ في هذا المتصفح فقط. لا تُدخل معلومات حساسة ما لم تكن مرتاحًا لإرسالها إلى مزود الاستدلال بعد تفعيله.</p></section>
 <section class="panel links"><h2>مساحة المساعد الأصلي</h2><a href="/notion-analyst-assistant/">فتح Analyst ↗</a><p class="muted">Analyst باقٍ مستقلًا؛ هذه الصفحة ليست إعادة تسمية له.</p></section>
 </aside>
 </div>
@@ -53,7 +53,7 @@ function persist(){localStorage.setItem('hussam-ai-independent-chat-v1',JSON.str
 async function checkHealth(){
  try{const r=await fetch(API+'/health',{cache:'no-store'});const d=await r.json();if(!r.ok)throw Error('health status '+r.status);
  serverReady=true;
- if(d.inferenceConfigured){$('modelState').textContent='المزود مضبوط — يحتاج اختبار رد';$('modelState').className='gold';setStatus('خادم المحادثة متصل','المزود مضبوط حسب إعداد الخادم؛ لم نثبت توليد رد بعد.')}
+ if(d.inferenceConfigured){$('modelState').textContent='المزود مضبوط — يحتاج اختبار رد';$('modelState').className='gold';setStatus('خادم المحادثة متصل','المزود مضبوط حسب إعداد الخادم؛ أرسل رسالة لاختبار توليد الرد.')}
  else{$('modelState').textContent='اعتماد المزود مفقود';$('modelState').className='red';setStatus('الخادم متصل، لكن الذكاء غير مفعّل','لم يُضبط اعتماد صالح لمزود الاستدلال. لا يمكن توليد رد حتى يُضبط.',true)}
  }catch{$('modelState').textContent='الخادم غير متاح';$('modelState').className='red';setStatus('تعذر الاتصال بخادم المحادثة','قد يكون النشر جاريًا أو الخادم المجاني في وضع الخمول. لم يتم توليد أي رد.',true)}
 }
