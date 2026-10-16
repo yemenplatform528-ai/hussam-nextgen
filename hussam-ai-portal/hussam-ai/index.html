@@ -11,10 +11,59 @@
 *{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(ellipse at 50% -12%,#2b4533,transparent 58%),var(--bg);color:var(--text);font:15px/1.8 Tahoma,Arial,sans-serif;padding:12px}
 main{width:min(980px,100%);margin:auto}.top{display:flex;align-items:center;gap:14px;padding:14px 4px 20px}.mark{width:62px;height:62px;flex:none;display:grid;place-items:center;border:1px solid #7c6940;border-radius:20px;color:var(--gold);font-size:30px;background:#17231a}.brand h1{margin:0;font-size:clamp(25px,5vw,36px);line-height:1.3}.brand p{margin:5px 0 0;color:var(--muted);font-size:12px}.tag{margin-inline-start:auto;border:1px solid #3d5943;border-radius:99px;padding:5px 10px;color:var(--green);font-size:10px;white-space:nowrap}
 .layout{display:grid;grid-template-columns:minmax(0,1fr) 260px;gap:12px}.panel{border:1px solid var(--line);border-radius:17px;background:#111a15ed;padding:15px;margin-bottom:12px}.status{border:1px solid #3d5943;background:#1b261e;border-radius:12px;padding:11px 13px;font-size:12px}.status.bad{border-color:#68433d;background:#301e1b}.status strong{display:block;font-size:13px;margin-bottom:3px}.muted{color:var(--muted);font-size:11px}.chat{display:flex;flex-direction:column;gap:12px;min-height:300px;max-height:55vh;overflow:auto;padding:8px 2px}.msg{white-space:pre-wrap;overflow-wrap:anywhere;padding:12px 14px;border-radius:14px;max-width:96%;font-size:14px}.user{align-self:flex-start;background:#27382a;border:1px solid #3d5943}.assistant{align-self:flex-end;background:#1a211b;border:1px solid #354239}.msg small{display:block;color:var(--muted);font-size:10px;margin-bottom:4px}.composer{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:end;border-top:1px solid var(--line);padding-top:12px}textarea{font:inherit;background:#0b100d;color:var(--text);border:1px solid var(--line);border-radius:12px;padding:12px;width:100%;min-height:54px;max-height:170px;resize:vertical;outline:none}button{font:inherit;cursor:pointer;border:1px solid #76643c;border-radius:11px;padding:10px 14px;background:#263326;color:var(--text)}button:disabled{opacity:.45;cursor:not-allowed}.primary{background:var(--gold);color:#172016;border-color:var(--gold);font-weight:bold}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.actions button{font-size:12px}.side h2{font-size:14px;margin:0 0 8px}.fact{padding:9px 0;border-bottom:1px solid #27372d;font-size:11px}.fact span{display:block;color:var(--muted)}.fact b{font-weight:normal}.green{color:var(--green)}.gold{color:var(--gold)}.red{color:var(--red)}progress{width:100%;height:8px;accent-color:var(--gold)}.hidden{display:none!important}.foot{text-align:center;color:var(--muted);font-size:10px;padding:12px}.links a{color:var(--gold);font-size:11px}@media(max-width:720px){.layout{grid-template-columns:1fr}.side{order:2}.chat{min-height:220px;max-height:50vh}.tag{display:none}}@media(max-width:460px){body{padding:8px}.panel{padding:11px}.composer{grid-template-columns:1fr}.composer button{width:100%}.top{gap:10px}.mark{width:50px;height:50px;border-radius:15px}}
-</style></head>
+</style>
+<style>
+/* Operations dashboard */
+.navbar{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 12px}.navbtn{flex:1;min-width:120px}.navbtn[aria-pressed="true"]{background:var(--gold);color:#172016;font-weight:bold}
+.dashgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.metric{border:1px solid var(--line);background:#0d1510;border-radius:12px;padding:12px;min-width:0}.metric span{display:block;color:var(--muted);font-size:11px}.metric strong{display:block;font-size:16px;overflow-wrap:anywhere}.dashsection{margin-top:14px}.dashsection h3{font-size:13px;margin:0 0 8px}.toolrow{display:flex;gap:8px;flex-wrap:wrap}.toolrow button{flex:1;min-width:130px}.filelabel{display:inline-flex;align-items:center;justify-content:center;border:1px solid #76643c;border-radius:11px;padding:10px 14px;background:#263326;color:var(--text);font-size:12px;cursor:pointer}.logbox{background:#080d0a;border:1px solid var(--line);border-radius:10px;padding:10px;white-space:pre-wrap;overflow-wrap:anywhere;font:11px/1.6 monospace;max-height:190px;overflow:auto}.notice{font-size:11px;color:var(--muted);margin:8px 0 0}
+@media(max-width:460px){.dashgrid{grid-template-columns:1fr}.toolrow button,.filelabel{width:100%}}
+</style>
+</head>
 <body><main>
 <header class="top"><div class="mark">⚔</div><div class="brand"><h1>Hussam AI</h1><p>الحسام اليمني 🇾🇪 · مساحة محادثة مستقلة</p></div><span class="tag">مستقل عن Analyst</span></header>
-<div class="layout">
+
+<div class="navbar" role="navigation" aria-label="التنقل الرئيسي">
+<button id="navChat" class="navbtn" aria-pressed="true">المحادثة</button>
+<button id="navDashboard" class="navbtn" aria-pressed="false">لوحة القيادة</button>
+</div>
+<section id="dashboard" class="panel hidden" aria-label="لوحة القيادة التشغيلية">
+<h2 style="margin:0 0 4px;font-size:18px">مركز قيادة الحسام</h2>
+<p class="muted">مراقبة مباشرة للخدمة، واختبار الاستدلال، وإدارة سجلّك المحلي. كل حالة تُعرض حسب نتيجة الفحص الفعلية.</p>
+<div class="dashgrid">
+<div class="metric"><span>واجهة الحسام</span><strong id="dashPortal">قيد الفحص</strong></div>
+<div class="metric"><span>خادم الاستدلال</span><strong id="dashServer">قيد الفحص</strong></div>
+<div class="metric"><span>مزود / نموذج</span><strong id="dashProvider">غير معروف</strong></div>
+<div class="metric"><span>سجل هذه الجلسة</span><strong id="dashMessages">0 رسالة</strong></div>
+<div class="metric"><span>الحفظ</span><strong id="dashStorage">محلي على هذا الجهاز</strong></div>
+<div class="metric"><span>آخر فحص</span><strong id="dashLastCheck">لم يُفحص بعد</strong></div>
+</div>
+<div class="dashsection"><h3>التشخيص والتحقق</h3>
+<div class="toolrow">
+<button id="refreshDashboard">تحديث الفحوصات</button>
+<button id="testInference">اختبار استدلال حي</button>
+<button id="copyDiagnostics">نسخ تقرير التشخيص</button>
+</div>
+<p class="notice">اختبار الاستدلال يرسل رسالة اختبار عامة إلى المزود ويستهلك طلبًا واحدًا. لا يتضمن سجل محادثتك أو معلوماتك الشخصية.</p>
+<div id="diagnostics" class="logbox" style="margin-top:10px">لم يُنفّذ فحص بعد.</div>
+</div>
+<div class="dashsection"><h3>الذاكرة وسجل المحادثة</h3>
+<div class="toolrow">
+<button id="exportMemory">تصدير السجل والذاكرة</button>
+<label class="filelabel" for="importMemory">استيراد نسخة محفوظة</label><input id="importMemory" class="hidden" type="file" accept="application/json,.json">
+<button id="clearMemory">مسح سجل هذا الجهاز</button>
+</div>
+<p class="notice">التصدير ينشئ نسخة JSON على جهازك. الاستيراد يستبدل سجل المحادثة الحالي. لا توجد حتى الآن ذاكرة سحابية مشتركة مؤكدة بين الأجهزة.</p>
+</div>
+<div class="dashsection"><h3>إدارة البنية التحتية</h3>
+<div class="toolrow">
+<button id="openRender">فتح إدارة الخدمات</button>
+<button id="openRepo">فتح الشفرة المصدرية</button>
+<button id="openDeploys">فتح سجل النشر</button>
+</div>
+<p class="notice">عمليات تغيير المفاتيح السرية أو إعدادات النشر تتطلب صلاحية مالك آمنة في الخادم؛ لن نعرض مفاتيح أو نسمح بتغييرات إدارية غير محمية من المتصفح.</p>
+</div>
+</section>
+<div id="chatLayout" class="layout">
 <div>
 <section class="panel">
 <div id="status" class="status"><strong>جارٍ الاتصال بخادم المحادثة</strong><span>لا توجد تنزيلات نموذج على الهاتف. ستظهر حالة مزود الاستدلال بعد فحص الخادم.</span></div>
@@ -62,5 +111,22 @@ try{const r=await fetch(API+'/api/chat',{method:'POST',headers:{'Content-Type':'
 catch(err){pending.remove();messages.pop();const reason=String(err?.message||err);renderMessage('assistant','تعذر توليد الرد: '+reason);setStatus('لم يثبت توليد رد',reason,true)}
 finally{busy=false;promptBox.disabled=false;send.disabled=false;promptBox.focus()}});
 $('clear').addEventListener('click',()=>{messages=[{role:'system',content:systemPrompt}];localStorage.removeItem('hussam-ai-independent-chat-v1');chat.replaceChildren();renderMessage('assistant','بدأت محادثة جديدة. حالة الاتصال والاستدلال ظاهرة أعلى الصفحة.')});
-checkHealth();
+
+const navChat=$('navChat'),navDashboard=$('navDashboard'),dashboard=$('dashboard'),chatLayout=$('chatLayout');
+function showView(which){const dash=which==='dashboard';dashboard.classList.toggle('hidden',!dash);chatLayout.classList.toggle('hidden',dash);navChat.setAttribute('aria-pressed',String(!dash));navDashboard.setAttribute('aria-pressed',String(dash));if(dash)refreshDashboard();}
+navChat.addEventListener('click',()=>showView('chat'));navDashboard.addEventListener('click',()=>showView('dashboard'));
+function updateDashCounts(){const count=messages.filter(m=>m.role==='user'||m.role==='assistant').length;$('dashMessages').textContent=count+' رسالة';$('dashStorage').textContent='محلي على هذا الجهاز';$('dashPortal').textContent='يعمل داخل الصفحة';}
+function diagnosticLine(message){const el=$('diagnostics');const stamp=new Date().toLocaleString();el.textContent='['+stamp+'] '+message+'\n'+el.textContent.slice(0,3000);}
+async function refreshDashboard(){updateDashCounts();$('dashLastCheck').textContent='جارٍ الفحص…';$('dashServer').textContent='قيد الفحص';try{const r=await fetch(API+'/health',{cache:'no-store'});const d=await r.json();if(!r.ok)throw Error('HTTP '+r.status);$('dashServer').textContent='متصل · HTTP '+r.status;$('dashProvider').textContent=String(d.provider||'غير معروف')+' / '+String(d.model||'غير معروف');$('dashLastCheck').textContent=new Date().toLocaleTimeString();$('dashServer').style.color=d.inferenceConfigured?'var(--green)':'var(--red)';diagnosticLine('فحص الصحة: HTTP '+r.status+'؛ provider='+String(d.provider)+'؛ model='+String(d.model)+'؛ inferenceConfigured='+String(d.inferenceConfigured));}catch(e){$('dashServer').textContent='غير متاح';$('dashProvider').textContent='غير مثبت';$('dashLastCheck').textContent=new Date().toLocaleTimeString();diagnosticLine('فشل فحص الصحة: '+String(e.message||e));}}
+$('refreshDashboard').addEventListener('click',refreshDashboard);
+$('testInference').addEventListener('click',async()=>{const b=$('testInference');b.disabled=true;b.textContent='جارٍ الاختبار…';try{const r=await fetch(API+'/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages:[{role:'system',content:'Return only the exact text HUSSAM_DASHBOARD_LIVE_TEST_OK. Do not add punctuation.'},{role:'user',content:'HUSSAM_DASHBOARD_LIVE_TEST'}]})});const d=await r.json().catch(()=>({}));if(!r.ok)throw Error('HTTP '+r.status+' '+String(d.error||d.message||''));if(typeof d.answer!=='string'||!d.answer.trim())throw Error('رد فارغ');diagnosticLine('اختبار الاستدلال: نجح HTTP '+r.status+'؛ provider='+String(d.provider)+'؛ model='+String(d.model)+'؛ answer='+d.answer.slice(0,180));$('dashProvider').textContent=String(d.provider||'؟')+' / '+String(d.model||'؟');}catch(e){diagnosticLine('اختبار الاستدلال: فشل — '+String(e.message||e));}finally{b.disabled=false;b.textContent='اختبار استدلال حي';}});
+$('copyDiagnostics').addEventListener('click',async()=>{const report='Hussam AI dashboard diagnostics\nTime: '+new Date().toISOString()+'\nMessages: '+messages.length+'\n'+$('diagnostics').textContent;try{await navigator.clipboard.writeText(report);diagnosticLine('تم نسخ تقرير التشخيص إلى الحافظة.')}catch{diagnosticLine('تعذر النسخ التلقائي؛ حدّد نص التقرير وانسخه يدويًا.')}});
+$('exportMemory').addEventListener('click',()=>{const data={format:'hussam-ai-local-memory',version:1,exportedAt:new Date().toISOString(),messages:messages.filter(m=>m.role==='user'||m.role==='assistant')};const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='hussam-ai-memory-'+new Date().toISOString().slice(0,10)+'.json';a.click();URL.revokeObjectURL(url);diagnosticLine('تم تجهيز نسخة JSON محلية من سجل المحادثة.');});
+$('importMemory').addEventListener('change',async e=>{const file=e.target.files?.[0];if(!file)return;try{const data=JSON.parse(await file.text());const arr=Array.isArray(data)?data:data.messages;if(!Array.isArray(arr)||arr.length>500||arr.some(m=>!m||!['user','assistant'].includes(m.role)||typeof m.content!=='string'||m.content.length>20000))throw Error('صيغة غير صالحة');if(!confirm('سيُستبدل سجل المحادثة الحالي بمحتوى الملف. هل تتابع؟'))return;messages=[{role:'system',content:systemPrompt},...arr.slice(-60)];localStorage.setItem('hussam-ai-independent-chat-v1',JSON.stringify(messages.slice(1)));chat.replaceChildren();for(const m of messages.slice(1))renderMessage(m.role,m.content);updateDashCounts();diagnosticLine('تم استيراد '+(messages.length-1)+' رسالة من نسخة محلية.');}catch(err){diagnosticLine('فشل الاستيراد: '+String(err.message||err));alert('تعذر استيراد النسخة: '+String(err.message||err));}finally{e.target.value='';}});
+$('clearMemory').addEventListener('click',()=>{if(!confirm('هل تريد مسح سجل المحادثة المحفوظ على هذا الجهاز؟ لا يمكن التراجع إلا بوجود نسخة مُصدّرة.'))return;messages=[{role:'system',content:systemPrompt}];localStorage.removeItem('hussam-ai-independent-chat-v1');chat.replaceChildren();renderMessage('assistant','تم مسح السجل المحلي وبدأت محادثة جديدة.');updateDashCounts();diagnosticLine('تم مسح السجل المحلي بعد تأكيدك.');});
+$('openRender').addEventListener('click',()=>window.open('https://dashboard.render.com/','_blank','noopener,noreferrer'));
+$('openRepo').addEventListener('click',()=>window.open('https://github.com/yemenplatform528-ai/hussam-nextgen/tree/hussam-ai-standalone-portal','_blank','noopener,noreferrer'));
+$('openDeploys').addEventListener('click',()=>window.open('https://dashboard.render.com/static/srv-db7rat2j9qps73dfhmc0','_blank','noopener,noreferrer'));
+
+checkHealth();refreshDashboard();
 </script></body></html>
