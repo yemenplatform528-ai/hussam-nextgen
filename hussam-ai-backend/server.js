@@ -147,6 +147,14 @@ const server = http.createServer(async (req, res) => {
       truth: "VERIFIED_RESPONSE"
     }));
   } catch (error) {
+    // Log only sanitized upstream diagnostics; never log API keys, headers, prompts, or provider response bodies.
+    console.warn("Inference upstream failure", JSON.stringify({
+      provider: active.provider,
+      model: active.model,
+      status: Number.isInteger(error?.status) ? error.status : null,
+      errorName: typeof error?.name === "string" ? error.name : "Error",
+      errorCode: typeof error?.cause?.code === "string" ? error.cause.code : null
+    }));
     const status = error?.status === 429 ? 429 : 502;
     res.writeHead(status);
     return res.end(JSON.stringify({
