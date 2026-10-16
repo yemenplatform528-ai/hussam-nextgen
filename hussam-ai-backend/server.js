@@ -27,35 +27,66 @@ async function generateWithGemini(messages, model) {
   }));
   if (!contents.length) throw new Error("NO_USER_CONTENT");
 
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
-    {
-      method: "POST",
-      headers: {
-        "x-goog-api-key": GEMINI_API_KEY,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        ...(systemText ? { systemInstruction: { parts: [{ text: systemText }] } } : {}),
-        contents,
-        generationConfig: { temperature: 0.65, maxOutputTokens: 800 }
-      }),
-      signal: AbortSignal.timeout(60_000)
+  // Use documented text-generation models as bounded fallbacks only for temporary
+  // availability or missing-model errors. Never retry quota or authentication failures.
+  const models = [...new Set([
+    model,
+    "gemini-3.6-flash",
+    "gemini-3.5-flash-lite",
+    "gemini-3.1-flash-lite"
+  ].filter(Boolean))];
+  let lastError;
+  for (const candidateModel of models) {
+    try {
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(candidateModel)}:generateContent`,
+        {
+          method: "POST",
+          headers: {
+            "x-goog-api-key": GEMINI_API_KEY,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            ...(systemText ? { systemInstruction: { parts: [{ text: systemText }] } } : {}),
+            contents,
+            generationConfig: { temperature: 0.65, maxOutputTokens: 800 }
+          }),
+          signal: AbortSignal.timeout(60_000)
+        }
+      );
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        const error = new Error("GEMINI_REQUEST_FAILED");
+        error.status = response.status;
+        error.model = candidateModel;
+        error.providerStatus = typeof data?.error?.status === "string" ? data.error.status : null;
+        error.providerMessage = typeof data?.error?.message === "string" ? data.error.message.slice(0, 300) : null;
+        lastError = error;
+        const canFallback = response.status === 503 || response.status === 404 ||
+          error.providerStatus === "UNAVAILABLE" || error.providerStatus === "NOT_FOUND";
+        if (canFallback) continue;
+        throw error;
+      }
+      const answer = data?.candidates?.[0]?.content?.parts
+        ?.map(part => typeof part.text === "string" ? part.text : "")
+        .join("").trim();
+      if (!answer) {
+        const error = new Error("EMPTY_MODEL_RESPONSE");
+        error.model = candidateModel;
+        throw error;
+      }
+      return { answer, model: candidateModel };
+    } catch (error) {
+      if (error?.message === "GEMINI_REQUEST_FAILED" &&
+          (error.status === 503 || error.status === 404 ||
+           error.providerStatus === "UNAVAILABLE" || error.providerStatus === "NOT_FOUND")) {
+        lastError = error;
+        continue;
+      }
+      throw error;
     }
-  );
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    const error = new Error("GEMINI_REQUEST_FAILED");
-    error.status = response.status;
-    error.providerStatus = typeof data?.error?.status === "string" ? data.error.status : null;
-    error.providerMessage = typeof data?.error?.message === "string" ? data.error.message.slice(0, 300) : null;
-    throw error;
   }
-  const answer = data?.candidates?.[0]?.content?.parts
-    ?.map(part => typeof part.text === "string" ? part.text : "")
-    .join("").trim();
-  if (!answer) throw new Error("EMPTY_MODEL_RESPONSE");
-  return answer;
+  throw lastError || new Error("GEMINI_MODELS_UNAVAILABLE");
 }
 
 async function generateWithOpenAI(messages, model) {
@@ -138,21 +169,21 @@ const server = http.createServer(async (req, res) => {
   }
 
   try {
-    const answer = active.provider === "gemini"
+    const generated = active.provider === "gemini"
       ? await generateWithGemini(body.messages, active.model)
-      : await generateWithOpenAI(body.messages, active.model);
+      : { answer: await generateWithOpenAI(body.messages, active.model), model: active.model };
     res.writeHead(200);
     return res.end(JSON.stringify({
-      answer,
+      answer: generated.answer,
       provider: active.provider,
-      model: active.model,
+      model: generated.model,
       truth: "VERIFIED_RESPONSE"
     }));
   } catch (error) {
     // Log only sanitized upstream diagnostics; never log API keys, headers, prompts, or provider response bodies.
     console.warn("Inference upstream failure", JSON.stringify({
       provider: active.provider,
-      model: active.model,
+      model: error?.model || active.model,
       status: Number.isInteger(error?.status) ? error.status : null,
       providerStatus: typeof error?.providerStatus === "string" ? error.providerStatus : null,
       providerMessage: typeof error?.providerMessage === "string" ? error.providerMessage : null,
