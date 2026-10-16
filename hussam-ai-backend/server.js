@@ -129,7 +129,11 @@ const server = http.createServer(async (req, res) => {
     return res.end(JSON.stringify({
       service: "hussam-ai-inference-bridge",
       status: "online",
+      // This reports environment configuration only; it does not call the provider.
       inferenceConfigured: active.provider !== "none",
+      providerConfigured: active.provider !== "none",
+      credentialPresent: active.provider !== "none",
+      liveInferenceVerified: false,
       provider: active.provider,
       model: active.model,
       truth: "OBSERVED"
@@ -196,7 +200,12 @@ const server = http.createServer(async (req, res) => {
     const isUnavailable = upstreamStatus === 503 || error?.providerStatus === "UNAVAILABLE";
     const isAuthFailure = upstreamStatus === 401 || upstreamStatus === 403;
     const isModelUnavailable = upstreamStatus === 404;
-    const status = isRateLimited ? 429 : isUnavailable ? 503 : 502;
+    // Preserve actionable gateway semantics for clients and diagnostics.
+    const status = isRateLimited ? 429
+      : isUnavailable ? 503
+      : isAuthFailure ? 502
+      : isModelUnavailable ? 502
+      : 502;
     const code = error?.message === "EMPTY_MODEL_RESPONSE"
       ? "EMPTY_MODEL_RESPONSE"
       : isRateLimited
