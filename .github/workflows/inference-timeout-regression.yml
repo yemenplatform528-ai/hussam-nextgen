@@ -1,0 +1,23 @@
+name: Inference timeout regression
+
+on:
+  push:
+    branches: [test/provider-timeout-regression]
+  pull_request:
+    paths:
+      - 'hussam-ai-backend/**'
+      - '.github/workflows/inference-timeout-regression.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  timeout-regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run deterministic timeout test (no provider calls)
+        run: node --test hussam-ai-backend/tests/provider-timeout.test.mjs
