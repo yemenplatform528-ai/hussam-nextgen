@@ -198,7 +198,7 @@ const server = http.createServer(async (req, res) => {
     const isUnavailable = upstreamStatus === 503 || error?.providerStatus === "UNAVAILABLE";
     const isAuthFailure = upstreamStatus === 401 || upstreamStatus === 403;
     const isModelUnavailable = upstreamStatus === 404;
-    const status = isTimeout ? 504 : isRateLimited ? 429 : isUnavailable ? 503 : 502;
+    const status = isTimeout ? 504 : isRateLimited ? 429 : isUnavailable ? 503 : isAuthFailure ? upstreamStatus : isModelUnavailable ? 404 : 502;
     const code = error?.message === "EMPTY_MODEL_RESPONSE"
       ? "EMPTY_MODEL_RESPONSE"
       : isTimeout
