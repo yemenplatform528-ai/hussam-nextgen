@@ -31,6 +31,7 @@ async function generateWithGemini(messages, model) {
   // availability or missing-model errors. Never retry quota or authentication failures.
   const models = [...new Set([
     model,
+    "gemini-3.7-flash",
     "gemini-3.6-flash",
     "gemini-3.5-flash-lite",
     "gemini-3.1-flash-lite"
