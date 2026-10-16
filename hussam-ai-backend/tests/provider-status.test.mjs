@@ -23,7 +23,7 @@ for (const [upstreamStatus, expectedStatus, expectedCode] of [
         ...process.env,
         PORT: String(port),
         TEST_PROVIDER_STATUS: String(upstreamStatus),
-        GEMINI_API_KEY: "test-only-not-a-real-key",
+        GEMINI_API_KEY: "test-placeholder",
         OPENAI_API_KEY: "",
         ALLOWED_ORIGIN: "http://127.0.0.1"
       },
@@ -52,9 +52,9 @@ for (const [upstreamStatus, expectedStatus, expectedCode] of [
       const body = await response.json();
       assert.equal(response.status, expectedStatus);
       assert.equal(body.error, expectedCode);
-      assert.equal(JSON.stringify(body).includes("test-only-not-a-real-key"), false);
+      assert.equal(JSON.stringify(body).includes("test-placeholder"), false);
       assert.equal(JSON.stringify(body).includes("mocked provider status"), false);
-      assert.equal(output.includes("test-only-not-a-real-key"), false);
+      assert.equal(output.includes("test-placeholder"), false);
     } finally {
       child.kill("SIGTERM");
       await Promise.race([
