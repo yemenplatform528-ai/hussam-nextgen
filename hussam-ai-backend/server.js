@@ -27,14 +27,13 @@ async function generateWithGemini(messages, model) {
   }));
   if (!contents.length) throw new Error("NO_USER_CONTENT");
 
-  // Use documented text-generation models as bounded fallbacks only for temporary
-  // availability or missing-model errors. Never retry quota or authentication failures.
+  // Bound fallback attempts to the three Flash models shown in the user's AI Studio
+  // quota panel. Each candidate is attempted at most once; no retry loops.
   const models = [...new Set([
     model,
+    "gemini-3.8-flash",
     "gemini-3.7-flash",
-    "gemini-3.6-flash",
-    "gemini-3.5-flash-lite",
-    "gemini-3.1-flash-lite"
+    "gemini-3.6-flash"
   ].filter(Boolean))];
   let lastError;
   for (const candidateModel of models) {
@@ -67,8 +66,7 @@ async function generateWithGemini(messages, model) {
         // free-tier Flash models once in order. Do not keep cycling after a fallback model is quota-limited.
         const canFallback = response.status === 503 || response.status === 404 ||
           error.providerStatus === "UNAVAILABLE" || error.providerStatus === "NOT_FOUND" ||
-          (response.status === 429 && candidateModel === model &&
-           (model === "gemini-3.8-flash" || model === "gemini-3.7-flash"));
+          response.status === 429;
         if (canFallback) continue;
         throw error;
       }
@@ -83,10 +81,8 @@ async function generateWithGemini(messages, model) {
       return { answer, model: candidateModel };
     } catch (error) {
       if (error?.message === "GEMINI_REQUEST_FAILED" &&
-          (error.status === 503 || error.status === 404 ||
-           error.providerStatus === "UNAVAILABLE" || error.providerStatus === "NOT_FOUND" ||
-           (error.status === 429 && error.model === model &&
-            (model === "gemini-3.8-flash" || model === "gemini-3.7-flash")))) {
+          (error.status === 503 || error.status === 404 || error.status === 429 ||
+           error.providerStatus === "UNAVAILABLE" || error.providerStatus === "NOT_FOUND")) {
         lastError = error;
         continue;
       }
