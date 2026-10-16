@@ -2,7 +2,7 @@ import http from "node:http";
 
 const PORT = Number(process.env.PORT || 10000);
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
-const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-3.8-flash";
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || "https://hussam-ai-standalone-portal.onrender.com";
@@ -159,18 +159,34 @@ const server = http.createServer(async (req, res) => {
       errorName: typeof error?.name === "string" ? error.name : "Error",
       errorCode: typeof error?.cause?.code === "string" ? error.cause.code : null
     }));
-    const status = error?.status === 429 ? 429 : 502;
+    const upstreamStatus = Number.isInteger(error?.status) ? error.status : null;
+    const isRateLimited = upstreamStatus === 429;
+    const isUnavailable = upstreamStatus === 503 || error?.providerStatus === "UNAVAILABLE";
+    const isAuthFailure = upstreamStatus === 401 || upstreamStatus === 403;
+    const isModelUnavailable = upstreamStatus === 404;
+    const status = isRateLimited ? 429 : isUnavailable ? 503 : 502;
+    const code = error?.message === "EMPTY_MODEL_RESPONSE"
+      ? "EMPTY_MODEL_RESPONSE"
+      : isRateLimited
+        ? "PROVIDER_QUOTA_OR_RATE_LIMIT"
+        : isUnavailable
+          ? "PROVIDER_TEMPORARILY_UNAVAILABLE"
+          : isAuthFailure
+            ? "PROVIDER_AUTHENTICATION_FAILED"
+            : isModelUnavailable
+              ? "PROVIDER_MODEL_UNAVAILABLE"
+              : "INFERENCE_CONNECTION_FAILED";
+    const message = isRateLimited
+      ? "رفض مزوّد الاستدلال الطلب بسبب الحصة أو حد المعدل. لم يُنتج رد."
+      : isUnavailable
+        ? "مزوّد الاستدلال غير متاح مؤقتًا. لم يُنتج رد؛ حاول لاحقًا."
+        : isAuthFailure
+          ? "رفض مزوّد الاستدلال بيانات الاعتماد. راجع إعداد المفتاح في الخادم دون مشاركته."
+          : isModelUnavailable
+            ? "النموذج المحدد غير متاح لدى المزوّد. راجع اسم النموذج وإتاحته."
+            : "تعذر إكمال طلب الاستدلال. لم يُنتج رد.";
     res.writeHead(status);
-    return res.end(JSON.stringify({
-      error: error?.message === "EMPTY_MODEL_RESPONSE"
-        ? "EMPTY_MODEL_RESPONSE"
-        : error?.status === 429
-          ? "PROVIDER_QUOTA_OR_RATE_LIMIT"
-          : "INFERENCE_CONNECTION_FAILED",
-      message: error?.status === 429
-        ? "رفض مزوّد الاستدلال الطلب بسبب الحصة أو حد المعدل. لم يُنتج رد."
-        : "تعذر إكمال طلب الاستدلال. لم يُنتج رد."
-    }));
+    return res.end(JSON.stringify({ error: code, message }));
   }
 });
 
