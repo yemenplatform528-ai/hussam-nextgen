@@ -189,18 +189,22 @@ const server = http.createServer(async (req, res) => {
       providerStatus: typeof error?.providerStatus === "string" ? error.providerStatus : null,
       providerMessage: typeof error?.providerMessage === "string" ? error.providerMessage : null,
       errorName: typeof error?.name === "string" ? error.name : "Error",
-      errorCode: typeof error?.cause?.code === "string" ? error.cause.code : null
+      errorCode: typeof error?.cause?.code === "string" ? error.cause.code : null,
+      timedOut: error?.name === "TimeoutError"
     }));
     const upstreamStatus = Number.isInteger(error?.status) ? error.status : null;
+    const isTimeout = error?.name === "TimeoutError";
     const isRateLimited = upstreamStatus === 429;
     const isUnavailable = upstreamStatus === 503 || error?.providerStatus === "UNAVAILABLE";
     const isAuthFailure = upstreamStatus === 401 || upstreamStatus === 403;
     const isModelUnavailable = upstreamStatus === 404;
-    const status = isRateLimited ? 429 : isUnavailable ? 503 : 502;
+    const status = isTimeout ? 504 : isRateLimited ? 429 : isUnavailable ? 503 : 502;
     const code = error?.message === "EMPTY_MODEL_RESPONSE"
       ? "EMPTY_MODEL_RESPONSE"
-      : isRateLimited
-        ? "PROVIDER_QUOTA_OR_RATE_LIMIT"
+      : isTimeout
+        ? "PROVIDER_TIMEOUT"
+        : isRateLimited
+          ? "PROVIDER_QUOTA_OR_RATE_LIMIT"
         : isUnavailable
           ? "PROVIDER_TEMPORARILY_UNAVAILABLE"
           : isAuthFailure
@@ -208,8 +212,10 @@ const server = http.createServer(async (req, res) => {
             : isModelUnavailable
               ? "PROVIDER_MODEL_UNAVAILABLE"
               : "INFERENCE_CONNECTION_FAILED";
-    const message = isRateLimited
-      ? "رفض مزوّد الاستدلال الطلب بسبب الحصة أو حد المعدل. لم يُنتج رد."
+    const message = isTimeout
+      ? "انتهت مهلة انتظار مزوّد الاستدلال قبل وصول رد. لم يُنتج رد؛ يلزم فحص اتصال الخدمة بالمزوّد."
+      : isRateLimited
+        ? "رفض مزوّد الاستدلال الطلب بسبب الحصة أو حد المعدل. لم يُنتج رد."
       : isUnavailable
         ? "مزوّد الاستدلال غير متاح مؤقتًا. لم يُنتج رد؛ حاول لاحقًا."
         : isAuthFailure
