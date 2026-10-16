@@ -63,8 +63,12 @@ async function generateWithGemini(messages, model) {
         error.providerStatus = typeof data?.error?.status === "string" ? data.error.status : null;
         error.providerMessage = typeof data?.error?.message === "string" ? data.error.message.slice(0, 300) : null;
         lastError = error;
+        // If the configured model has exhausted its quota, try the other dashboard-confirmed
+        // free-tier Flash models once in order. Do not keep cycling after a fallback model is quota-limited.
         const canFallback = response.status === 503 || response.status === 404 ||
-          error.providerStatus === "UNAVAILABLE" || error.providerStatus === "NOT_FOUND";
+          error.providerStatus === "UNAVAILABLE" || error.providerStatus === "NOT_FOUND" ||
+          (response.status === 429 && candidateModel === model &&
+           (model === "gemini-3.8-flash" || model === "gemini-3.7-flash"));
         if (canFallback) continue;
         throw error;
       }
@@ -80,7 +84,9 @@ async function generateWithGemini(messages, model) {
     } catch (error) {
       if (error?.message === "GEMINI_REQUEST_FAILED" &&
           (error.status === 503 || error.status === 404 ||
-           error.providerStatus === "UNAVAILABLE" || error.providerStatus === "NOT_FOUND")) {
+           error.providerStatus === "UNAVAILABLE" || error.providerStatus === "NOT_FOUND" ||
+           (error.status === 429 && error.model === model &&
+            (model === "gemini-3.8-flash" || model === "gemini-3.7-flash")))) {
         lastError = error;
         continue;
       }
