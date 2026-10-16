@@ -18,7 +18,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Inference bridge provider timeout regression
-        run: node --test hussam-ai-backend/tests/provider-timeout.test.mjs
+        run: node --test hussam-ai-backend/tests/provider-timeout.test.mjs hussam-ai-backend/tests/provider-status.test.mjs
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
