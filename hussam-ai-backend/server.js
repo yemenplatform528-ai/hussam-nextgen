@@ -47,6 +47,8 @@ async function generateWithGemini(messages, model) {
   if (!response.ok) {
     const error = new Error("GEMINI_REQUEST_FAILED");
     error.status = response.status;
+    error.providerStatus = typeof data?.error?.status === "string" ? data.error.status : null;
+    error.providerMessage = typeof data?.error?.message === "string" ? data.error.message.slice(0, 300) : null;
     throw error;
   }
   const answer = data?.candidates?.[0]?.content?.parts
@@ -152,6 +154,8 @@ const server = http.createServer(async (req, res) => {
       provider: active.provider,
       model: active.model,
       status: Number.isInteger(error?.status) ? error.status : null,
+      providerStatus: typeof error?.providerStatus === "string" ? error.providerStatus : null,
+      providerMessage: typeof error?.providerMessage === "string" ? error.providerMessage : null,
       errorName: typeof error?.name === "string" ? error.name : "Error",
       errorCode: typeof error?.cause?.code === "string" ? error.cause.code : null
     }));
