@@ -15,7 +15,8 @@ test("quota exhaustion returns 429 and makes exactly one provider attempt", asyn
   const child = spawn(process.execPath, ["--import", preloadFile, serverFile], {
     cwd: backend,
     env: { ...process.env, PORT: String(port), GEMINI_API_KEY: "test-only-not-a-real-key",
-      OPENAI_API_KEY: "", ALLOWED_ORIGIN: "http://127.0.0.1" },
+      OPENAI_API_KEY: "", ALLOWED_ORIGIN: "http://127.0.0.1",
+      HUSSAM_ACCESS_PASSWORD: "test-access-password-12345", HUSSAM_SESSION_SECRET: "test-session-secret-abcdefghijklmnopqrstuvwxyz" },
     stdio: ["ignore", "pipe", "pipe"]
   });
   let output = "";
@@ -30,8 +31,14 @@ test("quota exhaustion returns 429 and makes exactly one provider attempt", asyn
       await delay(100);
     }
     assert.equal(ready, true, `server did not become ready: ${output}`);
-    const response = await fetch(`${base}/api/chat`, {
+    const login = await fetch(`${base}/api/session/login`, {
       method: "POST", headers: { "Content-Type": "application/json", Origin: "http://127.0.0.1" },
+      body: JSON.stringify({ password: "test-access-password-12345" })
+    });
+    assert.equal(login.status, 200);
+    const cookie = login.headers.get("set-cookie").split(";")[0];
+    const response = await fetch(`${base}/api/chat`, {
+      method: "POST", headers: { "Content-Type": "application/json", Origin: "http://127.0.0.1", Cookie: cookie },
       body: JSON.stringify({ messages: [{ role: "user", content: "deterministic quota test" }] })
     });
     const body = await response.json();
