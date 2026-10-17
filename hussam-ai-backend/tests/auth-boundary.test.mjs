@@ -38,6 +38,21 @@ test("chat fails closed without session; login enforces exact origin and passwor
     }
     assert.equal(ready, true, `server did not become ready: ${output}`);
 
+    const validLogin = await fetch(`${base}/api/session/login`, {
+      method: "POST", headers: { "Content-Type": "application/json", Origin: "http://127.0.0.1" },
+      body: JSON.stringify({ password: "test-access-password-12345" })
+    });
+    assert.equal(validLogin.status, 200);
+    const validCookie = validLogin.headers.get("set-cookie").split(";")[0];
+    const token = validCookie.slice(validCookie.indexOf("=") + 1);
+    const tamperedCookie = "hussam_session=" + token.slice(0, -1) + (token.endsWith("x") ? "y" : "x");
+    const tamperedSession = await fetch(`${base}/api/chat`, {
+      method: "POST", headers: { "Content-Type": "application/json", Origin: "http://127.0.0.1", Cookie: tamperedCookie },
+      body: JSON.stringify({ messages: [{ role: "user", content: "must not reach provider" }] })
+    });
+    assert.equal(tamperedSession.status, 401);
+    assert.equal((output.match(/TEST_PROVIDER_CALL_/g) || []).length, 0);
+
     const noOrigin = await fetch(`${base}/api/chat`, {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ messages: [{ role: "user", content: "must not reach provider" }] })
@@ -57,7 +72,7 @@ test("chat fails closed without session; login enforces exact origin and passwor
       body: JSON.stringify({ password: "incorrect-password-value" })
     });
     assert.equal(badLogin.status, 401);
-    for (let i = 0; i < 7; i++) {
+    for (let i = 0; i < 6; i++) {
       const attempt = await fetch(`${base}/api/session/login`, {
         method: "POST", headers: { "Content-Type": "application/json", Origin: "http://127.0.0.1" },
         body: JSON.stringify({ password: "incorrect-password-value" })
