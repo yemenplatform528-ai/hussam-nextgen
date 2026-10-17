@@ -6,22 +6,30 @@ Truth labels: VERIFIED = direct test evidence; OBSERVED = live response/configur
 
 ## Latest verified work — Hussam AI quota guard
 
-- VERIFIED: on isolated branch `security/hussam-ai-quota-guard-2026-10-17`, commit `a64eb3f15bf1663a2f2ca8cab6af8ce50ee654a4`, Gemini fallback was changed to attempt only the configured model once per chat request. This prevents automatic fan-out to multiple models when the configured model is quota-limited or unavailable.
-- VERIFIED: Node syntax check passed; deterministic tests passed 2/2, including a mocked provider 429 test that asserts exactly one upstream attempt and no test-key leakage.
-- VERIFIED: `git diff --check` passed and the change was pushed to the isolated branch.
-- OBSERVED: draft PR #117 is open against `hussam-ai-standalone-portal`: https://github.com/yemenplatform528-ai/hussam-nextgen/pull/117
-- OBSERVED: Render service metadata still names `hussam-ai-standalone-portal` as the auto-deploy branch. Its latest listed live deployment is commit `f7eb104d28ab1b1337828c8e3e60cc50e2c8645c`, not the quota-guard commit. The quota fix is therefore NOT deployed.
-- SAFETY: no production deploy and no real provider generation request was made.
-- BLOCKED: this is a quota-protection improvement only. It does not add caller authentication, distributed rate limiting, or prove live generation works.
+- VERIFIED: isolated branch `security/hussam-ai-quota-guard-2026-10-17`, commit `a64eb3f15bf1663a2f2ca8cab6af8ce50ee654a4`, limits Gemini to the configured model once per chat request.
+- VERIFIED: Node tests passed 2/2 at the quota-guard stage, including a mocked 429 test proving exactly one provider call and no test-key leakage.
+- OBSERVED: draft PR #117: https://github.com/yemenplatform528-ai/hussam-nextgen/pull/117
+- OBSERVED: Render inference bridge auto-deploys from `hussam-ai-standalone-portal`; the quota-guard branch is not deployed.
+- SAFETY: no production deployment and no real provider generation request was made.
+
+## Latest verified work — Hussam AI owner-session boundary
+
+- VERIFIED: isolated branch `security/hussam-ai-session-auth-2026-10-17`, commit `27079712ecfa3aeb0b1667c7c67df78c2d018be5`.
+- VERIFIED: added server-side owner login at `POST /api/session/login`, constant-time password comparison, HMAC-signed 12-hour session cookies with HttpOnly/Secure/SameSite=Lax attributes, strict portal Origin validation, and fail-closed protection for `POST /api/chat`.
+- VERIFIED: portal includes a login screen and sends credentialed requests; no permanent shared secret is embedded in browser code.
+- VERIFIED: `node --check hussam-ai-backend/server.js`, extracted portal-module syntax check, `git diff --check`, and Node tests all passed; 3 tests passed, 0 failed. Coverage includes no-Origin rejection, missing-session rejection, invalid password, forged Origin, mocked provider 429, and timeout handling.
+- OBSERVED: draft PR #118: https://github.com/yemenplatform528-ai/hussam-nextgen/pull/118
+- BLOCKED rollout: not merged or deployed. Render must be configured with an owner-selected `HUSSAM_ACCESS_PASSWORD` of at least 16 characters and a random `HUSSAM_SESSION_SECRET` of at least 32 characters before deployment. If omitted, the backend intentionally rejects login/chat with `ACCESS_CONTROL_NOT_CONFIGURED`.
+- BLOCKED: distributed rate limiting and concurrency controls are not yet implemented; do not describe this as a complete security solution.
+- SAFETY: no production env vars, secrets, billing, or deployment settings were changed. No live inference request was sent.
 
 ## Hussam AI inference bridge
 
-- OBSERVED: a prior live `GET /health` response returned HTTP 200 with `status=online`, `inferenceConfigured=true`, `provider=gemini`, `model=gemini-3.8-flash`.
-- OBSERVED: available logs recorded Gemini 503 UNAVAILABLE, 429 RESOURCE_EXHAUSTED/quota exceeded, and a 404 for a retired candidate model.
-- BLOCKED: no successful end-to-end generated answer has been established in this checkpoint.
-- BLOCKED: source review of `hussam-ai-backend/server.js` found no caller authentication/authorization in `POST /api/chat`, no application-level rate/concurrency limiter, and acceptance of requests without an Origin header. CORS is not authentication.
-- OBSERVED: Render metadata confirms the inference bridge is a public web service on the Free plan, ingress allow-list `0.0.0.0/0`, running from `hussam-ai-standalone-portal`. A separate static portal service publishes `hussam-ai-portal` from the same branch.
-- SAFETY: no secrets, environment variables, billing settings, provider keys, production data, or production deployments were changed.
+- OBSERVED: live `GET /health` on 2026-10-17 returned HTTP 200, `status=online`, `inferenceConfigured=true`, `provider=gemini`, `model=gemini-3.8-flash`.
+- OBSERVED (historical logs): Gemini 503 UNAVAILABLE, 429 RESOURCE_EXHAUSTED/quota exceeded, and a 404 for a retired candidate model.
+- BLOCKED: no successful end-to-end generated answer has been established.
+- OBSERVED: Render metadata identifies a public Free web service, ingress allow-list `0.0.0.0/0`, branch `hussam-ai-standalone-portal`, with a separate static portal service from the same branch.
+- SAFETY: no provider keys or other secrets were read into this report.
 
 ## YIB / WORLD
 
@@ -32,16 +40,17 @@ Truth labels: VERIFIED = direct test evidence; OBSERVED = live response/configur
 
 ## Hussam NextGen FastAPI and database
 
-- OBSERVED (historical evidence): `/health` returned HTTP 200, `/ready?deep=true` indicated database reachability, and unauthenticated requests to `/api/v1/session` and `/api/v1/inventory/movements` returned HTTP 401.
-- OBSERVED (historical evidence): release/profile response labelled environment `development` / `release-candidate`; production suitability is not established.
-- OBSERVED: repository `render.yaml` sets `ENVIRONMENT=staging` and `RATE_LIMIT_EDGE_ENFORCED=true`, while previously observed live profile reported development. This discrepancy remains unresolved.
-- BLOCKED: a fresh unauthenticated probe from the Codespace received HTTP 403 for `/health`, `/ready?deep=true`, and `/api/v1/platform/release`; current runtime could not be re-verified.
-- BLOCKED: exact live Neon branch and migration state are not conclusively bound to the inspected Neon project/branch.
-- OBSERVED: inspected production-designated Neon branch reported Alembic revision `0028`; repository contains migration files through `0041`. Candidate gap only until actual connection target is proven.
-- OBSERVED: read-only counts for selected tables in that branch were zero. Do not infer all tables are empty or that this is the live app database.
+- OBSERVED live on 2026-10-17: `GET /health` returned HTTP 200 with `status=ok`, platform `hussam-nextgen`, version `1.0.0`.
+- OBSERVED live on 2026-10-17: `GET /ready?deep=true` returned HTTP 200, `database_configured=true`, `database_reachable=true`, `environment=development`.
+- OBSERVED live on 2026-10-17: `GET /api/v1/platform/release` returned HTTP 200, profile `development`, status `release-candidate`.
+- OBSERVED live on 2026-10-17: unauthenticated `GET /api/v1/session` and `GET /api/v1/inventory/movements?limit=1` returned HTTP 401 with `authentication required`.
+- BLOCKED: environment remains `development`, while repository `render.yaml` declares `ENVIRONMENT=staging`; the live deployment's source/service mapping is not reconciled yet.
+- BLOCKED: exact live Neon branch and migration state are not conclusively bound to the database used by this service.
+- OBSERVED (earlier Neon inspection): production-designated branch reported Alembic revision `0028`, while repository migration files reach `0041`. Candidate gap only until the actual connection target is proven.
+- OBSERVED: selected table counts on that inspected branch were zero; do not infer all tables are empty or that this is the live app database.
 - BLOCKED: no full restore-and-validate drill is evidenced.
 - VERIFIED: `python -m compileall -q app tests` passed on local main checkout `2caa70c` (syntax/bytecode check only).
-- BLOCKED: Python `pytest` is not installed in the Codespace; targeted pytest could not run. No dependency installation or application file change was made in that main checkout.
+- BLOCKED: Python `pytest` was not installed in the Codespace during the earlier attempt; no dependencies were installed into the main checkout.
 
 ## Project separation
 
@@ -50,11 +59,11 @@ Truth labels: VERIFIED = direct test evidence; OBSERVED = live response/configur
 
 ## Prioritized next actions
 
-1. HAI-P0: implement browser-compatible server-verifiable session authentication for `POST /api/chat`, using server-only access/session secrets, short-lived HttpOnly Secure cookies, origin validation, and a login UI. Until the required server environment variables are configured, access must fail closed; do not deploy a change that would strand the owner without a verified login path.
-2. HAI-P0: add trusted rate/concurrency and abuse controls, plus tests for missing/invalid auth, Origin bypass, body limits, throttling, cookie expiry/tampering, and safe error behavior.
-3. HAI-P1: prove one successful live generation only if the no-cost constraint can be assured; otherwise document the precise quota blocker and do not retry.
-4. API-P0: reconcile Render service identity, `render.yaml` staging setting, live profile, and HTTP 403 behavior before changing configuration.
-5. DB-P0: prove exact live database target via safe non-secret connection metadata; compare migration heads only after target identity is certain.
+1. HAI-P0: review PR #118, add trusted rate/concurrency and abuse controls, and expand tests for cookie tampering/expiry, body limits, throttling, and safe error behavior.
+2. HAI-P0: configure owner-selected server secrets only after a safe rollout/rollback plan; do not deploy the fail-closed auth change before the login path can be verified.
+3. HAI-P1: prove one successful live generation only if the no-cost constraint can be assured; otherwise document the quota blocker and do not retry.
+4. API-P0: reconcile the live FastAPI service/source with repository `render.yaml` and `development` profile before changing configuration.
+5. DB-P0: prove exact live database target via non-secret connection metadata; compare migration heads only after target identity is certain.
 6. DB-P1: inspect snapshot/backup policy and perform an isolated restore drill with schema and integrity validation.
 7. SEC-P1: inventory public routes and verify authentication, tenant isolation, CORS, rate limits, and secret handling.
 8. ARCH-P1: complete the per-product dependency/ownership map and staged repository separation plan.
@@ -64,10 +73,10 @@ Truth labels: VERIFIED = direct test evidence; OBSERVED = live response/configur
 
 - Do not claim live AI generation works solely because health says configured.
 - Do not claim YIB has a live model while provider is NONE.
-- Do not claim production-ready while release profile and deployment config disagree.
+- Do not claim production-ready while environment/deployment configuration disagrees.
 - Do not run migrations, rotate/delete credentials, enable billing, or change production deploy branches without explicit approval and rollback planning.
 - Do not store API keys, connection strings, session tokens, or private user data in this report.
 
 ## Continuation
 
-When the user says `أكمل`, continue with HAI-P0 authentication implementation/tests, then FastAPI deployment identity and DB target verification. Preserve working deployments and label every claim VERIFIED, OBSERVED, BLOCKED, UNKNOWN, or INFERRED.
+When the user says `أكمل`, continue with security validation and rate/concurrency controls, then reconcile FastAPI deployment identity and exact database target. Preserve working deployments and label every claim VERIFIED, OBSERVED, BLOCKED, UNKNOWN, or INFERRED.
