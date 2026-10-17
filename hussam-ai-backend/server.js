@@ -27,14 +27,10 @@ async function generateWithGemini(messages, model) {
   }));
   if (!contents.length) throw new Error("NO_USER_CONTENT");
 
-  // Bound fallback attempts to the three Flash models shown in the user's AI Studio
-  // quota panel. Each candidate is attempted at most once; no retry loops.
-  const models = [...new Set([
-    model,
-    "gemini-3.8-flash",
-    "gemini-3.7-flash",
-    "gemini-3.6-flash"
-  ].filter(Boolean))];
+  // Strict one-model/one-request policy: do not fan out to other models when
+  // quota or availability errors occur. This avoids multiplying upstream calls
+  // and keeps the no-cost/quota boundary explicit. Model changes are operator-controlled.
+  const models = model ? [model] : [];
   let lastError;
   for (const candidateModel of models) {
     try {
