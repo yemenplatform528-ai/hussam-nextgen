@@ -1,4 +1,5 @@
 import http from "node:http";
+import { createHmac, timingSafeEqual } from "node:crypto";
 
 const PORT = Number(process.env.PORT || 10000);
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
@@ -6,6 +7,63 @@ const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-3.8-flash";
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || "https://hussam-ai-standalone-portal.onrender.com";
+const HUSSAM_ACCESS_PASSWORD = process.env.HUSSAM_ACCESS_PASSWORD || "";
+const HUSSAM_SESSION_SECRET = process.env.HUSSAM_SESSION_SECRET || "";
+const SESSION_COOKIE = "hussam_session";
+const SESSION_TTL_SECONDS = 12 * 60 * 60;
+
+function sessionReady() {
+  return HUSSAM_ACCESS_PASSWORD.length >= 16 && HUSSAM_SESSION_SECRET.length >= 32;
+}
+function signSession(payload) {
+  const encoded = Buffer.from(JSON.stringify(payload)).toString("base64url");
+  const signature = createHmac("sha256", HUSSAM_SESSION_SECRET).update(encoded).digest("base64url");
+  return encoded + "." + signature;
+}
+function cookieValue(req, name) {
+  const cookies = (req.headers.cookie || "").split(";");
+  for (const part of cookies) {
+    const i = part.indexOf("=");
+    if (i > 0 && part.slice(0, i).trim() === name) return part.slice(i + 1).trim();
+  }
+  return "";
+}
+function validSession(req) {
+  if (!sessionReady()) return false;
+  const token = cookieValue(req, SESSION_COOKIE);
+  const split = token.lastIndexOf(".");
+  if (split <= 0) return false;
+  const encoded = token.slice(0, split);
+  const supplied = Buffer.from(token.slice(split + 1));
+  const expected = Buffer.from(createHmac("sha256", HUSSAM_SESSION_SECRET).update(encoded).digest("base64url"));
+  if (supplied.length !== expected.length || !timingSafeEqual(supplied, expected)) return false;
+  try {
+    const payload = JSON.parse(Buffer.from(encoded, "base64url").toString("utf8"));
+    return Number.isInteger(payload.exp) && payload.exp > Math.floor(Date.now() / 1000);
+  } catch { return false; }
+}
+function sameSecret(a, b) {
+  const aa = Buffer.from(String(a || ""));
+  const bb = Buffer.from(String(b || ""));
+  return aa.length > 0 && aa.length === bb.length && timingSafeEqual(aa, bb);
+}
+const rateBuckets = new Map();
+function allowRate(key, limit, windowMs) {
+  const now = Date.now();
+  let bucket = rateBuckets.get(key);
+  if (!bucket || now >= bucket.resetAt) bucket = { count: 0, resetAt: now + windowMs };
+  if (bucket.count >= limit) {
+    rateBuckets.set(key, bucket);
+    return false;
+  }
+  bucket.count += 1;
+  rateBuckets.set(key, bucket);
+  if (rateBuckets.size > 100) {
+    for (const [k, value] of rateBuckets) if (now >= value.resetAt) rateBuckets.delete(k);
+  }
+  return true;
+}
+let activeGenerations = 0;
 
 function activeProvider() {
   if (GEMINI_API_KEY) return { provider: "gemini", model: GEMINI_MODEL };
@@ -27,14 +85,10 @@ async function generateWithGemini(messages, model) {
   }));
   if (!contents.length) throw new Error("NO_USER_CONTENT");
 
-  // Bound fallback attempts to the three Flash models shown in the user's AI Studio
-  // quota panel. Each candidate is attempted at most once; no retry loops.
-  const models = [...new Set([
-    model,
-    "gemini-3.8-flash",
-    "gemini-3.7-flash",
-    "gemini-3.6-flash"
-  ].filter(Boolean))];
+  // Strict one-model/one-request policy: do not fan out to other models when
+  // quota or availability errors occur. This avoids multiplying upstream calls
+  // and keeps the no-cost/quota boundary explicit. Model changes are operator-controlled.
+  const models = model ? [model] : [];
   let lastError;
   for (const candidateModel of models) {
     try {
@@ -117,6 +171,7 @@ const server = http.createServer(async (req, res) => {
   const origin = req.headers.origin || "";
   if (origin === ALLOWED_ORIGIN) {
     res.setHeader("Access-Control-Allow-Origin", ALLOWED_ORIGIN);
+    res.setHeader("Access-Control-Allow-Credentials", "true");
     res.setHeader("Vary", "Origin");
   }
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
@@ -137,13 +192,65 @@ const server = http.createServer(async (req, res) => {
       truth: "OBSERVED"
     }));
   }
+  if (req.method === "POST" && url.pathname === "/api/session/login") {
+    if (origin !== ALLOWED_ORIGIN) {
+      res.writeHead(403);
+      return res.end(JSON.stringify({ error: "ORIGIN_NOT_ALLOWED" }));
+    }
+    if (!allowRate("login", 8, 15 * 60_000)) {
+      res.writeHead(429);
+      return res.end(JSON.stringify({ error: "LOGIN_RATE_LIMITED", message: "تجاوزت محاولات الدخول المسموح بها مؤقتًا." }));
+    }
+    if (!sessionReady()) {
+      res.writeHead(503);
+      return res.end(JSON.stringify({ error: "ACCESS_CONTROL_NOT_CONFIGURED", message: "لم تُضبط متغيرات حماية الوصول في الخادم؛ الدخول مغلق افتراضيًا." }));
+    }
+    let loginRaw = "";
+    for await (const chunk of req) {
+      loginRaw += chunk;
+      if (loginRaw.length > 8_192) {
+        res.writeHead(413);
+        return res.end(JSON.stringify({ error: "REQUEST_TOO_LARGE" }));
+      }
+    }
+    let loginBody;
+    try { loginBody = JSON.parse(loginRaw || "{}"); } catch {
+      res.writeHead(400);
+      return res.end(JSON.stringify({ error: "INVALID_JSON" }));
+    }
+    if (!sameSecret(loginBody.password, HUSSAM_ACCESS_PASSWORD)) {
+      res.writeHead(401);
+      return res.end(JSON.stringify({ error: "INVALID_ACCESS_PASSWORD", message: "رمز الدخول غير صحيح." }));
+    }
+    const exp = Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS;
+    const token = signSession({ exp });
+    res.setHeader("Set-Cookie", SESSION_COOKIE + "=" + token + "; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=" + SESSION_TTL_SECONDS);
+    res.writeHead(200);
+    return res.end(JSON.stringify({ authenticated: true, expiresIn: SESSION_TTL_SECONDS }));
+  }
   if (req.method !== "POST" || url.pathname !== "/api/chat") {
     res.writeHead(404);
     return res.end(JSON.stringify({ error: "NOT_FOUND" }));
   }
-  if (origin && origin !== ALLOWED_ORIGIN) {
+  if (origin !== ALLOWED_ORIGIN) {
     res.writeHead(403);
     return res.end(JSON.stringify({ error: "ORIGIN_NOT_ALLOWED" }));
+  }
+  if (!sessionReady()) {
+    res.writeHead(503);
+    return res.end(JSON.stringify({ error: "ACCESS_CONTROL_NOT_CONFIGURED", message: "لم تُضبط متغيرات حماية الوصول في الخادم؛ المحادثة مغلقة افتراضيًا." }));
+  }
+  if (!validSession(req)) {
+    res.writeHead(401);
+    return res.end(JSON.stringify({ error: "AUTHENTICATION_REQUIRED", message: "سجّل الدخول إلى مساحة الحسام قبل إرسال الرسائل." }));
+  }
+  if (!allowRate("chat", 20, 60_000)) {
+    res.writeHead(429);
+    return res.end(JSON.stringify({ error: "CHAT_RATE_LIMITED", message: "تم بلوغ حد الطلبات المؤقت لهذه الخدمة." }));
+  }
+  if (activeGenerations >= 2) {
+    res.writeHead(429);
+    return res.end(JSON.stringify({ error: "INFERENCE_CONCURRENCY_LIMITED", message: "الخدمة مشغولة بطلبات أخرى؛ لم يُرسل هذا الطلب إلى المزود." }));
   }
   if (active.provider === "none") {
     res.writeHead(503);
@@ -171,10 +278,12 @@ const server = http.createServer(async (req, res) => {
     return res.end(JSON.stringify({ error: "INVALID_MESSAGES" }));
   }
 
+  activeGenerations += 1;
   try {
     const generated = active.provider === "gemini"
       ? await generateWithGemini(body.messages, active.model)
       : { answer: await generateWithOpenAI(body.messages, active.model), model: active.model };
+    activeGenerations -= 1;
     res.writeHead(200);
     return res.end(JSON.stringify({
       answer: generated.answer,
@@ -183,6 +292,7 @@ const server = http.createServer(async (req, res) => {
       truth: "VERIFIED_RESPONSE"
     }));
   } catch (error) {
+    activeGenerations = Math.max(0, activeGenerations - 1);
     // Log only sanitized upstream diagnostics; never log API keys, headers, prompts, or provider response bodies.
     console.warn("Inference upstream failure", JSON.stringify({
       provider: active.provider,

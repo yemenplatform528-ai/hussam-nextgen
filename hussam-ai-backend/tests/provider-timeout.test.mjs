@@ -19,7 +19,9 @@ test("provider timeout returns 504 PROVIDER_TIMEOUT without leaking internals", 
       PORT: String(port),
       GEMINI_API_KEY: "test-only-not-a-real-key",
       OPENAI_API_KEY: "",
-      ALLOWED_ORIGIN: "http://127.0.0.1"
+      ALLOWED_ORIGIN: "http://127.0.0.1",
+      HUSSAM_ACCESS_PASSWORD: "test-access-password-12345",
+      HUSSAM_SESSION_SECRET: "test-session-secret-abcdefghijklmnopqrstuvwxyz"
     },
     stdio: ["ignore", "pipe", "pipe"]
   });
@@ -39,9 +41,16 @@ test("provider timeout returns 504 PROVIDER_TIMEOUT without leaking internals", 
     }
     assert.equal(ready, true, `server did not become ready: ${output}`);
 
-    const response = await fetch(`${base}/api/chat`, {
+    const login = await fetch(`${base}/api/session/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Origin: "http://127.0.0.1" },
+      body: JSON.stringify({ password: "test-access-password-12345" })
+    });
+    assert.equal(login.status, 200);
+    const cookie = login.headers.get("set-cookie").split(";")[0];
+    const response = await fetch(`${base}/api/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Origin: "http://127.0.0.1", Cookie: cookie },
       body: JSON.stringify({ messages: [{ role: "user", content: "deterministic timeout test" }] })
     });
     const body = await response.json();
