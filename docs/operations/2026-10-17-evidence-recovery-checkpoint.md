@@ -10,7 +10,8 @@ Truth labels: VERIFIED = direct test evidence; OBSERVED = live response/configur
 - VERIFIED: Node syntax check passed; deterministic tests passed 2/2, including a mocked provider 429 test that asserts exactly one upstream attempt and no test-key leakage.
 - VERIFIED: `git diff --check` passed and the change was pushed to the isolated branch.
 - OBSERVED: draft PR #117 is open against `hussam-ai-standalone-portal`: https://github.com/yemenplatform528-ai/hussam-nextgen/pull/117
-- SAFETY: this branch is not the Render auto-deploy branch; no production deploy and no real provider generation request was made.
+- OBSERVED: Render service metadata still names `hussam-ai-standalone-portal` as the auto-deploy branch. Its latest listed live deployment is commit `f7eb104d28ab1b1337828c8e3e60cc50e2c8645c`, not the quota-guard commit. The quota fix is therefore NOT deployed.
+- SAFETY: no production deploy and no real provider generation request was made.
 - BLOCKED: this is a quota-protection improvement only. It does not add caller authentication, distributed rate limiting, or prove live generation works.
 
 ## Hussam AI inference bridge
@@ -19,6 +20,7 @@ Truth labels: VERIFIED = direct test evidence; OBSERVED = live response/configur
 - OBSERVED: available logs recorded Gemini 503 UNAVAILABLE, 429 RESOURCE_EXHAUSTED/quota exceeded, and a 404 for a retired candidate model.
 - BLOCKED: no successful end-to-end generated answer has been established in this checkpoint.
 - BLOCKED: source review of `hussam-ai-backend/server.js` found no caller authentication/authorization in `POST /api/chat`, no application-level rate/concurrency limiter, and acceptance of requests without an Origin header. CORS is not authentication.
+- OBSERVED: Render metadata confirms the inference bridge is a public web service on the Free plan, ingress allow-list `0.0.0.0/0`, running from `hussam-ai-standalone-portal`. A separate static portal service publishes `hussam-ai-portal` from the same branch.
 - SAFETY: no secrets, environment variables, billing settings, provider keys, production data, or production deployments were changed.
 
 ## YIB / WORLD
@@ -48,8 +50,8 @@ Truth labels: VERIFIED = direct test evidence; OBSERVED = live response/configur
 
 ## Prioritized next actions
 
-1. HAI-P0: design a browser-compatible server-verifiable session/auth boundary for `POST /api/chat`; never place a permanent shared secret in browser JavaScript.
-2. HAI-P0: add trusted rate/concurrency and abuse controls, plus tests for missing/invalid auth, Origin bypass, body limits, throttling, and safe error behavior.
+1. HAI-P0: implement browser-compatible server-verifiable session authentication for `POST /api/chat`, using server-only access/session secrets, short-lived HttpOnly Secure cookies, origin validation, and a login UI. Until the required server environment variables are configured, access must fail closed; do not deploy a change that would strand the owner without a verified login path.
+2. HAI-P0: add trusted rate/concurrency and abuse controls, plus tests for missing/invalid auth, Origin bypass, body limits, throttling, cookie expiry/tampering, and safe error behavior.
 3. HAI-P1: prove one successful live generation only if the no-cost constraint can be assured; otherwise document the precise quota blocker and do not retry.
 4. API-P0: reconcile Render service identity, `render.yaml` staging setting, live profile, and HTTP 403 behavior before changing configuration.
 5. DB-P0: prove exact live database target via safe non-secret connection metadata; compare migration heads only after target identity is certain.
@@ -68,4 +70,4 @@ Truth labels: VERIFIED = direct test evidence; OBSERVED = live response/configur
 
 ## Continuation
 
-When the user says `أكمل`, continue with HAI-P0 authentication architecture/tests, then FastAPI deployment identity and DB target verification. Preserve working deployments and label every claim VERIFIED, OBSERVED, BLOCKED, UNKNOWN, or INFERRED.
+When the user says `أكمل`, continue with HAI-P0 authentication implementation/tests, then FastAPI deployment identity and DB target verification. Preserve working deployments and label every claim VERIFIED, OBSERVED, BLOCKED, UNKNOWN, or INFERRED.
