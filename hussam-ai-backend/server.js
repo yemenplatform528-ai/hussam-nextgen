@@ -47,6 +47,23 @@ function sameSecret(a, b) {
   const bb = Buffer.from(String(b || ""));
   return aa.length > 0 && aa.length === bb.length && timingSafeEqual(aa, bb);
 }
+const rateBuckets = new Map();
+function allowRate(key, limit, windowMs) {
+  const now = Date.now();
+  let bucket = rateBuckets.get(key);
+  if (!bucket || now >= bucket.resetAt) bucket = { count: 0, resetAt: now + windowMs };
+  if (bucket.count >= limit) {
+    rateBuckets.set(key, bucket);
+    return false;
+  }
+  bucket.count += 1;
+  rateBuckets.set(key, bucket);
+  if (rateBuckets.size > 100) {
+    for (const [k, value] of rateBuckets) if (now >= value.resetAt) rateBuckets.delete(k);
+  }
+  return true;
+}
+let activeGenerations = 0;
 
 function activeProvider() {
   if (GEMINI_API_KEY) return { provider: "gemini", model: GEMINI_MODEL };
@@ -180,6 +197,10 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(403);
       return res.end(JSON.stringify({ error: "ORIGIN_NOT_ALLOWED" }));
     }
+    if (!allowRate("login", 8, 15 * 60_000)) {
+      res.writeHead(429);
+      return res.end(JSON.stringify({ error: "LOGIN_RATE_LIMITED", message: "تجاوزت محاولات الدخول المسموح بها مؤقتًا." }));
+    }
     if (!sessionReady()) {
       res.writeHead(503);
       return res.end(JSON.stringify({ error: "ACCESS_CONTROL_NOT_CONFIGURED", message: "لم تُضبط متغيرات حماية الوصول في الخادم؛ الدخول مغلق افتراضيًا." }));
@@ -223,6 +244,14 @@ const server = http.createServer(async (req, res) => {
     res.writeHead(401);
     return res.end(JSON.stringify({ error: "AUTHENTICATION_REQUIRED", message: "سجّل الدخول إلى مساحة الحسام قبل إرسال الرسائل." }));
   }
+  if (!allowRate("chat", 20, 60_000)) {
+    res.writeHead(429);
+    return res.end(JSON.stringify({ error: "CHAT_RATE_LIMITED", message: "تم بلوغ حد الطلبات المؤقت لهذه الخدمة." }));
+  }
+  if (activeGenerations >= 2) {
+    res.writeHead(429);
+    return res.end(JSON.stringify({ error: "INFERENCE_CONCURRENCY_LIMITED", message: "الخدمة مشغولة بطلبات أخرى؛ لم يُرسل هذا الطلب إلى المزود." }));
+  }
   if (active.provider === "none") {
     res.writeHead(503);
     return res.end(JSON.stringify({
@@ -249,10 +278,12 @@ const server = http.createServer(async (req, res) => {
     return res.end(JSON.stringify({ error: "INVALID_MESSAGES" }));
   }
 
+  activeGenerations += 1;
   try {
     const generated = active.provider === "gemini"
       ? await generateWithGemini(body.messages, active.model)
       : { answer: await generateWithOpenAI(body.messages, active.model), model: active.model };
+    activeGenerations -= 1;
     res.writeHead(200);
     return res.end(JSON.stringify({
       answer: generated.answer,
@@ -261,6 +292,7 @@ const server = http.createServer(async (req, res) => {
       truth: "VERIFIED_RESPONSE"
     }));
   } catch (error) {
+    activeGenerations = Math.max(0, activeGenerations - 1);
     // Log only sanitized upstream diagnostics; never log API keys, headers, prompts, or provider response bodies.
     console.warn("Inference upstream failure", JSON.stringify({
       provider: active.provider,

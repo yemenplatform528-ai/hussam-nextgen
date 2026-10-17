@@ -57,6 +57,18 @@ test("chat fails closed without session; login enforces exact origin and passwor
       body: JSON.stringify({ password: "incorrect-password-value" })
     });
     assert.equal(badLogin.status, 401);
+    for (let i = 0; i < 7; i++) {
+      const attempt = await fetch(`${base}/api/session/login`, {
+        method: "POST", headers: { "Content-Type": "application/json", Origin: "http://127.0.0.1" },
+        body: JSON.stringify({ password: "incorrect-password-value" })
+      });
+      assert.equal(attempt.status, 401);
+    }
+    const throttledLogin = await fetch(`${base}/api/session/login`, {
+      method: "POST", headers: { "Content-Type": "application/json", Origin: "http://127.0.0.1" },
+      body: JSON.stringify({ password: "test-access-password-12345" })
+    });
+    assert.equal(throttledLogin.status, 429);
 
     const forgedOrigin = await fetch(`${base}/api/session/login`, {
       method: "POST", headers: { "Content-Type": "application/json", Origin: "https://attacker.example" },
