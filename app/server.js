@@ -17,7 +17,7 @@ const accessToken = process.env.YIB_ACCESS_TOKEN || '';
 const openaiApiKey = process.env.OPENAI_API_KEY || '';
 const openaiModel = process.env.OPENAI_MODEL || 'gpt-6-astra';
 const geminiApiKey = process.env.GEMINI_API_KEY || '';
-const geminiModel = process.env.GEMINI_MODEL || 'gemini-2.5-flash-lite';
+const geminiModel = process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite';
 const geminiFreeTierEnabled = process.env.YIB_GEMINI_FREE_TIER_ENABLED === 'true';
 const geminiEnabled = Boolean(geminiApiKey && geminiFreeTierEnabled);
 let lastGenerationVerified = false;
