@@ -17,11 +17,11 @@ test("provider timeout returns 504 PROVIDER_TIMEOUT without leaking internals", 
     env: {
       ...process.env,
       PORT: String(port),
-      GEMINI_API_KEY: "test-only-not-a-real-key",
+      GEMINI_API_KEY: "fake-key",
       OPENAI_API_KEY: "",
       ALLOWED_ORIGIN: "http://127.0.0.1",
-      HUSSAM_ACCESS_PASSWORD: "test-access-password-12345",
-      HUSSAM_SESSION_SECRET: "test-session-secret-abcdefghijklmnopqrstuvwxyz"
+      HUSSAM_ACCESS_PASSWORD: "test password fixture only 2026",
+      HUSSAM_SESSION_SECRET: "test session secret fixture only for tests"
     },
     stdio: ["ignore", "pipe", "pipe"]
   });
@@ -44,7 +44,7 @@ test("provider timeout returns 504 PROVIDER_TIMEOUT without leaking internals", 
     const login = await fetch(`${base}/api/session/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Origin: "http://127.0.0.1" },
-      body: JSON.stringify({ password: "test-access-password-12345" })
+      body: JSON.stringify({ password: "test password fixture only 2026" })
     });
     assert.equal(login.status, 200);
     const cookie = login.headers.get("set-cookie").split(";")[0];
@@ -57,10 +57,10 @@ test("provider timeout returns 504 PROVIDER_TIMEOUT without leaking internals", 
     assert.equal(response.status, 504);
     assert.equal(body.error, "PROVIDER_TIMEOUT");
     assert.match(body.message, /انتهت مهلة انتظار مزوّد الاستدلال/);
-    assert.equal(JSON.stringify(body).includes("test-only-not-a-real-key"), false);
+    assert.equal(JSON.stringify(body).includes("fake-key"), false);
     assert.equal(JSON.stringify(body).includes("simulated provider timeout"), false);
     assert.match(output, /"timedOut":true/);
-    assert.equal(output.includes("test-only-not-a-real-key"), false);
+    assert.equal(output.includes("fake-key"), false);
   } finally {
     child.kill("SIGTERM");
     await Promise.race([

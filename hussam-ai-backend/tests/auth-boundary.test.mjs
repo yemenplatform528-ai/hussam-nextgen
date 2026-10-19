@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
+import { createHmac } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
@@ -17,11 +18,11 @@ test("chat fails closed without session; login enforces exact origin and passwor
     env: {
       ...process.env,
       PORT: String(port),
-      GEMINI_API_KEY: "test-only-not-a-real-key",
+      GEMINI_API_KEY: "fake-key",
       OPENAI_API_KEY: "",
       ALLOWED_ORIGIN: "http://127.0.0.1",
-      HUSSAM_ACCESS_PASSWORD: "test-access-password-12345",
-      HUSSAM_SESSION_SECRET: "test-session-secret-abcdefghijklmnopqrstuvwxyz"
+      HUSSAM_ACCESS_PASSWORD: "test password fixture only 2026",
+      HUSSAM_SESSION_SECRET: "test session secret fixture only for tests"
     },
     stdio: ["ignore", "pipe", "pipe"]
   });
@@ -40,10 +41,15 @@ test("chat fails closed without session; login enforces exact origin and passwor
 
     const validLogin = await fetch(`${base}/api/session/login`, {
       method: "POST", headers: { "Content-Type": "application/json", Origin: "http://127.0.0.1" },
-      body: JSON.stringify({ password: "test-access-password-12345" })
+      body: JSON.stringify({ password: "test password fixture only 2026" })
     });
     assert.equal(validLogin.status, 200);
     const validCookie = validLogin.headers.get("set-cookie").split(";")[0];
+    const oversizedLogin = await fetch(`${base}/api/session/login`, {
+      method: "POST", headers: { "Content-Type": "application/json", Origin: "http://127.0.0.1" },
+      body: "x".repeat(9_000)
+    });
+    assert.equal(oversizedLogin.status, 413);
     const token = validCookie.slice(validCookie.indexOf("=") + 1);
     const tamperedCookie = "hussam_session=" + token.slice(0, -1) + (token.endsWith("x") ? "y" : "x");
     const tamperedSession = await fetch(`${base}/api/chat`, {
@@ -51,6 +57,20 @@ test("chat fails closed without session; login enforces exact origin and passwor
       body: JSON.stringify({ messages: [{ role: "user", content: "must not reach provider" }] })
     });
     assert.equal(tamperedSession.status, 401);
+
+    const expiredPayload = Buffer.from(JSON.stringify({ exp: Math.floor(Date.now() / 1000) - 60 })).toString("base64url");
+    const expiredSignature = createHmac("sha256", "test session secret fixture only for tests").update(expiredPayload).digest("base64url");
+    const expiredSession = await fetch(`${base}/api/chat`, {
+      method: "POST", headers: { "Content-Type": "application/json", Origin: "http://127.0.0.1", Cookie: `hussam_session=${expiredPayload}.${expiredSignature}` },
+      body: JSON.stringify({ messages: [{ role: "user", content: "expired session must not reach provider" }] })
+    });
+    assert.equal(expiredSession.status, 401);
+
+    const oversizedChat = await fetch(`${base}/api/chat`, {
+      method: "POST", headers: { "Content-Type": "application/json", Origin: "http://127.0.0.1", Cookie: validCookie },
+      body: "x".repeat(101_000)
+    });
+    assert.equal(oversizedChat.status, 413);
     assert.equal((output.match(/TEST_PROVIDER_CALL_/g) || []).length, 0);
 
     const noOrigin = await fetch(`${base}/api/chat`, {
@@ -69,25 +89,25 @@ test("chat fails closed without session; login enforces exact origin and passwor
 
     const badLogin = await fetch(`${base}/api/session/login`, {
       method: "POST", headers: { "Content-Type": "application/json", Origin: "http://127.0.0.1" },
-      body: JSON.stringify({ password: "incorrect-password-value" })
+      body: JSON.stringify({ password: "incorrect password for test" })
     });
     assert.equal(badLogin.status, 401);
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < 5; i++) {
       const attempt = await fetch(`${base}/api/session/login`, {
         method: "POST", headers: { "Content-Type": "application/json", Origin: "http://127.0.0.1" },
-        body: JSON.stringify({ password: "incorrect-password-value" })
+        body: JSON.stringify({ password: "incorrect password for test" })
       });
       assert.equal(attempt.status, 401);
     }
     const throttledLogin = await fetch(`${base}/api/session/login`, {
       method: "POST", headers: { "Content-Type": "application/json", Origin: "http://127.0.0.1" },
-      body: JSON.stringify({ password: "test-access-password-12345" })
+      body: JSON.stringify({ password: "test password fixture only 2026" })
     });
     assert.equal(throttledLogin.status, 429);
 
     const forgedOrigin = await fetch(`${base}/api/session/login`, {
       method: "POST", headers: { "Content-Type": "application/json", Origin: "https://attacker.example" },
-      body: JSON.stringify({ password: "test-access-password-12345" })
+      body: JSON.stringify({ password: "test password fixture only 2026" })
     });
     assert.equal(forgedOrigin.status, 403);
     assert.equal((output.match(/TEST_PROVIDER_CALL_/g) || []).length, 0);

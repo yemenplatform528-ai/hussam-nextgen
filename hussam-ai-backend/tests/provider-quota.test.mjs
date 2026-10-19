@@ -14,9 +14,9 @@ test("quota exhaustion returns 429 and makes exactly one provider attempt", asyn
   const port = 18766;
   const child = spawn(process.execPath, ["--import", preloadFile, serverFile], {
     cwd: backend,
-    env: { ...process.env, PORT: String(port), GEMINI_API_KEY: "test-only-not-a-real-key",
+    env: { ...process.env, PORT: String(port), GEMINI_API_KEY: "fake-key",
       OPENAI_API_KEY: "", ALLOWED_ORIGIN: "http://127.0.0.1",
-      HUSSAM_ACCESS_PASSWORD: "test-access-password-12345", HUSSAM_SESSION_SECRET: "test-session-secret-abcdefghijklmnopqrstuvwxyz" },
+      HUSSAM_ACCESS_PASSWORD: "test password fixture only 2026", HUSSAM_SESSION_SECRET: "test session secret fixture only for tests" },
     stdio: ["ignore", "pipe", "pipe"]
   });
   let output = "";
@@ -33,7 +33,7 @@ test("quota exhaustion returns 429 and makes exactly one provider attempt", asyn
     assert.equal(ready, true, `server did not become ready: ${output}`);
     const login = await fetch(`${base}/api/session/login`, {
       method: "POST", headers: { "Content-Type": "application/json", Origin: "http://127.0.0.1" },
-      body: JSON.stringify({ password: "test-access-password-12345" })
+      body: JSON.stringify({ password: "test password fixture only 2026" })
     });
     assert.equal(login.status, 200);
     const cookie = login.headers.get("set-cookie").split(";")[0];
