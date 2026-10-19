@@ -14,7 +14,7 @@ test("quota exhaustion returns 429 and makes exactly one provider attempt", asyn
   const port = 18766;
   const child = spawn(process.execPath, ["--import", preloadFile, serverFile], {
     cwd: backend,
-    env: { ...process.env, PORT: String(port), GEMINI_API_KEY: "test-only-not-a-real-key",
+    env: { ...process.env, PORT: String(port), GEMINI_API_KEY: "fake-key",
       OPENAI_API_KEY: "", ALLOWED_ORIGIN: "http://127.0.0.1" },
     stdio: ["ignore", "pipe", "pipe"]
   });
