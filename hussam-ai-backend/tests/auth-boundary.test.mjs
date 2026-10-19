@@ -87,23 +87,29 @@ test("chat fails closed without session; login enforces exact origin and passwor
     assert.equal(noSession.status, 401);
     assert.equal((output.match(/TEST_PROVIDER_CALL_/g) || []).length, 0);
 
+    const loginIp = "203.0.113.10";
     const badLogin = await fetch(`${base}/api/session/login`, {
-      method: "POST", headers: { "Content-Type": "application/json", Origin: "http://127.0.0.1" },
+      method: "POST", headers: { "Content-Type": "application/json", Origin: "http://127.0.0.1", "CF-Connecting-IP": loginIp },
       body: JSON.stringify({ password: "incorrect password for test" })
     });
     assert.equal(badLogin.status, 401);
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 7; i++) {
       const attempt = await fetch(`${base}/api/session/login`, {
-        method: "POST", headers: { "Content-Type": "application/json", Origin: "http://127.0.0.1" },
+        method: "POST", headers: { "Content-Type": "application/json", Origin: "http://127.0.0.1", "CF-Connecting-IP": loginIp },
         body: JSON.stringify({ password: "incorrect password for test" })
       });
       assert.equal(attempt.status, 401);
     }
     const throttledLogin = await fetch(`${base}/api/session/login`, {
-      method: "POST", headers: { "Content-Type": "application/json", Origin: "http://127.0.0.1" },
+      method: "POST", headers: { "Content-Type": "application/json", Origin: "http://127.0.0.1", "CF-Connecting-IP": loginIp },
       body: JSON.stringify({ password: "test password fixture only 2026" })
     });
     assert.equal(throttledLogin.status, 429);
+    const otherClientLogin = await fetch(`${base}/api/session/login`, {
+      method: "POST", headers: { "Content-Type": "application/json", Origin: "http://127.0.0.1", "CF-Connecting-IP": "198.51.100.20" },
+      body: JSON.stringify({ password: "test password fixture only 2026" })
+    });
+    assert.equal(otherClientLogin.status, 200, "one client's failed attempts must not lock out another client");
 
     const forgedOrigin = await fetch(`${base}/api/session/login`, {
       method: "POST", headers: { "Content-Type": "application/json", Origin: "https://attacker.example" },

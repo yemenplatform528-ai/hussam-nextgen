@@ -1,5 +1,6 @@
 import http from "node:http";
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { isIP } from "node:net";
 
 const PORT = Number(process.env.PORT || 10000);
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
@@ -48,6 +49,13 @@ function sameSecret(a, b) {
   return aa.length > 0 && aa.length === bb.length && timingSafeEqual(aa, bb);
 }
 const rateBuckets = new Map();
+function clientAddress(req) {
+  // Render serves this public service through Cloudflare. Only accept a syntactically
+  // valid CF-Connecting-IP value; otherwise fall back to the socket address.
+  const forwarded = String(req.headers["cf-connecting-ip"] || "").trim();
+  if (isIP(forwarded)) return forwarded;
+  return req.socket.remoteAddress || "unknown";
+}
 function allowRate(key, limit, windowMs) {
   const now = Date.now();
   let bucket = rateBuckets.get(key);
@@ -197,7 +205,7 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(403);
       return res.end(JSON.stringify({ error: "ORIGIN_NOT_ALLOWED" }));
     }
-    if (!allowRate("login", 8, 15 * 60_000)) {
+    if (!allowRate("login:" + clientAddress(req), 8, 15 * 60_000)) {
       res.writeHead(429);
       return res.end(JSON.stringify({ error: "LOGIN_RATE_LIMITED", message: "تجاوزت محاولات الدخول المسموح بها مؤقتًا." }));
     }
@@ -244,7 +252,7 @@ const server = http.createServer(async (req, res) => {
     res.writeHead(401);
     return res.end(JSON.stringify({ error: "AUTHENTICATION_REQUIRED", message: "سجّل الدخول إلى مساحة الحسام قبل إرسال الرسائل." }));
   }
-  if (!allowRate("chat", 20, 60_000)) {
+  if (!allowRate("chat:" + clientAddress(req), 20, 60_000)) {
     res.writeHead(429);
     return res.end(JSON.stringify({ error: "CHAT_RATE_LIMITED", message: "تم بلوغ حد الطلبات المؤقت لهذه الخدمة." }));
   }
