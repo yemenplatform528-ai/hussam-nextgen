@@ -2,6 +2,7 @@ import json
 import os
 import unittest
 from unittest.mock import patch
+from urllib.error import HTTPError
 
 from scripts import render_operator_audit as audit
 
@@ -12,25 +13,35 @@ class RenderOperatorAuditTests(unittest.TestCase):
             with self.assertRaisesRegex(audit.RenderAPIError, "not configured"):
                 audit.get_json("/services")
 
-    def test_error_does_not_expose_response_body(self):
-        class FakeHTTPError(Exception):
-            code = 403
-        err = FakeHTTPError()
-        err.read = lambda: b"secret-like-provider-response"
+    def test_error_does_not_expose_response_body_or_token(self):
+        error = HTTPError(
+            "https://api.render.com/v1/services", 403, "Forbidden", {}, None
+        )
+        error.read = lambda: b"secret-like-provider-response"
         with patch.dict(os.environ, {"RENDER_API_KEY": "test-token"}), patch(
-            "urllib.request.urlopen", side_effect=__import__("urllib.error").error.HTTPError(
-                "https://api.render.com/v1/services", 403, "Forbidden", {}, None
-            )
+            "urllib.request.urlopen", side_effect=error
         ):
             with self.assertRaises(audit.RenderAPIError) as caught:
                 audit.get_json("/services")
         self.assertNotIn("secret-like-provider-response", str(caught.exception))
         self.assertNotIn("test-token", str(caught.exception))
 
+    def test_owner_id_supports_render_resource_shapes(self):
+        self.assertEqual(audit.owner_id({"ownerId": "workspace-a"}), "workspace-a")
+        self.assertEqual(audit.owner_id({"owner": {"id": "workspace-b"}}), "workspace-b")
+        self.assertIsNone(audit.owner_id({"name": "no-owner-field"}))
+
     def test_pick_only_returns_explicit_safe_fields(self):
-        value = audit.pick({"id": "srv-1", "name": "service", "envVars": [{"key": "TOKEN", "value": "do-not-leak"}]}, "id", "name")
+        value = audit.pick(
+            {"id": "srv-1", "name": "service", "envVars": [{"key": "TOKEN", "value": "do-not-leak"}]},
+            "id", "name",
+        )
         self.assertEqual(value, {"id": "srv-1", "name": "service"})
         self.assertNotIn("do-not-leak", json.dumps(value))
+
+    def test_unwrap_only_extracts_expected_resource_container(self):
+        self.assertEqual(audit.unwrap({"cursor": "c", "service": {"id": "srv-1"}}), {"id": "srv-1"})
+        self.assertEqual(audit.unwrap({"id": "plain"}), {"id": "plain"})
 
 
 if __name__ == "__main__":
