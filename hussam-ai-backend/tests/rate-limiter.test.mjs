@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createRateLimiter } from "../../rate-limiter.js";
+import { createRateLimiter } from "../rate-limiter.js";
 
 test("rate limiter keeps a hard bucket bound and preserves recently used counters", () => {
   const limiter = createRateLimiter({ maxBuckets: 3 });

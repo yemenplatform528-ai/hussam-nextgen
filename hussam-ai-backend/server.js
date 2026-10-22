@@ -1,6 +1,6 @@
 import http from "node:http";
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { createRateLimiter } from "../rate-limiter.js";
+import { createRateLimiter } from "./rate-limiter.js";
 import { isIP } from "node:net";
 
 const PORT = Number(process.env.PORT || 10000);
