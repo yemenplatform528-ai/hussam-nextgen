@@ -17,7 +17,7 @@ from datetime import datetime, timezone
 
 API = "https://api.render.com/v1"
 TIMEOUT = 20
-MAX_PAGES = 10
+MAX_PAGES = 100
 PAGE_SIZE = 100
 
 
@@ -51,17 +51,20 @@ def get_json(path: str, query: dict | None = None):
 
 
 def unwrap(item: dict) -> dict:
-    for key in ("workspace", "service", "postgres", "keyValue"):
+    for key in ("owner", "workspace", "service", "postgres", "keyValue"):
         if isinstance(item.get(key), dict):
             return item[key]
     return item
 
 
-def list_pages(path: str):
+def list_pages(path: str, filters: dict | None = None):
+    """Return (resources, truncated); Render's cursor is a sibling of the resource."""
     rows = []
     cursor = None
-    for _ in range(MAX_PAGES):
+    for page_index in range(MAX_PAGES):
         params = {"limit": PAGE_SIZE}
+        if filters:
+            params.update(filters)
         if cursor:
             params["cursor"] = cursor
         payload = get_json(path, params)
@@ -69,12 +72,13 @@ def list_pages(path: str):
             raise RenderAPIError(f"Unexpected response shape for {path}")
         rows.extend(unwrap(item) for item in payload if isinstance(item, dict))
         if len(payload) < PAGE_SIZE:
-            break
+            return rows, False
         next_cursor = payload[-1].get("cursor") if payload and isinstance(payload[-1], dict) else None
         if not next_cursor or next_cursor == cursor:
-            break
+            raise RenderAPIError(f"Pagination cursor missing or repeated for {path}")
         cursor = next_cursor
-    return rows
+    # Never silently label a capped inventory as complete.
+    return rows, True
 
 
 def owner_id(obj: dict):
@@ -97,16 +101,19 @@ def audit():
     if not target:
         raise RenderAPIError("RENDER_AUDIT_WORKSPACE_ID is not configured")
 
-    workspace_rows = list_pages("/workspaces")
-    workspace = next((w for w in workspace_rows if w.get("id") == target), None)
+    # Render documents GET /owners as its workspace-list endpoint.
+    owner_rows, owners_truncated = list_pages("/owners")
+    workspace = next((w for w in owner_rows if w.get("id") == target), None)
     if not workspace:
         raise RenderAPIError("Configured workspace was not returned by Render; refusing to inventory")
 
-    # Render API keys can see multiple workspaces. Filter every resource to the
-    # single owner-selected workspace before building any report.
-    all_services = list_pages("/services")
-    all_databases = list_pages("/postgres")
-    all_key_values = list_pages("/key-value")
+    # Filter at the API as well as in the report. The API key itself remains
+    # account-wide; only this explicitly selected workspace is reported.
+    all_services, services_truncated = list_pages(
+        "/services", {"ownerId": target, "includePreviews": "false"}
+    )
+    all_databases, databases_truncated = list_pages("/postgres", {"ownerId": target})
+    all_key_values, key_values_truncated = list_pages("/key-value", {"ownerId": target})
     services = [x for x in all_services if owner_id(x) == target]
     databases = [x for x in all_databases if owner_id(x) == target]
     key_values = [x for x in all_key_values if owner_id(x) == target]
@@ -118,7 +125,7 @@ def audit():
             **pick(s, "id", "name", "type", "branch", "repo", "autoDeploy", "createdAt", "updatedAt", "suspended", "dashboardUrl"),
             "url": detail.get("url"),
             "region": detail.get("region"),
-            "plan": detail.get("plan"),
+            "plan": detail.get("plan") or detail.get("buildPlan"),
             "runtime": detail.get("runtime") or detail.get("env"),
         })
 
@@ -133,9 +140,18 @@ def audit():
         {**pick(k, "id", "name", "plan", "region", "status", "suspended", "createdAt", "updatedAt")}
         for k in key_values
     ]
+    truncated_categories = [
+        name for name, flag in (
+            ("owners", owners_truncated),
+            ("services", services_truncated),
+            ("postgres", databases_truncated),
+            ("key_value", key_values_truncated),
+        ) if flag
+    ]
     report = {
         "timestamp_utc": datetime.now(timezone.utc).isoformat(),
         "mode": "READ_ONLY",
+        "status": "PARTIAL" if truncated_categories else "COMPLETE",
         "scope": "single_workspace",
         "workspace": pick(workspace, "id", "name", "type"),
         "counts": {
@@ -143,6 +159,7 @@ def audit():
             "postgres": len(safe_databases),
             "key_value": len(safe_kv),
         },
+        "truncated_categories": truncated_categories,
         "services": sorted(safe_services, key=lambda x: str(x.get("name", ""))),
         "postgres": sorted(safe_databases, key=lambda x: str(x.get("name", ""))),
         "key_value": sorted(safe_kv, key=lambda x: str(x.get("name", ""))),
