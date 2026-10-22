@@ -54,7 +54,7 @@ def identity(env_name):
 source = identity("DATABASE_URL")
 target = identity("RESTORE_DATABASE_URL")
 if source == target:
-    raise SystemExit("Source and restore target resolve to the same parsed host/port/database identity")
+    raise SystemExit("RESTORE_DATABASE_URL must point to a distinct restore target (same parsed host/port/database identity)")
 print("Source/target URI identity check: distinct host/port/database tuple (operator must still verify target isolation).")
 PY
 
