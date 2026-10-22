@@ -9,7 +9,7 @@ This is an evidence snapshot, not a completion claim. It separates observed runt
 | Hussam AI inference bridge | One non-sensitive live request returned HTTP 200 with a non-empty Gemini answer and `truth: VERIFIED_RESPONSE`. | The currently deployed backend does not expose the new session-login route; secure owner access is not verified. |
 | Hussam AI portal | Portal URL returns HTTP 200. | Served HTML does not include the proposed login UI; portal/backend are not coordinated on the secure branch. |
 | YIB/WORLD | Health endpoint returns HTTP 200; owner-protected state/chat/export endpoints return HTTP 401 without a token. | Provider is `NONE`; `modelConfigured:false`; `liveModelVerified:false`; no live generation verified. |
-| Hussam NextGen FastAPI | `/health` returns HTTP 200. | `/ready` reports `database_configured:true` but `database_reachable:false`, and `environment:development`; production readiness is not established. |
+| Hussam NextGen FastAPI | `/health` returns HTTP 200; explicit read-only `/ready?deep=true` returned `database_reachable:true`. | Environment still reports `development`; default `/ready` skips the DB probe and reports `database_reachable:false`, so deployment environment/readiness semantics need correction. |
 | Project independence | Multiple branches and service URLs exist. | Branches alone do not prove independent ownership, deployment, databases, secrets, backup, or recovery. Physical separation remains unverified. |
 
 ## Direct observations
@@ -39,9 +39,10 @@ Relevant adapter PR: https://github.com/yemenplatform528-ai/hussam-nextgen/pull/
 ### Hussam NextGen FastAPI
 Observed at `https://hussam-nextgen.fastapicloud.dev`:
 - `GET /health`: HTTP 200; `status:ok`, platform `hussam-nextgen`, version `1.0.0`.
-- `GET /ready`: HTTP 200, but body reports `database_configured:true`, `database_reachable:false`, `environment:development`.
+- `GET /ready`: HTTP 200; body reports `database_configured:true`, `database_reachable:false`, `environment:development` because the default mode skips the database probe in development.
+- `GET /ready?deep=true`: HTTP 200; body reports `database_configured:true`, `database_reachable:true`, `environment:development`. This endpoint performs a read-only `SELECT 1`; no schema or data was changed.
 
-Interpretation: HTTP health is not equivalent to database readiness. Do not label this deployment production-ready until database connectivity and the intended environment are verified.
+Interpretation: database connectivity was verified at the time of the explicit deep probe. The earlier default response was not evidence of a database outage: it meant the probe was skipped. The remaining issue is that the deployed environment is labeled `development`, not the intended staging/production environment. Correct that configuration through the service's owner-controlled environment settings and re-check the production gates before claiming production readiness.
 
 ## Change-control gates
 
