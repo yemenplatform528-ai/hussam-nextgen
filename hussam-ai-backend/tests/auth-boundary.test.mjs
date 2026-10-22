@@ -39,6 +39,14 @@ test("chat fails closed without session; login enforces exact origin and passwor
     }
     assert.equal(ready, true, `server did not become ready: ${output}`);
 
+    const preflight = await fetch(`${base}/api/chat`, {
+      method: "OPTIONS",
+      headers: { Origin: "http://127.0.0.1", "Access-Control-Request-Method": "POST", "Access-Control-Request-Headers": "authorization,content-type" }
+    });
+    assert.equal(preflight.status, 204);
+    assert.equal(preflight.headers.get("access-control-allow-origin"), "http://127.0.0.1");
+    assert.match(preflight.headers.get("access-control-allow-headers") || "", /Authorization/i);
+
     const validLogin = await fetch(`${base}/api/session/login`, {
       method: "POST", headers: { "Content-Type": "application/json", Origin: "http://127.0.0.1" },
       body: JSON.stringify({ password: "test password fixture only 2026" })
