@@ -74,6 +74,7 @@ test("chat fails closed without session; login enforces exact origin and passwor
     assert.equal(validLogin.status, 200);
     const loginData = await validLogin.json();
     assert.equal(typeof loginData.token, "string");
+    assert.equal(loginData.expiresIn, 30 * 60, "stateless owner tokens must expire within 30 minutes");
     const validToken = loginData.token;
     const nullLogin = await fetch(`${base}/api/session/login`, {
       method: "POST", headers: { "Content-Type": "application/json", Origin: "http://127.0.0.1" },
