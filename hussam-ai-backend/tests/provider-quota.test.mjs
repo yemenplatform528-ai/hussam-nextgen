@@ -36,9 +36,9 @@ test("quota exhaustion returns 429 and makes exactly one provider attempt", asyn
       body: JSON.stringify({ password: "test password fixture only 2026" })
     });
     assert.equal(login.status, 200);
-    const cookie = login.headers.get("set-cookie").split(";")[0];
+    const loginData = await login.json();
     const response = await fetch(`${base}/api/chat`, {
-      method: "POST", headers: { "Content-Type": "application/json", Origin: "http://127.0.0.1", Cookie: cookie },
+      method: "POST", headers: { "Content-Type": "application/json", Origin: "http://127.0.0.1", Authorization: `Bearer ${loginData.token}` },
       body: JSON.stringify({ messages: [{ role: "user", content: "deterministic quota test" }] })
     });
     const body = await response.json();

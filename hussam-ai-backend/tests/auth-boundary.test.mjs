@@ -44,16 +44,22 @@ test("chat fails closed without session; login enforces exact origin and passwor
       body: JSON.stringify({ password: "test password fixture only 2026" })
     });
     assert.equal(validLogin.status, 200);
-    const validCookie = validLogin.headers.get("set-cookie").split(";")[0];
+    const loginData = await validLogin.json();
+    assert.equal(typeof loginData.token, "string");
+    const validToken = loginData.token;
+    const nullLogin = await fetch(`${base}/api/session/login`, {
+      method: "POST", headers: { "Content-Type": "application/json", Origin: "http://127.0.0.1" },
+      body: "null"
+    });
+    assert.equal(nullLogin.status, 400);
     const oversizedLogin = await fetch(`${base}/api/session/login`, {
       method: "POST", headers: { "Content-Type": "application/json", Origin: "http://127.0.0.1" },
       body: "x".repeat(9_000)
     });
     assert.equal(oversizedLogin.status, 413);
-    const token = validCookie.slice(validCookie.indexOf("=") + 1);
-    const tamperedCookie = "hussam_session=" + token.slice(0, -1) + (token.endsWith("x") ? "y" : "x");
+    const tamperedToken = validToken.slice(0, -1) + (validToken.endsWith("x") ? "y" : "x");
     const tamperedSession = await fetch(`${base}/api/chat`, {
-      method: "POST", headers: { "Content-Type": "application/json", Origin: "http://127.0.0.1", Cookie: tamperedCookie },
+      method: "POST", headers: { "Content-Type": "application/json", Origin: "http://127.0.0.1", Authorization: `Bearer ${tamperedToken}` },
       body: JSON.stringify({ messages: [{ role: "user", content: "must not reach provider" }] })
     });
     assert.equal(tamperedSession.status, 401);
@@ -61,13 +67,13 @@ test("chat fails closed without session; login enforces exact origin and passwor
     const expiredPayload = Buffer.from(JSON.stringify({ exp: Math.floor(Date.now() / 1000) - 60 })).toString("base64url");
     const expiredSignature = createHmac("sha256", "test session secret fixture only for tests").update(expiredPayload).digest("base64url");
     const expiredSession = await fetch(`${base}/api/chat`, {
-      method: "POST", headers: { "Content-Type": "application/json", Origin: "http://127.0.0.1", Cookie: `hussam_session=${expiredPayload}.${expiredSignature}` },
+      method: "POST", headers: { "Content-Type": "application/json", Origin: "http://127.0.0.1", Authorization: `Bearer ${expiredPayload}.${expiredSignature}` },
       body: JSON.stringify({ messages: [{ role: "user", content: "expired session must not reach provider" }] })
     });
     assert.equal(expiredSession.status, 401);
 
     const oversizedChat = await fetch(`${base}/api/chat`, {
-      method: "POST", headers: { "Content-Type": "application/json", Origin: "http://127.0.0.1", Cookie: validCookie },
+      method: "POST", headers: { "Content-Type": "application/json", Origin: "http://127.0.0.1", Authorization: `Bearer ${validToken}` },
       body: "x".repeat(101_000)
     });
     assert.equal(oversizedChat.status, 413);
