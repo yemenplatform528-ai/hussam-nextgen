@@ -25,6 +25,7 @@ Generate a session secret locally with a cryptographic generator such as `openss
 - Owner bearer sessions expire after **30 minutes maximum**.
 - Sessions are stateless HMAC-signed tokens. The current design has **no server-side revocation list** and logout is local to the current browser tab: it clears that tab's token and hides authenticated views.
 - A copied token may remain usable until its expiry; restarting the backend does not revoke it. Do not describe the logout control as server-side revocation.
+- Login throttling uses best-effort client identity plus a global ceiling of 100 attempts per 15 minutes. The application does not claim that a forwarded IP header is trusted at every ingress path; the global ceiling is the safety backstop if a caller varies that header. This reduces brute-force throughput but cannot eliminate denial-of-service risk.
 - Rotating `HUSSAM_SESSION_SECRET` invalidates outstanding tokens but is an operator action and forces all owners to sign in again. If immediate revocation becomes a requirement, implement and verify a durable shared revocation mechanism before claiming it.
 
 ## Deploy sequence
