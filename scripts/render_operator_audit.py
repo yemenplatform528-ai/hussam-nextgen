@@ -14,6 +14,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
+from urllib.parse import urlsplit
 
 API = "https://api.render.com/v1"
 TIMEOUT = 20
@@ -95,6 +96,60 @@ def pick(obj: dict, *keys):
     return {key: obj[key] for key in keys if key in obj and obj[key] is not None}
 
 
+def probe_public_service(url: str | None, health_path: str | None = None):
+    """Probe only Render's own public subdomains; never fetch arbitrary hosts."""
+    if not url:
+        return {"status": "SKIPPED", "reason": "missing_url"}
+    parsed = urlsplit(url)
+    if parsed.scheme != "https" or not parsed.hostname or not parsed.hostname.endswith(".onrender.com"):
+        return {"status": "SKIPPED", "reason": "url_not_onrender_https"}
+    path = health_path if isinstance(health_path, str) and health_path.startswith("/") else "/"
+    target = parsed._replace(path=path, query="", fragment="").geturl()
+    started = time.time()
+    request = urllib.request.Request(
+        target,
+        headers={"Accept": "application/json,text/html,*/*", "User-Agent": "yemen-render-readonly-audit/1"},
+        method="GET",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=8) as response:
+            return {
+                "status": f"HTTP_{response.status}",
+                "http_status": response.status,
+                "elapsed_seconds": round(time.time() - started, 3),
+                "content_type": response.headers.get("Content-Type"),
+            }
+    except urllib.error.HTTPError as exc:
+        return {
+            "status": f"HTTP_{exc.code}",
+            "http_status": exc.code,
+            "elapsed_seconds": round(time.time() - started, 3),
+        }
+    except (urllib.error.URLError, TimeoutError) as exc:
+        return {
+            "status": "UNREACHABLE",
+            "error_type": type(exc).__name__,
+            "elapsed_seconds": round(time.time() - started, 3),
+        }
+
+
+def database_expiry(d: dict, now: datetime | None = None):
+    raw = d.get("expiresAt")
+    if not raw:
+        return {"status": "NO_EXPIRY_REPORTED"}
+    try:
+        expiry = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except (ValueError, AttributeError):
+        return {"status": "UNKNOWN_EXPIRY_FORMAT"}
+    current = now or datetime.now(timezone.utc)
+    days = (expiry - current).total_seconds() / 86400
+    return {
+        "status": "EXPIRED" if days < 0 else ("URGENT" if days <= 7 else ("WARNING" if days <= 21 else "OK")),
+        "expires_at": expiry.isoformat(),
+        "days_remaining": round(days, 2),
+    }
+
+
 def audit():
     started = time.time()
     target = os.environ.get("RENDER_AUDIT_WORKSPACE_ID", "").strip()
@@ -127,12 +182,14 @@ def audit():
             "region": detail.get("region"),
             "plan": detail.get("plan") or detail.get("buildPlan"),
             "runtime": detail.get("runtime") or detail.get("env"),
+            "health_probe": probe_public_service(detail.get("url"), detail.get("healthCheckPath")),
         })
 
     safe_databases = [
         {
             **pick(d, "id", "name", "status", "plan", "region", "version", "expiresAt", "suspended", "createdAt", "updatedAt"),
             "ipAllowListEntryCount": len(d.get("ipAllowList") or []),
+            "expiry_assessment": database_expiry(d),
         }
         for d in databases
     ]
@@ -160,6 +217,15 @@ def audit():
             "key_value": len(safe_kv),
         },
         "truncated_categories": truncated_categories,
+        "warnings": [
+            {"resource": d.get("name"), "kind": "POSTGRES_EXPIRY", **d["expiry_assessment"]}
+            for d in safe_databases
+            if d["expiry_assessment"].get("status") in ("EXPIRED", "URGENT", "WARNING")
+        ] + [
+            {"resource": s.get("name"), "kind": "SERVICE_HEALTH", "health_probe": s.get("health_probe")}
+            for s in safe_services
+            if s.get("health_probe", {}).get("status") not in ("HTTP_200", "HTTP_204", "SKIPPED")
+        ],
         "services": sorted(safe_services, key=lambda x: str(x.get("name", ""))),
         "postgres": sorted(safe_databases, key=lambda x: str(x.get("name", ""))),
         "key_value": sorted(safe_kv, key=lambda x: str(x.get("name", ""))),
