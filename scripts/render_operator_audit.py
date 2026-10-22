@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Read-only Render account audit. Never prints API credentials or arbitrary response bodies."""
+"""Read-only inventory for one explicitly selected Render workspace.
+
+Never prints API credentials, arbitrary API response bodies, env-var values,
+connection strings, or resources from other workspaces.
+"""
 from __future__ import annotations
 
 import json
@@ -41,10 +45,16 @@ def get_json(path: str, query: dict | None = None):
         with urllib.request.urlopen(req, timeout=TIMEOUT) as response:
             return json.loads(response.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
-        # Do not include response bodies or headers; they may contain sensitive details.
         raise RenderAPIError(f"Render API returned HTTP {exc.code} for {path}") from None
     except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
         raise RenderAPIError(f"Render API request failed for {path}: {type(exc).__name__}") from None
+
+
+def unwrap(item: dict) -> dict:
+    for key in ("workspace", "service", "postgres", "keyValue"):
+        if isinstance(item.get(key), dict):
+            return item[key]
+    return item
 
 
 def list_pages(path: str):
@@ -55,23 +65,26 @@ def list_pages(path: str):
         if cursor:
             params["cursor"] = cursor
         payload = get_json(path, params)
-        if isinstance(payload, list):
-            # Render list endpoints may wrap each resource as {cursor, service}.
-            for item in payload:
-                if isinstance(item, dict):
-                    resource = item.get("service") or item.get("postgres") or item.get("keyValue") or item
-                    if isinstance(resource, dict):
-                        rows.append(resource)
-            if len(payload) < PAGE_SIZE:
-                break
-            # Some endpoint responses do not expose a cursor; do not loop the same page.
-            next_cursor = payload[-1].get("cursor") if payload and isinstance(payload[-1], dict) else None
-            if not next_cursor or next_cursor == cursor:
-                break
-            cursor = next_cursor
-        else:
+        if not isinstance(payload, list):
             raise RenderAPIError(f"Unexpected response shape for {path}")
+        rows.extend(unwrap(item) for item in payload if isinstance(item, dict))
+        if len(payload) < PAGE_SIZE:
+            break
+        next_cursor = payload[-1].get("cursor") if payload and isinstance(payload[-1], dict) else None
+        if not next_cursor or next_cursor == cursor:
+            break
+        cursor = next_cursor
     return rows
+
+
+def owner_id(obj: dict):
+    value = obj.get("ownerId") or obj.get("owner_id")
+    if value:
+        return value
+    owner = obj.get("owner")
+    if isinstance(owner, dict):
+        return owner.get("id")
+    return None
 
 
 def pick(obj: dict, *keys):
@@ -80,44 +93,51 @@ def pick(obj: dict, *keys):
 
 def audit():
     started = time.time()
-    workspaces = get_json("/workspaces")
-    services = list_pages("/services")
-    databases = list_pages("/postgres")
-    key_values = list_pages("/key-value")
+    target = os.environ.get("RENDER_AUDIT_WORKSPACE_ID", "").strip()
+    if not target:
+        raise RenderAPIError("RENDER_AUDIT_WORKSPACE_ID is not configured")
+
+    workspace_rows = list_pages("/workspaces")
+    workspace = next((w for w in workspace_rows if w.get("id") == target), None)
+    if not workspace:
+        raise RenderAPIError("Configured workspace was not returned by Render; refusing to inventory")
+
+    # Render API keys can see multiple workspaces. Filter every resource to the
+    # single owner-selected workspace before building any report.
+    all_services = list_pages("/services")
+    all_databases = list_pages("/postgres")
+    all_key_values = list_pages("/key-value")
+    services = [x for x in all_services if owner_id(x) == target]
+    databases = [x for x in all_databases if owner_id(x) == target]
+    key_values = [x for x in all_key_values if owner_id(x) == target]
 
     safe_services = []
     for s in services:
         detail = s.get("serviceDetails") if isinstance(s.get("serviceDetails"), dict) else {}
         safe_services.append({
-            **pick(s, "id", "name", "type", "ownerId", "branch", "repo", "autoDeploy", "createdAt", "updatedAt", "suspended", "dashboardUrl"),
+            **pick(s, "id", "name", "type", "branch", "repo", "autoDeploy", "createdAt", "updatedAt", "suspended", "dashboardUrl"),
             "url": detail.get("url"),
             "region": detail.get("region"),
             "plan": detail.get("plan"),
             "runtime": detail.get("runtime") or detail.get("env"),
-            "rootDir": detail.get("rootDir"),
         })
 
     safe_databases = [
         {
-            **pick(d, "id", "name", "ownerId", "status", "plan", "region", "version", "expiresAt", "suspended", "createdAt", "updatedAt"),
+            **pick(d, "id", "name", "status", "plan", "region", "version", "expiresAt", "suspended", "createdAt", "updatedAt"),
             "ipAllowListEntryCount": len(d.get("ipAllowList") or []),
         }
         for d in databases
     ]
     safe_kv = [
-        {**pick(k, "id", "name", "ownerId", "plan", "region", "status", "suspended", "createdAt", "updatedAt")}
+        {**pick(k, "id", "name", "plan", "region", "status", "suspended", "createdAt", "updatedAt")}
         for k in key_values
     ]
     report = {
         "timestamp_utc": datetime.now(timezone.utc).isoformat(),
         "mode": "READ_ONLY",
-        "api": "https://api.render.com/v1",
-        "workspaces": [
-            pick(w, "id", "name", "type")
-            for item in (workspaces if isinstance(workspaces, list) else [])
-            for w in ([item.get("workspace", item)] if isinstance(item, dict) else [])
-            if isinstance(w, dict)
-        ],
+        "scope": "single_workspace",
+        "workspace": pick(workspace, "id", "name", "type"),
         "counts": {
             "services": len(safe_services),
             "postgres": len(safe_databases),
@@ -127,7 +147,7 @@ def audit():
         "postgres": sorted(safe_databases, key=lambda x: str(x.get("name", ""))),
         "key_value": sorted(safe_kv, key=lambda x: str(x.get("name", ""))),
         "elapsed_seconds": round(time.time() - started, 3),
-        "security_note": "No secret values, connection strings, request bodies, or API response bodies are recorded.",
+        "security_note": "Only the selected workspace is included. No secrets, env-var values, connection strings, or arbitrary API response bodies are recorded.",
     }
     return report
 
