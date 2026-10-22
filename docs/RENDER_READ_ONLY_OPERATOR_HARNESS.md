@@ -8,7 +8,7 @@ This adds a repeatable, audited path to run a read-only Render REST API inventor
 2. Render documents that the key can access all workspaces associated with the account. Treat it as a high-impact secret.
 3. In GitHub repository Settings → Environments, create `render-readonly` and configure a required reviewer before adding any credential. Add `RENDER_API_KEY` only as an environment secret in that environment, never in a file, repository secret, issue, or chat. Do not configure the key if required-reviewer protection is unavailable.
 4. Review and merge the workflow only after reviewing the script and its permissions.
-5. Create or open a regular GitHub issue, then comment exactly `/render-audit` on a regular issue. The workflow accepts only GitHub issue-comment associations `OWNER`, `MEMBER`, or `COLLABORATOR`, ignores comments on pull requests, and references the protected `render-readonly` environment. Configure required-reviewer protection before adding the API key.
+5. Create or open a regular GitHub issue, then comment exactly `/render-audit` on a regular issue. The workflow accepts only comments from the repository owner account `yemenplatform528-ai`, ignores comments on pull requests, and references the protected `render-readonly` environment. Configure required-reviewer protection before adding the API key.
 6. Retrieve the sanitized artifact from the resulting Actions run. It contains only the selected Yemen workspace, resource IDs/names, service URLs, plans/status/region and database expiry, plus a SHA-256 checksum.
 7. Revoke the API key when no longer needed.
 
