@@ -65,6 +65,34 @@ function allowRate(key, limit, windowMs) {
   }
   return true;
 }
+async function readRequestBody(req, maxBytes, timeoutCode = "REQUEST_BODY_TIMEOUT") {
+  let raw = "";
+  let bodyTimeout;
+  try {
+    const bodyRead = (async () => {
+      for await (const chunk of req) {
+        raw += chunk;
+        if (raw.length > maxBytes) {
+          const error = new Error("REQUEST_TOO_LARGE");
+          error.code = "REQUEST_TOO_LARGE";
+          throw error;
+        }
+      }
+    })();
+    const deadline = new Promise((_, reject) => {
+      bodyTimeout = setTimeout(() => {
+        const error = new Error(timeoutCode);
+        error.code = timeoutCode;
+        reject(error);
+      }, Math.max(100, Number(process.env.HUSSAM_REQUEST_BODY_TIMEOUT_MS) || 15_000));
+      bodyTimeout.unref?.();
+    });
+    await Promise.race([bodyRead, deadline]);
+    return raw;
+  } finally {
+    if (bodyTimeout) clearTimeout(bodyTimeout);
+  }
+}
 let activeGenerations = 0;
 let activeUploads = 0;
 
@@ -199,13 +227,24 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(503);
       return res.end(JSON.stringify({ error: "ACCESS_CONTROL_NOT_CONFIGURED", message: "لم تُضبط متغيرات حماية الوصول في الخادم؛ الدخول مغلق افتراضيًا." }));
     }
-    let loginRaw = "";
-    for await (const chunk of req) {
-      loginRaw += chunk;
-      if (loginRaw.length > 8_192) {
+    let loginRaw;
+    try {
+      loginRaw = await readRequestBody(req, 8_192, "LOGIN_BODY_TIMEOUT");
+    } catch (error) {
+      if (error?.code === "REQUEST_TOO_LARGE") {
         res.writeHead(413);
-        return res.end(JSON.stringify({ error: "REQUEST_TOO_LARGE" }));
+        res.end(JSON.stringify({ error: "REQUEST_TOO_LARGE" }));
+        res.once("finish", () => req.destroy());
+        return;
       }
+      if (error?.code === "LOGIN_BODY_TIMEOUT") {
+        res.writeHead(408);
+        res.end(JSON.stringify({ error: "LOGIN_BODY_TIMEOUT" }));
+        res.once("finish", () => req.destroy());
+        return;
+      }
+      res.writeHead(400);
+      return res.end(JSON.stringify({ error: "REQUEST_BODY_INTERRUPTED" }));
     }
     let loginBody;
     try { loginBody = JSON.parse(loginRaw || "{}"); } catch {
@@ -260,41 +299,23 @@ const server = http.createServer(async (req, res) => {
     return res.end(JSON.stringify({ error: "UPLOAD_CONCURRENCY_LIMITED", message: "هناك عدد كبير من الطلبات الواردة؛ أعد المحاولة بعد قليل." }));
   }
   activeUploads += 1;
-  let raw = "";
+  let raw;
   let uploadReleased = false;
   const releaseUpload = () => {
     if (uploadReleased) return;
     uploadReleased = true;
     activeUploads = Math.max(0, activeUploads - 1);
   };
-  let bodyTimeout;
   try {
-    const bodyRead = (async () => {
-      for await (const chunk of req) {
-        raw += chunk;
-        if (raw.length > 100_000) {
-          const error = new Error("REQUEST_TOO_LARGE");
-          error.code = "REQUEST_TOO_LARGE";
-          throw error;
-        }
-      }
-    })();
-    const deadline = new Promise((_, reject) => {
-      bodyTimeout = setTimeout(() => {
-        const error = new Error("REQUEST_BODY_TIMEOUT");
-        error.code = "REQUEST_BODY_TIMEOUT";
-        reject(error);
-      }, Math.max(100, Number(process.env.HUSSAM_REQUEST_BODY_TIMEOUT_MS) || 15_000));
-      bodyTimeout.unref?.();
-    });
-    await Promise.race([bodyRead, deadline]);
+    raw = await readRequestBody(req, 100_000, "REQUEST_BODY_TIMEOUT");
   } catch (error) {
     releaseUpload();
-    if (bodyTimeout) clearTimeout(bodyTimeout);
     if (!res.headersSent) {
       if (error?.code === "REQUEST_TOO_LARGE") {
         res.writeHead(413);
-        return res.end(JSON.stringify({ error: "REQUEST_TOO_LARGE" }));
+        res.end(JSON.stringify({ error: "REQUEST_TOO_LARGE" }));
+        res.once("finish", () => req.destroy());
+        return;
       }
       if (error?.code === "REQUEST_BODY_TIMEOUT") {
         res.writeHead(408);
@@ -306,8 +327,6 @@ const server = http.createServer(async (req, res) => {
       return res.end(JSON.stringify({ error: "REQUEST_BODY_INTERRUPTED" }));
     }
     return;
-  } finally {
-    if (bodyTimeout) clearTimeout(bodyTimeout);
   }
   releaseUpload();
   let body;
