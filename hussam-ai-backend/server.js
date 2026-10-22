@@ -1,11 +1,91 @@
 import http from "node:http";
+import { createHmac, timingSafeEqual } from "node:crypto";
+import { createRateLimiter } from "./rate-limiter.js";
+import { isIP } from "node:net";
 
 const PORT = Number(process.env.PORT || 10000);
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
-const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-3.8-flash";
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-3.6-flash";
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || "https://hussam-ai-standalone-portal.onrender.com";
+const HUSSAM_ACCESS_PASSWORD = process.env.HUSSAM_ACCESS_PASSWORD || "";
+const HUSSAM_SESSION_SECRET = process.env.HUSSAM_SESSION_SECRET || "";
+const SESSION_TTL_SECONDS = 12 * 60 * 60;
+
+function sessionReady() {
+  return HUSSAM_ACCESS_PASSWORD.length >= 16 && HUSSAM_SESSION_SECRET.length >= 32;
+}
+function signSession(payload) {
+  const encoded = Buffer.from(JSON.stringify(payload)).toString("base64url");
+  const signature = createHmac("sha256", HUSSAM_SESSION_SECRET).update(encoded).digest("base64url");
+  return encoded + "." + signature;
+}
+function validSessionToken(token) {
+  if (!sessionReady() || typeof token !== "string") return false;
+  const split = token.lastIndexOf(".");
+  if (split <= 0) return false;
+  const encoded = token.slice(0, split);
+  const supplied = Buffer.from(token.slice(split + 1));
+  const expected = Buffer.from(createHmac("sha256", HUSSAM_SESSION_SECRET).update(encoded).digest("base64url"));
+  if (supplied.length !== expected.length || !timingSafeEqual(supplied, expected)) return false;
+  try {
+    const payload = JSON.parse(Buffer.from(encoded, "base64url").toString("utf8"));
+    return Number.isInteger(payload.exp) && payload.exp > Math.floor(Date.now() / 1000);
+  } catch { return false; }
+}
+function bearerToken(req) {
+  const value = String(req.headers.authorization || "");
+  return value.startsWith("Bearer ") ? value.slice(7) : "";
+}
+function sameSecret(a, b) {
+  const aa = Buffer.from(String(a || ""));
+  const bb = Buffer.from(String(b || ""));
+  return aa.length > 0 && aa.length === bb.length && timingSafeEqual(aa, bb);
+}
+const rateLimiter = createRateLimiter({ maxBuckets: 512 });
+function clientAddress(req) {
+  // Render serves this public service through Cloudflare. Only accept a syntactically
+  // valid CF-Connecting-IP value; otherwise fall back to the socket address.
+  const forwarded = String(req.headers["cf-connecting-ip"] || "").trim();
+  if (isIP(forwarded)) return forwarded;
+  return req.socket.remoteAddress || "unknown";
+}
+function allowRate(key, limit, windowMs) {
+  return rateLimiter.allow(key, limit, windowMs);
+}
+async function readRequestBody(req, maxBytes, timeoutCode = "REQUEST_BODY_TIMEOUT") {
+  let raw = "";
+  let bodyTimeout;
+  try {
+    const bodyRead = (async () => {
+      for await (const chunk of req) {
+        raw += chunk;
+        if (raw.length > maxBytes) {
+          const error = new Error("REQUEST_TOO_LARGE");
+          error.code = "REQUEST_TOO_LARGE";
+          throw error;
+        }
+      }
+    })();
+    const deadline = new Promise((_, reject) => {
+      bodyTimeout = setTimeout(() => {
+        const error = new Error(timeoutCode);
+        error.code = timeoutCode;
+        reject(error);
+      }, Math.max(100, Number(process.env.HUSSAM_REQUEST_BODY_TIMEOUT_MS) || 15_000));
+      bodyTimeout.unref?.();
+    });
+    await Promise.race([bodyRead, deadline]);
+    return raw;
+  } finally {
+    if (bodyTimeout) clearTimeout(bodyTimeout);
+  }
+}
+let activeGenerations = 0;
+let activeUploads = 0;
+let liveModelVerified = false; // Process-local evidence; resets on restart.
+
 
 function activeProvider() {
   if (GEMINI_API_KEY) return { provider: "gemini", model: GEMINI_MODEL };
@@ -27,14 +107,10 @@ async function generateWithGemini(messages, model) {
   }));
   if (!contents.length) throw new Error("NO_USER_CONTENT");
 
-  // Bound fallback attempts to the three Flash models shown in the user's AI Studio
-  // quota panel. Each candidate is attempted at most once; no retry loops.
-  const models = [...new Set([
-    model,
-    "gemini-3.8-flash",
-    "gemini-3.7-flash",
-    "gemini-3.6-flash"
-  ].filter(Boolean))];
+  // Strict one-model/one-request policy: do not fan out to other models when
+  // quota or availability errors occur. This avoids multiplying upstream calls
+  // and keeps the no-cost/quota boundary explicit. Model changes are operator-controlled.
+  const models = model ? [model] : [];
   let lastError;
   for (const candidateModel of models) {
     try {
@@ -62,12 +138,8 @@ async function generateWithGemini(messages, model) {
         error.providerStatus = typeof data?.error?.status === "string" ? data.error.status : null;
         error.providerMessage = typeof data?.error?.message === "string" ? data.error.message.slice(0, 300) : null;
         lastError = error;
-        // If the configured model has exhausted its quota, try the other dashboard-confirmed
-        // free-tier Flash models once in order. Do not keep cycling after a fallback model is quota-limited.
-        const canFallback = response.status === 503 || response.status === 404 ||
-          error.providerStatus === "UNAVAILABLE" || error.providerStatus === "NOT_FOUND" ||
-          response.status === 429;
-        if (canFallback) continue;
+        // One configured model means one upstream attempt. Never rotate through models
+        // automatically: that can multiply quota consumption and obscure the real failure.
         throw error;
       }
       const answer = data?.candidates?.[0]?.content?.parts
@@ -80,12 +152,6 @@ async function generateWithGemini(messages, model) {
       }
       return { answer, model: candidateModel };
     } catch (error) {
-      if (error?.message === "GEMINI_REQUEST_FAILED" &&
-          (error.status === 503 || error.status === 404 || error.status === 429 ||
-           error.providerStatus === "UNAVAILABLE" || error.providerStatus === "NOT_FOUND")) {
-        lastError = error;
-        continue;
-      }
       throw error;
     }
   }
@@ -120,7 +186,7 @@ const server = http.createServer(async (req, res) => {
     res.setHeader("Vary", "Origin");
   }
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
   res.setHeader("Content-Type", "application/json; charset=utf-8");
   if (req.method === "OPTIONS") { res.writeHead(204); return res.end(); }
 
@@ -132,18 +198,82 @@ const server = http.createServer(async (req, res) => {
       service: "hussam-ai-inference-bridge",
       status: "online",
       inferenceConfigured: active.provider !== "none",
+      accessControlConfigured: sessionReady(),
+      liveModelVerified,
       provider: active.provider,
       model: active.model,
       truth: "OBSERVED"
     }));
   }
+  if (req.method === "POST" && url.pathname === "/api/session/login") {
+    if (origin !== ALLOWED_ORIGIN) {
+      res.writeHead(403);
+      return res.end(JSON.stringify({ error: "ORIGIN_NOT_ALLOWED" }));
+    }
+    if (!allowRate("login:" + clientAddress(req), 8, 15 * 60_000)) {
+      res.writeHead(429);
+      return res.end(JSON.stringify({ error: "LOGIN_RATE_LIMITED", message: "تجاوزت محاولات الدخول المسموح بها مؤقتًا." }));
+    }
+    if (!sessionReady()) {
+      res.writeHead(503);
+      return res.end(JSON.stringify({ error: "ACCESS_CONTROL_NOT_CONFIGURED", message: "لم تُضبط متغيرات حماية الوصول في الخادم؛ الدخول مغلق افتراضيًا." }));
+    }
+    let loginRaw;
+    try {
+      loginRaw = await readRequestBody(req, 8_192, "LOGIN_BODY_TIMEOUT");
+    } catch (error) {
+      if (error?.code === "REQUEST_TOO_LARGE") {
+        res.writeHead(413);
+        res.end(JSON.stringify({ error: "REQUEST_TOO_LARGE" }));
+        res.once("finish", () => req.destroy());
+        return;
+      }
+      if (error?.code === "LOGIN_BODY_TIMEOUT") {
+        res.writeHead(408);
+        res.end(JSON.stringify({ error: "LOGIN_BODY_TIMEOUT" }));
+        res.once("finish", () => req.destroy());
+        return;
+      }
+      res.writeHead(400);
+      return res.end(JSON.stringify({ error: "REQUEST_BODY_INTERRUPTED" }));
+    }
+    let loginBody;
+    try { loginBody = JSON.parse(loginRaw || "{}"); } catch {
+      res.writeHead(400);
+      return res.end(JSON.stringify({ error: "INVALID_JSON" }));
+    }
+    if (!loginBody || typeof loginBody !== "object" || Array.isArray(loginBody)) {
+      res.writeHead(400);
+      return res.end(JSON.stringify({ error: "INVALID_LOGIN_BODY" }));
+    }
+    if (!sameSecret(loginBody.password, HUSSAM_ACCESS_PASSWORD)) {
+      res.writeHead(401);
+      return res.end(JSON.stringify({ error: "INVALID_ACCESS_PASSWORD", message: "رمز الدخول غير صحيح." }));
+    }
+    const exp = Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS;
+    const token = signSession({ exp });
+    res.writeHead(200);
+    return res.end(JSON.stringify({ authenticated: true, token, expiresIn: SESSION_TTL_SECONDS }));
+  }
   if (req.method !== "POST" || url.pathname !== "/api/chat") {
     res.writeHead(404);
     return res.end(JSON.stringify({ error: "NOT_FOUND" }));
   }
-  if (origin && origin !== ALLOWED_ORIGIN) {
+  if (origin !== ALLOWED_ORIGIN) {
     res.writeHead(403);
     return res.end(JSON.stringify({ error: "ORIGIN_NOT_ALLOWED" }));
+  }
+  if (!sessionReady()) {
+    res.writeHead(503);
+    return res.end(JSON.stringify({ error: "ACCESS_CONTROL_NOT_CONFIGURED", message: "لم تُضبط متغيرات حماية الوصول في الخادم؛ المحادثة مغلقة افتراضيًا." }));
+  }
+  if (!validSessionToken(bearerToken(req))) {
+    res.writeHead(401);
+    return res.end(JSON.stringify({ error: "AUTHENTICATION_REQUIRED", message: "سجّل الدخول إلى مساحة الحسام قبل إرسال الرسائل." }));
+  }
+  if (!allowRate("chat:" + clientAddress(req), 20, 60_000)) {
+    res.writeHead(429);
+    return res.end(JSON.stringify({ error: "CHAT_RATE_LIMITED", message: "تم بلوغ حد الطلبات المؤقت لهذه الخدمة." }));
   }
   if (active.provider === "none") {
     res.writeHead(503);
@@ -153,14 +283,43 @@ const server = http.createServer(async (req, res) => {
     }));
   }
 
-  let raw = "";
-  for await (const chunk of req) {
-    raw += chunk;
-    if (raw.length > 100_000) {
-      res.writeHead(413);
-      return res.end(JSON.stringify({ error: "REQUEST_TOO_LARGE" }));
-    }
+  // Bound uploads separately from model generations. Slow clients must not occupy
+  // scarce inference slots; reserve the generation slot only after a full valid body.
+  if (activeUploads >= 8) {
+    res.writeHead(429);
+    return res.end(JSON.stringify({ error: "UPLOAD_CONCURRENCY_LIMITED", message: "هناك عدد كبير من الطلبات الواردة؛ أعد المحاولة بعد قليل." }));
   }
+  activeUploads += 1;
+  let raw;
+  let uploadReleased = false;
+  const releaseUpload = () => {
+    if (uploadReleased) return;
+    uploadReleased = true;
+    activeUploads = Math.max(0, activeUploads - 1);
+  };
+  try {
+    raw = await readRequestBody(req, 100_000, "REQUEST_BODY_TIMEOUT");
+  } catch (error) {
+    releaseUpload();
+    if (!res.headersSent) {
+      if (error?.code === "REQUEST_TOO_LARGE") {
+        res.writeHead(413);
+        res.end(JSON.stringify({ error: "REQUEST_TOO_LARGE" }));
+        res.once("finish", () => req.destroy());
+        return;
+      }
+      if (error?.code === "REQUEST_BODY_TIMEOUT") {
+        res.writeHead(408);
+        res.end(JSON.stringify({ error: "REQUEST_BODY_TIMEOUT" }));
+        res.once("finish", () => req.destroy());
+        return;
+      }
+      res.writeHead(400);
+      return res.end(JSON.stringify({ error: "REQUEST_BODY_INTERRUPTED" }));
+    }
+    return;
+  }
+  releaseUpload();
   let body;
   try { body = JSON.parse(raw || "{}"); } catch {
     res.writeHead(400);
@@ -170,11 +329,23 @@ const server = http.createServer(async (req, res) => {
     res.writeHead(400);
     return res.end(JSON.stringify({ error: "INVALID_MESSAGES" }));
   }
+  // No await between this final check and reservation, so the cap is atomic
+  // within this Node event loop and only actual generations consume these slots.
+  if (activeGenerations >= 2) {
+    res.writeHead(429);
+    return res.end(JSON.stringify({ error: "INFERENCE_CONCURRENCY_LIMITED", message: "الخدمة مشغولة بطلبات أخرى؛ لم يُرسل هذا الطلب إلى المزود." }));
+  }
+  activeGenerations += 1;
 
   try {
     const generated = active.provider === "gemini"
       ? await generateWithGemini(body.messages, active.model)
       : { answer: await generateWithOpenAI(body.messages, active.model), model: active.model };
+    if (typeof generated.answer !== "string" || !generated.answer.trim()) {
+      throw new Error("EMPTY_MODEL_RESPONSE");
+    }
+    liveModelVerified = true;
+    activeGenerations -= 1;
     res.writeHead(200);
     return res.end(JSON.stringify({
       answer: generated.answer,
@@ -183,6 +354,7 @@ const server = http.createServer(async (req, res) => {
       truth: "VERIFIED_RESPONSE"
     }));
   } catch (error) {
+    activeGenerations = Math.max(0, activeGenerations - 1);
     // Log only sanitized upstream diagnostics; never log API keys, headers, prompts, or provider response bodies.
     console.warn("Inference upstream failure", JSON.stringify({
       provider: active.provider,
