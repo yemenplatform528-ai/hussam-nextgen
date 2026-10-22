@@ -63,3 +63,15 @@
 - Remaining blockers and evidence links:
 
 **Stop condition:** If secret presence, deployment provenance, or a reversible rollback cannot be verified, leave the PR open and do not claim production authentication is enabled.
+
+
+## Additional code-review findings — PR #118 (2026-10-22)
+
+Reviewed proposed backend at head `b2ac2a297680683e870ed00d581b9c1ebf87768b`.
+
+1. **Logout/revocation gap:** the proposed login route issues a signed bearer token with a 12-hour expiry, but the reviewed diff did not implement a logout endpoint or visible logout control. Removing the token from the current browser tab is not server-side revocation; a copied token may remain valid until expiry. Before describing this as a secure owner session boundary, add deliberate logout behavior and define/re-test revocation semantics, including process restart and multi-instance behavior.
+2. **Trusted client IP:** login throttling uses `CF-Connecting-IP` when it is a syntactically valid address. Verify the hosting edge overwrites this header for direct requests to the Render origin. If this trust boundary cannot be demonstrated, use a trusted-proxy configuration or a safe fallback; do not treat a caller-controlled header as proof of client identity.
+3. **Acceptance coverage:** the rollout checklist's logout requirement must map to implemented behavior and an automated/browser test. Test login success and failure, invalid/expired tokens, logout/revocation, protected endpoints, origin/CORS behavior, and coordinated portal/backend versions.
+4. **CI provenance:** the PR description reports passing workflow run `39708512860` and local regression tests, but the connector's combined-status lookup returned no status records for the exact head SHA. Re-check the run directly in GitHub before release; do not infer success from an empty status response.
+
+A review note was posted in the PR conversation. PR #118 remains open and unmerged. No deployment, secret change, or provider-generation request was performed.
