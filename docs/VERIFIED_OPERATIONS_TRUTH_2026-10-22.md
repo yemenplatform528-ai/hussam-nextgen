@@ -26,6 +26,8 @@ Interpretation: live inference is verified for the current deployment only. Secu
 
 Relevant security PR: https://github.com/yemenplatform528-ai/hussam-nextgen/pull/118
 
+Additional branch verification on 2026-10-22: the exact security branch head `b2ac2a297680683e870ed00d581b9c1ebf87768b` passed local Node syntax checks, `git diff --check`, and all 5 backend tests in an isolated worktree. This validates that branch's tests, not its deployment or production secrets.
+
 ### YIB/WORLD
 Observed at `https://yib-world-independent.onrender.com`:
 - `GET /api/health`: HTTP 200; `status:PASS`, `provider:NONE`, `modelConfigured:false`, `liveModelVerified:false`, `auth:REQUIRED`, `persistence:POSTGRES_DURABLE`, `paidOpenAIAllowed:false`.
@@ -36,11 +38,14 @@ Interpretation: access control is enforced on these tested routes, but model inf
 
 Relevant adapter PR: https://github.com/yemenplatform528-ai/hussam-nextgen/pull/119
 
+Additional branch verification on 2026-10-22: the exact YIB adapter branch head `ca3fea4cd0ecbfca8a221999f9f3520999080616` passed local JavaScript syntax checks and `git diff --check` in an isolated worktree. This does not establish deployment or live provider generation.
+
 ### Hussam NextGen FastAPI
 Observed at `https://hussam-nextgen.fastapicloud.dev`:
 - `GET /health`: HTTP 200; `status:ok`, platform `hussam-nextgen`, version `1.0.0`.
 - `GET /ready`: HTTP 200; body reports `database_configured:true`, `database_reachable:false`, `environment:development` because the default mode skips the database probe in development.
 - `GET /ready?deep=true`: HTTP 200; body reports `database_configured:true`, `database_reachable:true`, `environment:development`. This endpoint performs a read-only `SELECT 1`; no schema or data was changed.
+- Repository configuration note: `render.yaml` declares a separate Render service named `hussam-nextgen-api` with `ENVIRONMENT=staging`. The live URL checked above is on FastAPICloud, and it reports `environment:development`; the repository's Render manifest does not establish or control the FastAPICloud service's live environment. Deployment ownership/configuration for that endpoint remains to be verified with the hosting owner.
 
 Interpretation: database connectivity was verified at the time of the explicit deep probe. The earlier default response was not evidence of a database outage: it meant the probe was skipped. The remaining issue is that the deployed environment is labeled `development`, not the intended staging/production environment. Correct that configuration through the service's owner-controlled environment settings and re-check the production gates before claiming production readiness.
 
