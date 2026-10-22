@@ -29,3 +29,10 @@ Stop if the database identity is ambiguous, credentials cannot be accessed throu
 ## Evidence to record
 
 UTC timestamp; Render resource ID/status/expiry; tool versions; authorized host and access method (no credentials); backup file size and SHA-256; archive verification result; isolated restore target identity; restore validation and duration; confirmation temporary access was removed; outcome `PASS` / `FAIL` / `BLOCKED`; next action.
+
+
+## Script-specific safety review
+
+The repository script `scripts/postgres_backup_restore_drill.sh` was inspected. It requires `DATABASE_URL`, `BACKUP_FILE`, `RESTORE_DATABASE_URL`, `pg_dump`, and `pg_restore`; it creates a custom-format archive, verifies that the archive can be listed, then performs `pg_restore --clean --if-exists` against the supplied target and checks `SELECT 1`.
+
+**Important limitation:** the script's source/target guard compares the raw connection URL strings only. It does not prove that two differently formatted URLs identify different databases, and it does not calculate a checksum or compare source/restore database identity. Therefore do not use it against any valuable target until the operator independently confirms that the restore target is isolated and disposable. After backup, calculate SHA-256 and file size separately. A successful `pg_restore --list` alone is not proof of a successful restore or correct target isolation.
