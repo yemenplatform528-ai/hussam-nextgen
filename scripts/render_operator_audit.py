@@ -96,6 +96,12 @@ def pick(obj: dict, *keys):
     return {key: obj[key] for key in keys if key in obj and obj[key] is not None}
 
 
+class NoRedirectHandler(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        # Report redirects instead of following a URL that might leave Render.
+        return None
+
+
 def probe_public_service(url: str | None, health_path: str | None = None):
     """Probe only Render's own public subdomains; never fetch arbitrary hosts."""
     if not url:
@@ -112,7 +118,8 @@ def probe_public_service(url: str | None, health_path: str | None = None):
         method="GET",
     )
     try:
-        with urllib.request.urlopen(request, timeout=8) as response:
+        opener = urllib.request.build_opener(NoRedirectHandler)
+        with opener.open(request, timeout=8) as response:
             return {
                 "status": f"HTTP_{response.status}",
                 "http_status": response.status,
