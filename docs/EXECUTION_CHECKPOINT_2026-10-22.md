@@ -58,3 +58,33 @@ No PR was merged, no secrets were changed, no database allowlist was changed, no
 - Queried workflow runs directly for the exact PR heads. PR #118 CI run `39708512860` completed with conclusion `success`. PR #119 adapter syntax run `39708479420` and CI run `39708479447` both completed with conclusion `success`. This supersedes the earlier combined-status lookup that returned no status records.
 - Inspected `scripts/postgres_backup_restore_drill.sh`. It creates a custom-format dump and verifies archive listing, then restores with `pg_restore --clean --if-exists`. Its source/target guard only compares raw URL strings; it does not prove database identity or calculate a checksum. Added that limitation to the backup runbook. Do not use the script against a valuable target until the restore target is independently verified as isolated/disposable; calculate SHA-256 and size separately.
 - PR #119 metadata was corrected to match the actual one-line diff: the change removes the unsupported `temperature` setting; it does not change the model default. PR remains open and unmerged.
+
+
+## Latest continuation evidence — 2026-10-22 (UTC)
+
+### Hussam AI owner-session release
+
+- PR #118 remains open/unmerged. Draft stacked PR #130: https://github.com/yemenplatform528-ai/hussam-nextgen/pull/130
+- Current PR #130 head: `3f6943d13a5448f06d7c5e2ad4b5238470aabab5`.
+- Exact-head GitHub Actions run `39761158268` completed successfully: `baseline`, `browser-e2e`, `postgres-integration`, and `container-security` all passed.
+- In an isolated Codespace worktree, the Node backend suite passed 5/5 tests and the extracted portal ES module passed syntax validation.
+- The candidate limits stateless bearer sessions to 30 minutes, adds local sign-out and automatic local expiry, and adds a global 100-attempt/15-minute login ceiling alongside best-effort client throttling. The UI and runbook explicitly state that local sign-out does not revoke copied bearer tokens; no server-side revocation list exists.
+- Latest confirmed live observation remains the prior probe: backend `POST /api/session/login` returned HTTP 404 and the served portal HTML had no login UI markers. A fresh probe could not be run because Desktop Commander now reports no device online (last seen 7 hours ago). This is an access limitation, not proof of current service failure or recovery.
+- Render deployment read-back still lists backend commit `f7eb104d28ab1b1337828c8e3e60cc50e2c8645c` and portal commit `d0fdc284ae9ea807d87f8011578091598a836290`, both older than the auth candidate. No production deployment was triggered.
+- Remaining blockers: prove trusted proxy/client-IP behavior at ingress; verify required secret variable names in Render without exposing values; coordinate backend/portal deployment and execute live browser acceptance; decide whether immediate server-side revocation is a requirement.
+
+### YIB Memory PostgreSQL recovery
+
+- Draft PR #131: https://github.com/yemenplatform528-ai/hussam-nextgen/pull/131
+- Exact-head CI run `39760643099` completed successfully; all four jobs passed.
+- The backup drill now requires `RESTORE_TARGET_DISPOSABLE=YES`, compares parsed host/port/database identities instead of raw URL strings, normalizes SQLAlchemy PostgreSQL URI schemes for libpq tools, refuses archive paths inside the repository, verifies archive readability, and prints SHA-256 and byte size. The runbook and regression assertions were updated.
+- Local shell syntax check passed. A non-attested target was rejected before backup; a source/target pair pointing to the same parsed database despite different query strings was rejected; a distinct database identity passed preflight and then stopped because `pg_dump` is absent from this Codespace.
+- Render read-back at this checkpoint: database `yib_world_independent_memory`, PostgreSQL 18, Free plan, status `available`, expiry `2026-11-07T19:51:53.875885Z`, empty IP allowlist.
+- No connection, allowlist change, backup, restore, or billing change was performed. URI identity checks do not prove that DNS aliases refer to separate physical databases; the operator must independently verify the restore target is isolated and disposable.
+
+### Current release boundary
+
+- PRs #130 and #131 are drafts, open and unmerged. PRs #118 and #119 remain open/unmerged.
+- No secret values were read or written, no paid plan was enabled, no database recovery completed, no provider generation request was sent in this continuation, and no production deployment was triggered.
+- CI success is evidence for the tested commit and test suite only. It is not evidence of production authentication, server-side token revocation, a live provider response, or a successful database backup/restore.
+- Next order: (1) restore an authorized, stable execution path and perform the time-sensitive backup/restore drill safely; (2) finish the auth release gate and coordinate deployment only after host settings and live browser acceptance can be checked; (3) independently verify YIB provider credentials/quota through authorized host settings and only then perform a bounded non-sensitive generation test.
