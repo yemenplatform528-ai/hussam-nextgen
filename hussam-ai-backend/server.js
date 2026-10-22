@@ -1,5 +1,6 @@
 import http from "node:http";
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { createRateLimiter } from "../rate-limiter.js";
 import { isIP } from "node:net";
 
 const PORT = Number(process.env.PORT || 10000);
@@ -42,7 +43,7 @@ function sameSecret(a, b) {
   const bb = Buffer.from(String(b || ""));
   return aa.length > 0 && aa.length === bb.length && timingSafeEqual(aa, bb);
 }
-const rateBuckets = new Map();
+const rateLimiter = createRateLimiter({ maxBuckets: 512 });
 function clientAddress(req) {
   // Render serves this public service through Cloudflare. Only accept a syntactically
   // valid CF-Connecting-IP value; otherwise fall back to the socket address.
@@ -51,19 +52,7 @@ function clientAddress(req) {
   return req.socket.remoteAddress || "unknown";
 }
 function allowRate(key, limit, windowMs) {
-  const now = Date.now();
-  let bucket = rateBuckets.get(key);
-  if (!bucket || now >= bucket.resetAt) bucket = { count: 0, resetAt: now + windowMs };
-  if (bucket.count >= limit) {
-    rateBuckets.set(key, bucket);
-    return false;
-  }
-  bucket.count += 1;
-  rateBuckets.set(key, bucket);
-  if (rateBuckets.size > 100) {
-    for (const [k, value] of rateBuckets) if (now >= value.resetAt) rateBuckets.delete(k);
-  }
-  return true;
+  return rateLimiter.allow(key, limit, windowMs);
 }
 async function readRequestBody(req, maxBytes, timeoutCode = "REQUEST_BODY_TIMEOUT") {
   let raw = "";
@@ -95,6 +84,8 @@ async function readRequestBody(req, maxBytes, timeoutCode = "REQUEST_BODY_TIMEOU
 }
 let activeGenerations = 0;
 let activeUploads = 0;
+let liveModelVerified = false; // Process-local evidence; resets on restart.
+
 
 function activeProvider() {
   if (GEMINI_API_KEY) return { provider: "gemini", model: GEMINI_MODEL };
@@ -208,7 +199,7 @@ const server = http.createServer(async (req, res) => {
       status: "online",
       inferenceConfigured: active.provider !== "none",
       accessControlConfigured: sessionReady(),
-      liveModelVerified: false,
+      liveModelVerified,
       provider: active.provider,
       model: active.model,
       truth: "OBSERVED"
@@ -350,6 +341,10 @@ const server = http.createServer(async (req, res) => {
     const generated = active.provider === "gemini"
       ? await generateWithGemini(body.messages, active.model)
       : { answer: await generateWithOpenAI(body.messages, active.model), model: active.model };
+    if (typeof generated.answer !== "string" || !generated.answer.trim()) {
+      throw new Error("EMPTY_MODEL_RESPONSE");
+    }
+    liveModelVerified = true;
     activeGenerations -= 1;
     res.writeHead(200);
     return res.end(JSON.stringify({
