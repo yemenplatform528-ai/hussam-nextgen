@@ -30,11 +30,6 @@ esac
 export DATABASE_URL RESTORE_DATABASE_URL
 
 command -v python3 >/dev/null || { echo "python3 is required for safe URI identity comparison" >&2; exit 2; }
-command -v pg_dump >/dev/null || { echo "pg_dump is required" >&2; exit 2; }
-command -v pg_restore >/dev/null || { echo "pg_restore is required" >&2; exit 2; }
-command -v psql >/dev/null || { echo "psql is required" >&2; exit 2; }
-command -v sha256sum >/dev/null || { echo "sha256sum is required" >&2; exit 2; }
-command -v realpath >/dev/null || { echo "realpath is required" >&2; exit 2; }
 
 # Compare host/port/database, not raw URLs (which may differ only by credentials,
 # query order, encoding, or URI scheme). Never print either connection URL.
@@ -62,6 +57,12 @@ if source == target:
     raise SystemExit("Source and restore target resolve to the same parsed host/port/database identity")
 print("Source/target URI identity check: distinct host/port/database tuple (operator must still verify target isolation).")
 PY
+
+command -v pg_dump >/dev/null || { echo "pg_dump is required" >&2; exit 2; }
+command -v pg_restore >/dev/null || { echo "pg_restore is required" >&2; exit 2; }
+command -v psql >/dev/null || { echo "psql is required" >&2; exit 2; }
+command -v sha256sum >/dev/null || { echo "sha256sum is required" >&2; exit 2; }
+command -v realpath >/dev/null || { echo "realpath is required" >&2; exit 2; }
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 REPO_ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel 2>/dev/null || true)"
