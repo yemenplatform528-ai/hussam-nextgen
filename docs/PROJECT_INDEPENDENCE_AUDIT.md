@@ -85,3 +85,48 @@
 ## 7. الخطوة التالية ذات الأولوية
 
 إكمال الجرد للفرع النشط ثم ربط كل خدمة منشورة بمستودعها وفرعها والتزامها، مع مراجعة قواعد البيانات والذاكرة ونسخ الاسترداد. بعد ذلك فقط تُعتمد خطة نقل تدريجية. هذا المستند لا يغير التطبيق ولا ينقل أي أصل.
+
+## 8. متابعة الأدلة التشغيلية والجرد الحي — 2026-10-22
+
+### قائمة المستودعات المتاحة عبر GitHub
+
+أعادت أداة GitHub المتصلة، عند طلب ما يصل إلى 100 مستودع للمالك `yemenplatform528-ai`، مستودعًا واحدًا: `yemenplatform528-ai/hussam-nextgen`، فرعه الافتراضي `main`، ومرئيته `public`.
+
+**الحالة:** `OBSERVED` ضمن صلاحيات الحساب الموصول فقط. لا يُستنتج من ذلك عدم وجود مستودعات في حسابات أخرى أو خارج صلاحيات هذه الوصلة.
+
+### فروع مرصودة داخل المستودع الموحد
+
+شملت قائمة الفروع التي أعادتها GitHub وقت التدقيق:
+
+- `main`
+- `hussam-ai-standalone-portal`
+- `notion-analyst-assistant`
+- `yib-world-independent`
+- `feat/yib-provider-neutral-runtime`
+- `docs/yib-current-free-tier-model-2026-10-19`
+- `security/hussam-ai-auth-hardening-followup`
+- `security/hussam-ai-session-auth-2026-10-17`
+- `security/hussam-ai-api-audit-2026-10-17`
+- `security/hussam-ai-audit-main-2026-10-17`
+- `security/hussam-ai-quota-guard-2026-10-17`
+- `fix/hussam-ai-truthful-health-errors`
+- `fix/yib-auth-fail-closed`
+- `continuity/recovery-2026-10-01`
+- `ops/evidence-checkpoint-2026-10-17`
+- `ops/gap-closure-2026-10-17`
+- `test/provider-timeout-regression`, `test/provider-timeout-regression-clean`, `test/provider-timeout-regression-portal`
+- `yemen-satellite-zero`
+
+هذه القائمة توضح تعدد مسارات العمل داخل مستودع واحد؛ **الفروع ليست مشاريع مستقلة تشغيليًا بحد ذاتها**. يلزم قبل تنظيف الفروع مراجعة ما إذا كانت تحتوي تغييرات فريدة أو نقاط استرداد لا توجد في `main`. لا حذف أو دمج بناءً على اسم الفرع وحده.
+
+### اختبار قراءة فقط للخدمات المنشورة
+
+- فحص `GET /health` على `https://hussam-ai-inference-bridge.onrender.com/health` أعاد HTTP 200 وحقولًا `status: online`, `inferenceConfigured: true`, `provider: gemini`, `model: gemini-3.8-flash`, `truth: OBSERVED`.
+- فحص صفحة `https://hussam-ai-standalone-portal.onrender.com/hussam-ai/` أعاد HTTP 200 ومحتوى HTML عربيًا.
+- أرسل اختبار تشخيصي واحد إلى `POST /api/session/login` بكلمة مرور وهمية غير سرية، دون إرسال طلب توليد نموذج؛ أعاد HTTP 404 و`NOT_FOUND`.
+
+**الاستنتاج:** الواجهة وخدمة الصحة متاحتان من الإنترنت، لكن مسار الدخول الذي يتوقعه فرع المصادقة الجديد غير موجود على خدمة الإنتاج التي فُحصت. لذلك لم نختبر توليدًا حيًا من خلال المسار المحمي، ولا نعتبر `inferenceConfigured: true` إثباتًا أن النموذج أجاب فعليًا. لا يُنشر فرع الأمان قبل معالجة هذا الفرق وتكوين الأسرار في بيئة الخدمة بطريقة آمنة.
+
+## 9. بوابة الفصل التالية
+
+الأولوية التالية ليست إنشاء مستودعات فارغة أو نقلًا آليًا للفروع. بل إعداد جدول لكل منتج يربط: الفرع/الالتزام، خدمة النشر، قاعدة البيانات، مخزن الذاكرة، إعدادات البيئة (أسماء المتغيرات فقط)، ومصدر النسخة الاحتياطية. لا يُبدأ فصل مادي حتى تتوفر هذه الروابط ويُختبر استرداد كل أصل.
