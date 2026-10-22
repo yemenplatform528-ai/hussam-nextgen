@@ -60,8 +60,17 @@ class RenderOperatorAuditTests(unittest.TestCase):
             def __exit__(self, *args):
                 return False
 
-        with patch("urllib.request.urlopen", return_value=FakeResponse()):
+        class FakeOpener:
+            def open(self, request, timeout):
+                self.request = request
+                self.timeout = timeout
+                return FakeResponse()
+
+        fake_opener = FakeOpener()
+        with patch("urllib.request.build_opener", return_value=fake_opener):
             result = audit.probe_public_service("https://service.onrender.com")
+        self.assertEqual(fake_opener.timeout, 8)
+        self.assertEqual(fake_opener.request.full_url, "https://service.onrender.com/")
         self.assertEqual(result["status"], "HTTP_204")
         self.assertEqual(result["http_status"], 204)
         self.assertNotIn("body", result)
