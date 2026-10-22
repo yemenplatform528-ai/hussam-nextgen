@@ -6,7 +6,14 @@ export function createRateLimiter({ maxBuckets = 512 } = {}) {
       const now = Date.now();
       for (const [candidate, bucket] of buckets) if (now >= bucket.resetAt) buckets.delete(candidate);
       let bucket = buckets.get(key);
-      if (!bucket || now >= bucket.resetAt) bucket = { count: 0, resetAt: now + windowMs };
+      if (!bucket) {
+        // Never evict an unexpired counter: under key churn that would reset a
+        // caller's throttle window. Fail closed for new keys until a bucket expires.
+        if (buckets.size >= capacity) return false;
+        bucket = { count: 0, resetAt: now + windowMs };
+      } else if (now >= bucket.resetAt) {
+        bucket = { count: 0, resetAt: now + windowMs };
+      }
       if (bucket.count >= limit) {
         buckets.delete(key);
         buckets.set(key, bucket);
@@ -15,7 +22,6 @@ export function createRateLimiter({ maxBuckets = 512 } = {}) {
       bucket.count += 1;
       buckets.delete(key);
       buckets.set(key, bucket);
-      while (buckets.size > capacity) buckets.delete(buckets.keys().next().value);
       return true;
     },
     size() { return buckets.size; }
