@@ -51,3 +51,10 @@ No PR was merged, no secrets were changed, no database allowlist was changed, no
 - Current source declares `gemini-3.5-flash-lite`. Google's current model catalog lists that identifier as stable, and its current pricing page lists free-tier token pricing. This does not prove that the user's particular Google AI Studio project has quota remaining or that live generation will succeed.
 - The adapter remains disabled unless `GEMINI_API_KEY` and `YIB_GEMINI_FREE_TIER_ENABLED=true` are set. No credentials were added and no generation request was made.
 - Official references checked: https://ai.google.dev/gemini-api/docs/models and https://ai.google.dev/gemini-api/docs/pricing.
+
+
+## CI and backup-script safety re-check — 2026-10-22
+
+- Queried workflow runs directly for the exact PR heads. PR #118 CI run `39708512860` completed with conclusion `success`. PR #119 adapter syntax run `39708479420` and CI run `39708479447` both completed with conclusion `success`. This supersedes the earlier combined-status lookup that returned no status records.
+- Inspected `scripts/postgres_backup_restore_drill.sh`. It creates a custom-format dump and verifies archive listing, then restores with `pg_restore --clean --if-exists`. Its source/target guard only compares raw URL strings; it does not prove database identity or calculate a checksum. Added that limitation to the backup runbook. Do not use the script against a valuable target until the restore target is independently verified as isolated/disposable; calculate SHA-256 and size separately.
+- PR #119 metadata was corrected to match the actual one-line diff: the change removes the unsupported `temperature` setting; it does not change the model default. PR remains open and unmerged.
