@@ -41,6 +41,24 @@ test("chat fails closed without session; login enforces exact origin and passwor
     }
     assert.equal(ready, true, `server did not become ready: ${output}`);
 
+    const stalledLoginStatus = await new Promise((resolveStatus, rejectStatus) => {
+      const stalled = http.request(`${base}/api/session/login`, {
+        method: "POST",
+        headers: {
+          Origin: "http://127.0.0.1",
+          "CF-Connecting-IP": "192.0.2.50",
+          "Content-Type": "application/json",
+          "Content-Length": "100"
+        }
+      }, response => {
+        response.resume();
+        response.on("end", () => resolveStatus(response.statusCode));
+      });
+      stalled.on("error", error => rejectStatus(error));
+      stalled.flushHeaders();
+    });
+    assert.equal(stalledLoginStatus, 408, "a stalled unauthenticated login body must time out");
+
     const preflight = await fetch(`${base}/api/chat`, {
       method: "OPTIONS",
       headers: { Origin: "http://127.0.0.1", "Access-Control-Request-Method": "POST", "Access-Control-Request-Headers": "authorization,content-type" }
