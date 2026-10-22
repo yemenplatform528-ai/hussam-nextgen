@@ -1,0 +1,47 @@
+name: Render Read-Only Account Audit
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    # Requires an owner-configured RENDER_API_KEY repository/environment secret.
+    # This workflow makes GET requests only and does not deploy or modify resources.
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate the read-only auditor
+        run: python -m unittest tests.test_render_operator_audit -v
+      - name: Inventory Render account
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+        run: |
+          set -eu
+          mkdir -p evidence/render-audit
+          python scripts/render_operator_audit.py > evidence/render-audit/account-inventory.json
+          python - <<'PY'
+          import json
+          p = "evidence/render-audit/account-inventory.json"
+          data = json.load(open(p, encoding="utf-8"))
+          print(json.dumps({
+              "timestamp_utc": data.get("timestamp_utc"),
+              "mode": data.get("mode"),
+              "counts": data.get("counts"),
+              "workspaces": data.get("workspaces"),
+              "service_names": [x.get("name") for x in data.get("services", [])],
+              "postgres_names": [x.get("name") for x in data.get("postgres", [])],
+              "key_value_names": [x.get("name") for x in data.get("key_value", [])],
+          }, indent=2))
+          PY
+          sha256sum evidence/render-audit/account-inventory.json > evidence/render-audit/SHA256SUMS.txt
+      - name: Upload sanitized audit artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: render-read-only-account-audit
+          path: evidence/render-audit/
+          retention-days: 7
+          if-no-files-found: error
