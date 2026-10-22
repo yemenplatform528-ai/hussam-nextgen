@@ -4,7 +4,7 @@
 
 The independent Node runtime now supports Google's Gemini Developer API as an optional provider. The adapter is deliberately **off by default**. It does not make a model live merely because a key exists, and the status endpoint reports `liveModelVerified: false` until an actual generation request succeeds.
 
-Default model: `gemini-2.5-flash-lite`. Google lists text input/output for this model on its free tier; quotas and availability can change. See the [official Gemini API pricing page](https://ai.google.dev/gemini-api/docs/pricing) and [model page](https://ai.google.dev/gemini-api/docs/models/gemini-2.5-flash-lite).
+Default model: `gemini-3.5-flash-lite`. Google's current official pricing page lists free-tier input and output for this model; free-tier quotas and availability can change. For new projects, Google recommends newer models rather than the legacy 2.5 family, whose access is being limited for users who have not actively used it. See the [official Gemini API pricing page](https://ai.google.dev/gemini-api/docs/pricing) and [models page](https://ai.google.dev/gemini-api/docs/models).
 
 ## Required runtime environment
 
