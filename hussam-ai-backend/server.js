@@ -261,24 +261,55 @@ const server = http.createServer(async (req, res) => {
   }
   activeUploads += 1;
   let raw = "";
+  let uploadReleased = false;
+  const releaseUpload = () => {
+    if (uploadReleased) return;
+    uploadReleased = true;
+    activeUploads = Math.max(0, activeUploads - 1);
+  };
+  let bodyTimeout;
   try {
-    for await (const chunk of req) {
-      raw += chunk;
-      if (raw.length > 100_000) {
-        activeUploads = Math.max(0, activeUploads - 1);
+    const bodyRead = (async () => {
+      for await (const chunk of req) {
+        raw += chunk;
+        if (raw.length > 100_000) {
+          const error = new Error("REQUEST_TOO_LARGE");
+          error.code = "REQUEST_TOO_LARGE";
+          throw error;
+        }
+      }
+    })();
+    const deadline = new Promise((_, reject) => {
+      bodyTimeout = setTimeout(() => {
+        const error = new Error("REQUEST_BODY_TIMEOUT");
+        error.code = "REQUEST_BODY_TIMEOUT";
+        reject(error);
+      }, Math.max(100, Number(process.env.HUSSAM_REQUEST_BODY_TIMEOUT_MS) || 15_000));
+      bodyTimeout.unref?.();
+    });
+    await Promise.race([bodyRead, deadline]);
+  } catch (error) {
+    releaseUpload();
+    if (bodyTimeout) clearTimeout(bodyTimeout);
+    if (!res.headersSent) {
+      if (error?.code === "REQUEST_TOO_LARGE") {
         res.writeHead(413);
         return res.end(JSON.stringify({ error: "REQUEST_TOO_LARGE" }));
       }
-    }
-  } catch {
-    activeUploads = Math.max(0, activeUploads - 1);
-    if (!res.headersSent) {
+      if (error?.code === "REQUEST_BODY_TIMEOUT") {
+        res.writeHead(408);
+        res.end(JSON.stringify({ error: "REQUEST_BODY_TIMEOUT" }));
+        res.once("finish", () => req.destroy());
+        return;
+      }
       res.writeHead(400);
       return res.end(JSON.stringify({ error: "REQUEST_BODY_INTERRUPTED" }));
     }
     return;
+  } finally {
+    if (bodyTimeout) clearTimeout(bodyTimeout);
   }
-  activeUploads = Math.max(0, activeUploads - 1);
+  releaseUpload();
   let body;
   try { body = JSON.parse(raw || "{}"); } catch {
     res.writeHead(400);

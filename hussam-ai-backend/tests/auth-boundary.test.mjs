@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
+import http from "node:http";
 import { createHmac } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
@@ -22,7 +23,8 @@ test("chat fails closed without session; login enforces exact origin and passwor
       OPENAI_API_KEY: "",
       ALLOWED_ORIGIN: "http://127.0.0.1",
       HUSSAM_ACCESS_PASSWORD: "test password fixture only 2026",
-      HUSSAM_SESSION_SECRET: "test session secret fixture only for tests"
+      HUSSAM_SESSION_SECRET: "test session secret fixture only for tests",
+      HUSSAM_REQUEST_BODY_TIMEOUT_MS: "250"
     },
     stdio: ["ignore", "pipe", "pipe"]
   });
@@ -85,6 +87,24 @@ test("chat fails closed without session; login enforces exact origin and passwor
       body: "x".repeat(101_000)
     });
     assert.equal(oversizedChat.status, 413);
+
+    const stalledBodyStatus = await new Promise((resolveStatus, rejectStatus) => {
+      const stalled = http.request(`${base}/api/chat`, {
+        method: "POST",
+        headers: {
+          Origin: "http://127.0.0.1",
+          Authorization: `Bearer ${validToken}`,
+          "Content-Type": "application/json",
+          "Content-Length": "100"
+        }
+      }, response => {
+        response.resume();
+        response.on("end", () => resolveStatus(response.statusCode));
+      });
+      stalled.on("error", error => rejectStatus(error));
+      stalled.flushHeaders();
+    });
+    assert.equal(stalledBodyStatus, 408, "a stalled request body must time out rather than hold an upload slot indefinitely");
     assert.equal((output.match(/TEST_PROVIDER_CALL_/g) || []).length, 0);
 
     const noOrigin = await fetch(`${base}/api/chat`, {
