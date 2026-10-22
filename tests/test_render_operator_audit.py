@@ -1,6 +1,7 @@
 import json
 import os
 import unittest
+from datetime import datetime, timezone
 from unittest.mock import patch
 from urllib.error import HTTPError
 
@@ -43,6 +44,43 @@ class RenderOperatorAuditTests(unittest.TestCase):
         self.assertEqual(audit.unwrap({"cursor": "c", "owner": {"id": "tea-1"}}), {"id": "tea-1"})
         self.assertEqual(audit.unwrap({"cursor": "c", "service": {"id": "srv-1"}}), {"id": "srv-1"})
         self.assertEqual(audit.unwrap({"id": "plain"}), {"id": "plain"})
+
+    def test_probe_refuses_non_render_hosts(self):
+        result = audit.probe_public_service("https://example.com")
+        self.assertEqual(result, {"status": "SKIPPED", "reason": "url_not_onrender_https"})
+
+    def test_probe_reports_http_status_without_reading_body(self):
+        class FakeResponse:
+            status = 204
+            headers = {"Content-Type": "text/plain"}
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return False
+
+        with patch("urllib.request.urlopen", return_value=FakeResponse()):
+            result = audit.probe_public_service("https://service.onrender.com")
+        self.assertEqual(result["status"], "HTTP_204")
+        self.assertEqual(result["http_status"], 204)
+        self.assertNotIn("body", result)
+
+    def test_database_expiry_warns_with_days_remaining(self):
+        now = datetime(2026, 10, 23, tzinfo=timezone.utc)
+        result = audit.database_expiry(
+            {"expiresAt": "2026-11-07T19:51:53.875885Z"}, now=now
+        )
+        self.assertEqual(result["status"], "WARNING")
+        self.assertGreater(result["days_remaining"], 14)
+        self.assertLess(result["days_remaining"], 16)
+
+    def test_database_expiry_marks_expired(self):
+        now = datetime(2026, 10, 23, tzinfo=timezone.utc)
+        result = audit.database_expiry(
+            {"expiresAt": "2026-10-22T00:00:00Z"}, now=now
+        )
+        self.assertEqual(result["status"], "EXPIRED")
 
     def test_list_pages_uses_sibling_cursor_and_marks_page_cap(self):
         page_one = [
