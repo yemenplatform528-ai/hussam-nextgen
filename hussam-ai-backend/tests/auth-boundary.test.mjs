@@ -164,6 +164,23 @@ test("chat fails closed without session; login enforces exact origin and passwor
     });
     assert.equal(otherClientLogin.status, 200, "one client's failed attempts must not lock out another client");
 
+    // Treat forwarded client identity as best-effort: rotating caller-supplied
+    // IP values must still hit the global login ceiling without reaching inference.
+    let globalThrottleObserved = false;
+    for (let i = 1; i <= 120; i++) {
+      const attempt = await fetch(`${base}/api/session/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Origin: "http://127.0.0.1", "CF-Connecting-IP": `192.0.2.${i}` },
+        body: JSON.stringify({ password: "incorrect password for test" })
+      });
+      if (attempt.status === 429) {
+        globalThrottleObserved = true;
+        break;
+      }
+      assert.equal(attempt.status, 401);
+    }
+    assert.equal(globalThrottleObserved, true, "rotating forwarded IP values must not bypass the global login ceiling");
+
     const forgedOrigin = await fetch(`${base}/api/session/login`, {
       method: "POST", headers: { "Content-Type": "application/json", Origin: "https://attacker.example" },
       body: JSON.stringify({ password: "test password fixture only 2026" })
