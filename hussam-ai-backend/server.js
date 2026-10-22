@@ -119,12 +119,8 @@ async function generateWithGemini(messages, model) {
         error.providerStatus = typeof data?.error?.status === "string" ? data.error.status : null;
         error.providerMessage = typeof data?.error?.message === "string" ? data.error.message.slice(0, 300) : null;
         lastError = error;
-        // If the configured model has exhausted its quota, try the other dashboard-confirmed
-        // free-tier Flash models once in order. Do not keep cycling after a fallback model is quota-limited.
-        const canFallback = response.status === 503 || response.status === 404 ||
-          error.providerStatus === "UNAVAILABLE" || error.providerStatus === "NOT_FOUND" ||
-          response.status === 429;
-        if (canFallback) continue;
+        // One configured model means one upstream attempt. Never rotate through models
+        // automatically: that can multiply quota consumption and obscure the real failure.
         throw error;
       }
       const answer = data?.candidates?.[0]?.content?.parts
@@ -137,12 +133,6 @@ async function generateWithGemini(messages, model) {
       }
       return { answer, model: candidateModel };
     } catch (error) {
-      if (error?.message === "GEMINI_REQUEST_FAILED" &&
-          (error.status === 503 || error.status === 404 || error.status === 429 ||
-           error.providerStatus === "UNAVAILABLE" || error.providerStatus === "NOT_FOUND")) {
-        lastError = error;
-        continue;
-      }
       throw error;
     }
   }
@@ -189,6 +179,8 @@ const server = http.createServer(async (req, res) => {
       service: "hussam-ai-inference-bridge",
       status: "online",
       inferenceConfigured: active.provider !== "none",
+      accessControlConfigured: sessionReady(),
+      liveModelVerified: false,
       provider: active.provider,
       model: active.model,
       truth: "OBSERVED"
