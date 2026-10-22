@@ -92,7 +92,7 @@ const modelResponse=async(history)=>{
    const contents=history.slice(-20).filter(m=>m.role==='user'||m.role==='system'||m.role==='assistant').map(m=>({role:m.role==='user'?'user':'model',parts:[{text:String(m.content||'')}]})).filter(m=>m.parts[0].text.trim());
    const r=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(provider.model)+':generateContent',{
     method:'POST',headers:{'content-type':'application/json','x-goog-api-key':geminiApiKey},signal:AbortSignal.timeout(25000),
-    body:JSON.stringify({systemInstruction:{parts:[{text:instructions}]},contents,generationConfig:{temperature:0.3,maxOutputTokens:2048}})
+    body:JSON.stringify({systemInstruction:{parts:[{text:instructions}]},contents,generationConfig:{maxOutputTokens:2048}})
    });
    if(!r.ok) return {content:'تعذّر الحصول على إجابة من مزود Gemini (HTTP '+r.status+'). لم يتم استبدال الخطأ بإجابة مولّدة محليًا.',truth:'OBSERVED',model:provider.model,providerStatus:r.status};
    const data=await r.json();
