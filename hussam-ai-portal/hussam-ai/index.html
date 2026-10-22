@@ -120,7 +120,7 @@ finally{busy=false;promptBox.disabled=false;send.disabled=false;promptBox.focus(
 $('clear').addEventListener('click',()=>{messages=[{role:'system',content:systemPrompt}];localStorage.removeItem('hussam-ai-independent-chat-v1');chat.replaceChildren();renderMessage('assistant','بدأت محادثة جديدة. حالة الاتصال والاستدلال ظاهرة أعلى الصفحة.')});
 
 const navChat=$('navChat'),navDashboard=$('navDashboard'),dashboard=$('dashboard'),chatLayout=$('chatLayout');
-function showView(which){const dash=which==='dashboard';dashboard.classList.toggle('hidden',!dash);chatLayout.classList.toggle('hidden',dash);navChat.setAttribute('aria-pressed',String(!dash));navDashboard.setAttribute('aria-pressed',String(dash));if(dash)refreshDashboard();}
+function showView(which){if(which==='chat'&&!authenticated){$('loginPanel').classList.remove('hidden');$('loginStatus').textContent='سجّل الدخول أولًا لعرض سجل المحادثة.';return;}const dash=which==='dashboard';dashboard.classList.toggle('hidden',!dash);chatLayout.classList.toggle('hidden',dash);navChat.setAttribute('aria-pressed',String(!dash));navDashboard.setAttribute('aria-pressed',String(dash));if(dash)refreshDashboard();}
 navChat.addEventListener('click',()=>showView('chat'));navDashboard.addEventListener('click',()=>showView('dashboard'));
 function updateDashCounts(){const count=messages.filter(m=>m.role==='user'||m.role==='assistant').length;$('dashMessages').textContent=count+' رسالة';$('dashStorage').textContent='محلي على هذا الجهاز';$('dashPortal').textContent='يعمل داخل الصفحة';}
 function diagnosticLine(message){const el=$('diagnostics');const stamp=new Date().toLocaleString();el.textContent='['+stamp+'] '+message+'\n'+el.textContent.slice(0,3000);}

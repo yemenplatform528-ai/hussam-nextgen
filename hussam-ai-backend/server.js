@@ -268,25 +268,30 @@ const server = http.createServer(async (req, res) => {
     }));
   }
 
+  // Reserve a generation slot before the first await while reading the request
+  // body; otherwise concurrent uploads can all pass the cap before reserving.
+  activeGenerations += 1;
   let raw = "";
   for await (const chunk of req) {
     raw += chunk;
     if (raw.length > 100_000) {
+      activeGenerations = Math.max(0, activeGenerations - 1);
       res.writeHead(413);
       return res.end(JSON.stringify({ error: "REQUEST_TOO_LARGE" }));
     }
   }
   let body;
   try { body = JSON.parse(raw || "{}"); } catch {
+    activeGenerations = Math.max(0, activeGenerations - 1);
     res.writeHead(400);
     return res.end(JSON.stringify({ error: "INVALID_JSON" }));
   }
   if (!validMessages(body.messages)) {
+    activeGenerations = Math.max(0, activeGenerations - 1);
     res.writeHead(400);
     return res.end(JSON.stringify({ error: "INVALID_MESSAGES" }));
   }
 
-  activeGenerations += 1;
   try {
     const generated = active.provider === "gemini"
       ? await generateWithGemini(body.messages, active.model)
