@@ -47,10 +47,10 @@ test("provider timeout returns 504 PROVIDER_TIMEOUT without leaking internals", 
       body: JSON.stringify({ password: "test password fixture only 2026" })
     });
     assert.equal(login.status, 200);
-    const cookie = login.headers.get("set-cookie").split(";")[0];
+    const loginData = await login.json();
     const response = await fetch(`${base}/api/chat`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", Origin: "http://127.0.0.1", Cookie: cookie },
+      headers: { "Content-Type": "application/json", Origin: "http://127.0.0.1", Authorization: `Bearer ${loginData.token}` },
       body: JSON.stringify({ messages: [{ role: "user", content: "deterministic timeout test" }] })
     });
     const body = await response.json();

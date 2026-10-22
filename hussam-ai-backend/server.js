@@ -10,7 +10,6 @@ const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || "https://hussam-ai-standalone-portal.onrender.com";
 const HUSSAM_ACCESS_PASSWORD = process.env.HUSSAM_ACCESS_PASSWORD || "";
 const HUSSAM_SESSION_SECRET = process.env.HUSSAM_SESSION_SECRET || "";
-const SESSION_COOKIE = "hussam_session";
 const SESSION_TTL_SECONDS = 12 * 60 * 60;
 
 function sessionReady() {
@@ -21,17 +20,8 @@ function signSession(payload) {
   const signature = createHmac("sha256", HUSSAM_SESSION_SECRET).update(encoded).digest("base64url");
   return encoded + "." + signature;
 }
-function cookieValue(req, name) {
-  const cookies = (req.headers.cookie || "").split(";");
-  for (const part of cookies) {
-    const i = part.indexOf("=");
-    if (i > 0 && part.slice(0, i).trim() === name) return part.slice(i + 1).trim();
-  }
-  return "";
-}
-function validSession(req) {
-  if (!sessionReady()) return false;
-  const token = cookieValue(req, SESSION_COOKIE);
+function validSessionToken(token) {
+  if (!sessionReady() || typeof token !== "string") return false;
   const split = token.lastIndexOf(".");
   if (split <= 0) return false;
   const encoded = token.slice(0, split);
@@ -42,6 +32,10 @@ function validSession(req) {
     const payload = JSON.parse(Buffer.from(encoded, "base64url").toString("utf8"));
     return Number.isInteger(payload.exp) && payload.exp > Math.floor(Date.now() / 1000);
   } catch { return false; }
+}
+function bearerToken(req) {
+  const value = String(req.headers.authorization || "");
+  return value.startsWith("Bearer ") ? value.slice(7) : "";
 }
 function sameSecret(a, b) {
   const aa = Buffer.from(String(a || ""));
@@ -72,6 +66,7 @@ function allowRate(key, limit, windowMs) {
   return true;
 }
 let activeGenerations = 0;
+let activeUploads = 0;
 
 function activeProvider() {
   if (GEMINI_API_KEY) return { provider: "gemini", model: GEMINI_MODEL };
@@ -124,12 +119,8 @@ async function generateWithGemini(messages, model) {
         error.providerStatus = typeof data?.error?.status === "string" ? data.error.status : null;
         error.providerMessage = typeof data?.error?.message === "string" ? data.error.message.slice(0, 300) : null;
         lastError = error;
-        // If the configured model has exhausted its quota, try the other dashboard-confirmed
-        // free-tier Flash models once in order. Do not keep cycling after a fallback model is quota-limited.
-        const canFallback = response.status === 503 || response.status === 404 ||
-          error.providerStatus === "UNAVAILABLE" || error.providerStatus === "NOT_FOUND" ||
-          response.status === 429;
-        if (canFallback) continue;
+        // One configured model means one upstream attempt. Never rotate through models
+        // automatically: that can multiply quota consumption and obscure the real failure.
         throw error;
       }
       const answer = data?.candidates?.[0]?.content?.parts
@@ -142,12 +133,6 @@ async function generateWithGemini(messages, model) {
       }
       return { answer, model: candidateModel };
     } catch (error) {
-      if (error?.message === "GEMINI_REQUEST_FAILED" &&
-          (error.status === 503 || error.status === 404 || error.status === 429 ||
-           error.providerStatus === "UNAVAILABLE" || error.providerStatus === "NOT_FOUND")) {
-        lastError = error;
-        continue;
-      }
       throw error;
     }
   }
@@ -179,11 +164,10 @@ const server = http.createServer(async (req, res) => {
   const origin = req.headers.origin || "";
   if (origin === ALLOWED_ORIGIN) {
     res.setHeader("Access-Control-Allow-Origin", ALLOWED_ORIGIN);
-    res.setHeader("Access-Control-Allow-Credentials", "true");
     res.setHeader("Vary", "Origin");
   }
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
   res.setHeader("Content-Type", "application/json; charset=utf-8");
   if (req.method === "OPTIONS") { res.writeHead(204); return res.end(); }
 
@@ -195,6 +179,8 @@ const server = http.createServer(async (req, res) => {
       service: "hussam-ai-inference-bridge",
       status: "online",
       inferenceConfigured: active.provider !== "none",
+      accessControlConfigured: sessionReady(),
+      liveModelVerified: false,
       provider: active.provider,
       model: active.model,
       truth: "OBSERVED"
@@ -226,15 +212,18 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(400);
       return res.end(JSON.stringify({ error: "INVALID_JSON" }));
     }
+    if (!loginBody || typeof loginBody !== "object" || Array.isArray(loginBody)) {
+      res.writeHead(400);
+      return res.end(JSON.stringify({ error: "INVALID_LOGIN_BODY" }));
+    }
     if (!sameSecret(loginBody.password, HUSSAM_ACCESS_PASSWORD)) {
       res.writeHead(401);
       return res.end(JSON.stringify({ error: "INVALID_ACCESS_PASSWORD", message: "رمز الدخول غير صحيح." }));
     }
     const exp = Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS;
     const token = signSession({ exp });
-    res.setHeader("Set-Cookie", SESSION_COOKIE + "=" + token + "; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=" + SESSION_TTL_SECONDS);
     res.writeHead(200);
-    return res.end(JSON.stringify({ authenticated: true, expiresIn: SESSION_TTL_SECONDS }));
+    return res.end(JSON.stringify({ authenticated: true, token, expiresIn: SESSION_TTL_SECONDS }));
   }
   if (req.method !== "POST" || url.pathname !== "/api/chat") {
     res.writeHead(404);
@@ -248,17 +237,13 @@ const server = http.createServer(async (req, res) => {
     res.writeHead(503);
     return res.end(JSON.stringify({ error: "ACCESS_CONTROL_NOT_CONFIGURED", message: "لم تُضبط متغيرات حماية الوصول في الخادم؛ المحادثة مغلقة افتراضيًا." }));
   }
-  if (!validSession(req)) {
+  if (!validSessionToken(bearerToken(req))) {
     res.writeHead(401);
     return res.end(JSON.stringify({ error: "AUTHENTICATION_REQUIRED", message: "سجّل الدخول إلى مساحة الحسام قبل إرسال الرسائل." }));
   }
   if (!allowRate("chat:" + clientAddress(req), 20, 60_000)) {
     res.writeHead(429);
     return res.end(JSON.stringify({ error: "CHAT_RATE_LIMITED", message: "تم بلوغ حد الطلبات المؤقت لهذه الخدمة." }));
-  }
-  if (activeGenerations >= 2) {
-    res.writeHead(429);
-    return res.end(JSON.stringify({ error: "INFERENCE_CONCURRENCY_LIMITED", message: "الخدمة مشغولة بطلبات أخرى؛ لم يُرسل هذا الطلب إلى المزود." }));
   }
   if (active.provider === "none") {
     res.writeHead(503);
@@ -268,14 +253,63 @@ const server = http.createServer(async (req, res) => {
     }));
   }
 
-  let raw = "";
-  for await (const chunk of req) {
-    raw += chunk;
-    if (raw.length > 100_000) {
-      res.writeHead(413);
-      return res.end(JSON.stringify({ error: "REQUEST_TOO_LARGE" }));
-    }
+  // Bound uploads separately from model generations. Slow clients must not occupy
+  // scarce inference slots; reserve the generation slot only after a full valid body.
+  if (activeUploads >= 8) {
+    res.writeHead(429);
+    return res.end(JSON.stringify({ error: "UPLOAD_CONCURRENCY_LIMITED", message: "هناك عدد كبير من الطلبات الواردة؛ أعد المحاولة بعد قليل." }));
   }
+  activeUploads += 1;
+  let raw = "";
+  let uploadReleased = false;
+  const releaseUpload = () => {
+    if (uploadReleased) return;
+    uploadReleased = true;
+    activeUploads = Math.max(0, activeUploads - 1);
+  };
+  let bodyTimeout;
+  try {
+    const bodyRead = (async () => {
+      for await (const chunk of req) {
+        raw += chunk;
+        if (raw.length > 100_000) {
+          const error = new Error("REQUEST_TOO_LARGE");
+          error.code = "REQUEST_TOO_LARGE";
+          throw error;
+        }
+      }
+    })();
+    const deadline = new Promise((_, reject) => {
+      bodyTimeout = setTimeout(() => {
+        const error = new Error("REQUEST_BODY_TIMEOUT");
+        error.code = "REQUEST_BODY_TIMEOUT";
+        reject(error);
+      }, Math.max(100, Number(process.env.HUSSAM_REQUEST_BODY_TIMEOUT_MS) || 15_000));
+      bodyTimeout.unref?.();
+    });
+    await Promise.race([bodyRead, deadline]);
+  } catch (error) {
+    releaseUpload();
+    if (bodyTimeout) clearTimeout(bodyTimeout);
+    if (!res.headersSent) {
+      if (error?.code === "REQUEST_TOO_LARGE") {
+        res.writeHead(413);
+        return res.end(JSON.stringify({ error: "REQUEST_TOO_LARGE" }));
+      }
+      if (error?.code === "REQUEST_BODY_TIMEOUT") {
+        res.writeHead(408);
+        res.end(JSON.stringify({ error: "REQUEST_BODY_TIMEOUT" }));
+        res.once("finish", () => req.destroy());
+        return;
+      }
+      res.writeHead(400);
+      return res.end(JSON.stringify({ error: "REQUEST_BODY_INTERRUPTED" }));
+    }
+    return;
+  } finally {
+    if (bodyTimeout) clearTimeout(bodyTimeout);
+  }
+  releaseUpload();
   let body;
   try { body = JSON.parse(raw || "{}"); } catch {
     res.writeHead(400);
@@ -285,8 +319,14 @@ const server = http.createServer(async (req, res) => {
     res.writeHead(400);
     return res.end(JSON.stringify({ error: "INVALID_MESSAGES" }));
   }
-
+  // No await between this final check and reservation, so the cap is atomic
+  // within this Node event loop and only actual generations consume these slots.
+  if (activeGenerations >= 2) {
+    res.writeHead(429);
+    return res.end(JSON.stringify({ error: "INFERENCE_CONCURRENCY_LIMITED", message: "الخدمة مشغولة بطلبات أخرى؛ لم يُرسل هذا الطلب إلى المزود." }));
+  }
   activeGenerations += 1;
+
   try {
     const generated = active.provider === "gemini"
       ? await generateWithGemini(body.messages, active.model)
