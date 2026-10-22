@@ -66,6 +66,7 @@ function allowRate(key, limit, windowMs) {
   return true;
 }
 let activeGenerations = 0;
+let activeUploads = 0;
 
 function activeProvider() {
   if (GEMINI_API_KEY) return { provider: "gemini", model: GEMINI_MODEL };
@@ -252,10 +253,6 @@ const server = http.createServer(async (req, res) => {
     res.writeHead(429);
     return res.end(JSON.stringify({ error: "CHAT_RATE_LIMITED", message: "تم بلوغ حد الطلبات المؤقت لهذه الخدمة." }));
   }
-  if (activeGenerations >= 2) {
-    res.writeHead(429);
-    return res.end(JSON.stringify({ error: "INFERENCE_CONCURRENCY_LIMITED", message: "الخدمة مشغولة بطلبات أخرى؛ لم يُرسل هذا الطلب إلى المزود." }));
-  }
   if (active.provider === "none") {
     res.writeHead(503);
     return res.end(JSON.stringify({
@@ -264,29 +261,48 @@ const server = http.createServer(async (req, res) => {
     }));
   }
 
-  // Reserve a generation slot before the first await while reading the request
-  // body; otherwise concurrent uploads can all pass the cap before reserving.
-  activeGenerations += 1;
-  let raw = "";
-  for await (const chunk of req) {
-    raw += chunk;
-    if (raw.length > 100_000) {
-      activeGenerations = Math.max(0, activeGenerations - 1);
-      res.writeHead(413);
-      return res.end(JSON.stringify({ error: "REQUEST_TOO_LARGE" }));
-    }
+  // Bound uploads separately from model generations. Slow clients must not occupy
+  // scarce inference slots; reserve the generation slot only after a full valid body.
+  if (activeUploads >= 8) {
+    res.writeHead(429);
+    return res.end(JSON.stringify({ error: "UPLOAD_CONCURRENCY_LIMITED", message: "هناك عدد كبير من الطلبات الواردة؛ أعد المحاولة بعد قليل." }));
   }
+  activeUploads += 1;
+  let raw = "";
+  try {
+    for await (const chunk of req) {
+      raw += chunk;
+      if (raw.length > 100_000) {
+        activeUploads = Math.max(0, activeUploads - 1);
+        res.writeHead(413);
+        return res.end(JSON.stringify({ error: "REQUEST_TOO_LARGE" }));
+      }
+    }
+  } catch {
+    activeUploads = Math.max(0, activeUploads - 1);
+    if (!res.headersSent) {
+      res.writeHead(400);
+      return res.end(JSON.stringify({ error: "REQUEST_BODY_INTERRUPTED" }));
+    }
+    return;
+  }
+  activeUploads = Math.max(0, activeUploads - 1);
   let body;
   try { body = JSON.parse(raw || "{}"); } catch {
-    activeGenerations = Math.max(0, activeGenerations - 1);
     res.writeHead(400);
     return res.end(JSON.stringify({ error: "INVALID_JSON" }));
   }
   if (!validMessages(body.messages)) {
-    activeGenerations = Math.max(0, activeGenerations - 1);
     res.writeHead(400);
     return res.end(JSON.stringify({ error: "INVALID_MESSAGES" }));
   }
+  // No await between this final check and reservation, so the cap is atomic
+  // within this Node event loop and only actual generations consume these slots.
+  if (activeGenerations >= 2) {
+    res.writeHead(429);
+    return res.end(JSON.stringify({ error: "INFERENCE_CONCURRENCY_LIMITED", message: "الخدمة مشغولة بطلبات أخرى؛ لم يُرسل هذا الطلب إلى المزود." }));
+  }
+  activeGenerations += 1;
 
   try {
     const generated = active.provider === "gemini"
