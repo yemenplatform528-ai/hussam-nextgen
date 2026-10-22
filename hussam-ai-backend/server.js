@@ -11,7 +11,7 @@ const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || "https://hussam-ai-standalone-portal.onrender.com";
 const HUSSAM_ACCESS_PASSWORD = process.env.HUSSAM_ACCESS_PASSWORD || "";
 const HUSSAM_SESSION_SECRET = process.env.HUSSAM_SESSION_SECRET || "";
-const SESSION_TTL_SECONDS = 12 * 60 * 60;
+const SESSION_TTL_SECONDS = 30 * 60; // Stateless bearer sessions: copied tokens remain usable until expiry.
 
 function sessionReady() {
   return HUSSAM_ACCESS_PASSWORD.length >= 16 && HUSSAM_SESSION_SECRET.length >= 32;
