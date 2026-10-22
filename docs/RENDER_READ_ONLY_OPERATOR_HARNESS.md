@@ -1,6 +1,6 @@
 # Render Read-Only Operator Harness
 
-This adds a repeatable, audited path to run a read-only Render REST API inventory from GitHub Actions, independent of Codespaces and Desktop Commander. It targets the known Yemen workspace `tea-db0p6749v7es73ceig1g`, filters resources through Render's `ownerId` query parameter and again before reporting, and uses Render's documented `GET /v1/owners` endpoint. Pagination caps are marked `PARTIAL`, never silently presented as complete.
+This adds a repeatable, audited path to run a read-only Render REST API inventory from GitHub Actions, independent of Codespaces and Desktop Commander. It targets the known Yemen workspace `tea-db0p6749v7es73ceig1g`, filters resources through Render's `ownerId` query parameter and again before reporting, and uses Render's documented `GET /v1/owners` endpoint. Pagination caps are marked `PARTIAL`, never silently presented as complete. The auditor also probes only HTTPS `*.onrender.com` service URLs without storing response bodies and flags PostgreSQL expiry windows (warning at 21 days, urgent at 7 days, expired after the expiry time).
 
 ## Owner setup (do not paste secrets into chat)
 
