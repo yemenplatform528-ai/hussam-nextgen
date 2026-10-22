@@ -1,30 +1,35 @@
 # Render Read-Only Operator Harness
 
-This harness adds a repeatable, auditable way to inventory the Render account from a GitHub Actions runner when the owner configures a secret. It is deliberately read-only: it does not deploy, mutate environment variables, create/delete resources, query database rows, or run model requests.
+This adds a repeatable, audited path to run a read-only Render REST API inventory from GitHub Actions, independent of Codespaces and Desktop Commander. The job is deliberately restricted to the known Yemen workspace `tea-db0p6749v7es73ceig1g`; it filters resource results by owner/workspace before writing the artifact. It does not inventory other workspaces.
 
-## Why this exists
-
-The connected Render tools can inspect resources and some operational data, but they do not expose arbitrary shell execution or direct arbitrary HTTP requests. Render's official REST API covers most dashboard capabilities and requires an API key. The harness provides a controlled execution path for safe account-wide inventory, independently of Codespaces and Desktop Commander.
-
-## Owner setup required (secret is never pasted into chat)
+## Owner setup (do not paste secrets into chat)
 
 1. In Render Dashboard, open Account Settings and create a Render API key.
-2. Treat the key as a high-impact secret: Render documents that API keys can access all workspaces the account belongs to. Do not put it in repository files, issues, logs, or chat.
-3. In GitHub repository Settings → Secrets and variables → Actions, add a repository secret named `RENDER_API_KEY`. Prefer a dedicated environment with required reviewer approval if the repository has that capability configured.
-4. Merge this change only after reviewing the workflow and the script; the workflow is manual-only and the script sends GET requests only.
-5. Open Actions → “Render Read-Only Account Audit” → Run workflow. It produces a sanitized JSON artifact with resource names, IDs, status/plan/region/expiry and a SHA-256 checksum. It never includes environment variable values, database URLs, API response bodies, or the token.
-6. Retrieve the artifact and use it as the latest evidence ledger. Remove/revoke the API key when no longer needed.
+2. Render documents that an API key can access all workspaces the account belongs to. Treat it as a high-impact secret.
+3. In GitHub repository Settings → Environments, create `render-readonly`; add a required reviewer if available. Add `RENDER_API_KEY` as an environment secret in that environment, not in a file or issue.
+4. Review and merge the workflow only after reviewing the script and its permissions.
+5. Create or open a regular GitHub issue, then comment exactly `/render-audit` as the repository owner `yemenplatform528-ai`. The workflow ignores comments from other accounts and comments on pull requests.
+6. Retrieve the sanitized artifact from the resulting Actions run. It includes only the configured Yemen workspace, with resource IDs/names, service URLs, plans/status/region and database expiry, plus a SHA-256 checksum.
+7. Revoke the API key when no longer needed.
 
-## Current capabilities and limits
+## What this unlocks
 
-- The Render MCP integration currently exposes workspace/resource inventory, service/deploy/event/log/metric inspection, limited environment-variable updates, resource creation and read-only SQL subject to network access.
-- The harness extends repeatable account-wide inventory through the official REST API, but is not a general shell and is not a write-control plane.
-- Do not use an account-wide key with untrusted workflows. Anyone who can change trusted workflow code on the default branch could potentially misuse the secret. Keep repository write access restricted and inspect changes before merging.
-- No secret is configured by this code, no workflow run is triggered, and no Render resource is modified by adding this harness.
-- This does not claim the Render account is fully controllable. Additional capabilities must be enabled one at a time with explicit least-risk tests.
+- Repeatable API-backed inventory through a runner even when Codespaces/Desktop Commander is offline.
+- Evidence artifacts that can be fetched and analyzed after each run.
+- A foundation to add more read-only Render REST API checks after validating the current workflow.
+
+## Deliberate limits
+
+- The job sends GET requests only. It does not deploy, restart, update settings, create/delete resources, read environment-variable values, run SQL, or call model providers.
+- The Render API key is account-wide for all workspaces. Filtering reduces what the report publishes but does not reduce the key's underlying permissions. Do not use untrusted workflow code with this key.
+- A public repository means workflow logs and artifacts can be visible to repository visitors. This report intentionally contains only the selected Yemen workspace. If the account later contains sensitive resource names or URLs, move the runner and artifacts to a private repository before widening the report.
+- This is not equivalent to arbitrary shell access. Render documents that SSH is unavailable for Free web services and static sites/datastores; the current Hussam AI and YIB web services are on Free plans.
+- No key is configured by this code, no workflow is triggered by these commits, and no Render resource is modified.
 
 ## Official references
 
 - Render API: https://render.com/docs/api
 - API authentication: https://api-docs.render.com/reference/authentication
-- List services: https://api-docs.render.com/reference/list-services
+- Render MCP: https://render.com/docs/mcp-server
+- Render CLI: https://render.com/docs/cli
+- Render SSH restrictions: https://render.com/docs/ssh
