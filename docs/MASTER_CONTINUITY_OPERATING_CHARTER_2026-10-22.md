@@ -156,3 +156,11 @@ These are inherited findings and must be re-checked before consequential action;
 - GitHub combined-status lookup returned no status records for the two PR head SHAs; re-check the actual Actions run before merge.
 - New commits on `main`: secure rollout findings `4e1c330667c407b08a4b6feb2ab0cceb06d1d7ee`; execution checkpoint test/deployment evidence `f86cf5b585dcb498f4699bf3dbdec40dcf128213`; YIB adapter clarification `fc81c53727f9f1994f8d44cc12206fb00c4efa48`.
 - No PR was merged, no secrets or database allowlist were changed, no provider-generation request was made, no billing was enabled, and no production deploy was triggered.
+
+
+## 14. Latest CI and backup-script safety confirmation (2026-10-22)
+
+- Exact-head CI now confirmed directly via workflow-run records: PR #118 run `39708512860` success; PR #119 adapter syntax run `39708479420` success and CI run `39708479447` success.
+- PR #119 title/body was corrected to match its actual diff (remove Gemini `temperature` only). It remains open/unmerged; no provider is enabled.
+- The PostgreSQL drill script was inspected and its raw-URL-only source/target comparison limitation documented in `docs/YIB_MEMORY_POSTGRES_BACKUP_RESTORE_RUNBOOK.md`. A destructive restore must not be attempted until the target is independently proven isolated/disposable. No database connection, backup, restore, allowlist change, or credential access occurred.
+- Latest documentation commits include backup script limitation `18563f7d8f315b2c3829f368b3f050058a4dbc2e` and CI/checkpoint update `788196998ba35bc4b87ca9f45ab7d513f9051291`.
