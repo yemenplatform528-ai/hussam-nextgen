@@ -64,9 +64,11 @@ jobs:
           if [ -f evidence/render-audit/workspace-inventory.json ]; then
             status=$(python -c 'import json; print(json.load(open("evidence/render-audit/workspace-inventory.json")).get("status", "COMPLETE"))')
             if [ "$status" = "BLOCKED" ]; then
-              gh issue comment "$ISSUE_NUMBER" --body "Render read-only audit status: BLOCKED. Configure the protected `render-readonly` environment secret `RENDER_API_KEY` (never paste the key into chat or an issue), then comment `/render-audit` again."
+              gh issue comment "$ISSUE_NUMBER" --body 'Render read-only audit status: BLOCKED. Configure the protected render-readonly environment secret RENDER_API_KEY (never paste the key into chat or an issue), then comment /render-audit again.'
+            elif [ "$status" = "PARTIAL" ]; then
+              gh issue comment "$ISSUE_NUMBER" --body 'Render read-only audit status: PARTIAL. Pagination reached the safety cap; inspect the artifact truncated_categories field before relying on counts. No Render resources were modified.'
             else
-              gh issue comment "$ISSUE_NUMBER" --body "Render read-only audit completed for the authorized Yemen workspace. Sanitized evidence is attached to the GitHub Actions run artifact; no Render resources were modified."
+              gh issue comment "$ISSUE_NUMBER" --body 'Render read-only audit status: COMPLETE for the authorized Yemen workspace. Sanitized evidence is attached to the GitHub Actions run artifact; no Render resources were modified.'
             fi
           else
             gh issue comment "$ISSUE_NUMBER" --body "Render read-only audit failed before producing an evidence artifact. Review the Actions run logs; secrets and arbitrary API response bodies are not intentionally printed."
