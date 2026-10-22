@@ -39,9 +39,20 @@ class RenderOperatorAuditTests(unittest.TestCase):
         self.assertEqual(value, {"id": "srv-1", "name": "service"})
         self.assertNotIn("do-not-leak", json.dumps(value))
 
-    def test_unwrap_only_extracts_expected_resource_container(self):
+    def test_unwrap_handles_render_owner_and_resource_envelopes(self):
+        self.assertEqual(audit.unwrap({"cursor": "c", "owner": {"id": "tea-1"}}), {"id": "tea-1"})
         self.assertEqual(audit.unwrap({"cursor": "c", "service": {"id": "srv-1"}}), {"id": "srv-1"})
         self.assertEqual(audit.unwrap({"id": "plain"}), {"id": "plain"})
+
+    def test_list_pages_uses_sibling_cursor_and_marks_page_cap(self):
+        page_one = [{"cursor": "cursor-1", "owner": {"id": "one"}}]
+        with patch.object(audit, "MAX_PAGES", 1), patch.object(
+            audit, "get_json", return_value=page_one
+        ) as get_json:
+            rows, truncated = audit.list_pages("/owners")
+        self.assertEqual(rows, [{"id": "one"}])
+        self.assertTrue(truncated)
+        self.assertEqual(get_json.call_args.args[1], {"limit": audit.PAGE_SIZE})
 
 
 if __name__ == "__main__":
