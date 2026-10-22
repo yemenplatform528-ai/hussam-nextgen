@@ -25,6 +25,7 @@ main{width:min(980px,100%);margin:auto}.top{display:flex;align-items:center;gap:
 <div class="navbar" role="navigation" aria-label="التنقل الرئيسي">
 <button id="navChat" class="navbtn" aria-pressed="true">المحادثة</button>
 <button id="navDashboard" class="navbtn" aria-pressed="false">لوحة القيادة</button>
+<button id="logoutButton" class="navbtn hidden" type="button">إنهاء الجلسة</button>
 </div>
 <section id="dashboard" class="panel hidden" aria-label="لوحة القيادة التشغيلية">
 <h2 style="margin:0 0 4px;font-size:18px">مركز قيادة الحسام</h2>
@@ -68,6 +69,7 @@ main{width:min(980px,100%);margin:auto}.top{display:flex;align-items:center;gap:
 <p class="muted">أدخل رمز الوصول الذي ضُبط لمالك الخدمة. لا يُحفظ الرمز في سجل المحادثة أو التخزين المحلي.</p>
 <form id="loginForm" class="composer"><input id="accessPassword" type="password" autocomplete="current-password" minlength="16" placeholder="رمز الوصول الخاص" aria-label="رمز الوصول الخاص" required style="font:inherit;background:#0b100d;color:var(--text);border:1px solid var(--line);border-radius:12px;padding:12px;width:100%"><button id="loginButton" class="primary" type="submit">دخول آمن</button></form>
 <div id="loginStatus" class="muted" role="status">يلزم ضبط HUSSAM_ACCESS_PASSWORD وHUSSAM_SESSION_SECRET في الخادم قبل تفعيل الدخول.</div>
+<p class="notice">تنتهي الجلسة تلقائيًا خلال 30 دقيقة كحد أقصى. زر إنهاء الجلسة يمسح الرمز من هذا التبويب فقط؛ أي رمز منسوخ قد يبقى صالحًا حتى انتهاء صلاحيته، إذ لا توجد إبطال فوري للخادم.</p>
 </section>
 <div id="chatLayout" class="layout hidden">
 <div>
@@ -98,7 +100,7 @@ main{width:min(980px,100%);margin:auto}.top{display:flex;align-items:center;gap:
 <script type="module">
 const $=id=>document.getElementById(id), status=$('status'), promptBox=$('prompt'), send=$('send'), chat=$('chat');
 const API='https://hussam-ai-inference-bridge.onrender.com';
-let authenticated=false,sessionToken="";
+let authenticated=false,sessionToken="",sessionTimer=0;
 const systemPrompt=`أنت Hussam AI (الحسام اليمني)، مساعد مستقل يطبق سلوك Analyst الذي عرّفه المستخدم في Notion؛ لست النموذج الأصلي نفسه ولا تدّع نقل أوزان النموذج أو جلسة Notion. كن منهجيًا، دقيقًا، منطقيًا، قائمًا على الأدلة، موجزًا عالي الكثافة، واستخدم العربية افتراضيًا. أجب عن الطلب الأساسي مباشرة، اشرح الخطوات العملية، وقارن الخيارات عند الحاجة. لا تطلب إعادة معلومات سبق تقديمها. عند التفويض واصل التنفيذ ضمن الأدوات المتاحة وميّز ما نُفذ مما ينتظر إجراءً خارجيًا. لا تدّع اتصالًا أو تنفيذًا لم يحدث ولا تختلق نتائج. ميّز VERIFIED (مثبت)، OBSERVED (ملاحظ)، REPORTED (منقول)، INFERRED (مستنتج)، BLOCKED (متعذر)، UNKNOWN (غير معلوم). لا تدّع أن تفضيلات حُفظت دائمًا إلا إذا نجحت آلية حفظ فعلية.`;
 let messages=[{role:'system',content:systemPrompt}],busy=false,serverReady=false;
 const saved=localStorage.getItem('hussam-ai-independent-chat-v1');
@@ -135,6 +137,20 @@ $('openRender').addEventListener('click',()=>window.open('https://dashboard.rend
 $('openRepo').addEventListener('click',()=>window.open('https://github.com/yemenplatform528-ai/hussam-nextgen/tree/hussam-ai-standalone-portal','_blank','noopener,noreferrer'));
 $('openDeploys').addEventListener('click',()=>window.open('https://dashboard.render.com/static/srv-db7rat2j9qps73dfhmc0','_blank','noopener,noreferrer'));
 
-$('loginForm').addEventListener('submit',async e=>{e.preventDefault();const password=$('accessPassword').value;const b=$('loginButton');b.disabled=true;$('loginStatus').textContent='جارٍ التحقق من رمز الوصول…';try{const r=await fetch(API+'/api/session/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password})});const d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.message||d.error||('HTTP '+r.status));if(typeof d.token!=='string'||!d.token)throw Error('لم يصدر الخادم رمز جلسة صالحًا.');sessionToken=d.token;authenticated=true;$('accessPassword').value='';$('loginPanel').classList.add('hidden');$('chatLayout').classList.remove('hidden');$('loginStatus').textContent='تم تسجيل الدخول لهذه الجلسة.';diagnosticLine('تم إنشاء جلسة وصول مؤقتة لهذا التبويب؛ يلزم تسجيل الدخول مجددًا بعد إعادة تحميل الصفحة.');}catch(err){$('loginStatus').textContent='تعذر الدخول: '+String(err.message||err);diagnosticLine('فشل تسجيل الدخول: '+String(err.message||err));}finally{b.disabled=false;}});
+function endLocalSession(message){
+ if(sessionTimer)clearTimeout(sessionTimer);
+ sessionTimer=0;authenticated=false;sessionToken="";
+ $('logoutButton').classList.add('hidden');
+ $('chatLayout').classList.add('hidden');$('dashboard').classList.add('hidden');
+ $('loginPanel').classList.remove('hidden');
+ $('navChat').setAttribute('aria-pressed','true');$('navDashboard').setAttribute('aria-pressed','false');
+ $('loginStatus').textContent=message;
+ diagnosticLine('تم إنهاء الجلسة محليًا فقط؛ لا توجد قائمة إبطال على الخادم، وأي رمز منسوخ يظل صالحًا حتى انتهاء صلاحيته.');
+}
+$('logoutButton').addEventListener('click',()=>endLocalSession('تم إنهاء الجلسة في هذا التبويب. قد يبقى أي رمز منسوخ صالحًا حتى انتهاء صلاحيته.'));
+$('loginForm').addEventListener('submit',async e=>{e.preventDefault();const password=$('accessPassword').value;const b=$('loginButton');b.disabled=true;$('loginStatus').textContent='جارٍ التحقق من رمز الوصول…';try{const r=await fetch(API+'/api/session/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password})});const d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.message||d.error||('HTTP '+r.status));if(typeof d.token!=='string'||!d.token)throw Error('لم يصدر الخادم رمز جلسة صالحًا.');sessionToken=d.token;authenticated=true;$('accessPassword').value='';$('loginPanel').classList.add('hidden');$('chatLayout').classList.remove('hidden');$('logoutButton').classList.remove('hidden');
+const sessionSeconds=Math.min(30*60,Math.max(1,Number(d.expiresIn)||30*60));if(sessionTimer)clearTimeout(sessionTimer);
+sessionTimer=setTimeout(()=>endLocalSession('انتهت صلاحية الجلسة. سجّل الدخول مجددًا؛ أي رمز منسوخ قد يبقى صالحًا حتى انتهاء صلاحيته.'),sessionSeconds*1000);
+$('loginStatus').textContent='تم تسجيل الدخول. تنتهي الجلسة خلال 30 دقيقة كحد أقصى.';diagnosticLine('تم إنشاء جلسة عديمة الحالة لهذا التبويب بمدة قصوى 30 دقيقة؛ إنهاء الجلسة محلي ولا يبطل رمزًا منسوخًا على الخادم.');}catch(err){$('loginStatus').textContent='تعذر الدخول: '+String(err.message||err);diagnosticLine('فشل تسجيل الدخول: '+String(err.message||err));}finally{b.disabled=false;}});
 checkHealth();refreshDashboard();
 </script></body></html>

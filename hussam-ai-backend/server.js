@@ -11,7 +11,7 @@ const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || "https://hussam-ai-standalone-portal.onrender.com";
 const HUSSAM_ACCESS_PASSWORD = process.env.HUSSAM_ACCESS_PASSWORD || "";
 const HUSSAM_SESSION_SECRET = process.env.HUSSAM_SESSION_SECRET || "";
-const SESSION_TTL_SECONDS = 12 * 60 * 60;
+const SESSION_TTL_SECONDS = 30 * 60; // Stateless bearer sessions: copied tokens remain usable until expiry.
 
 function sessionReady() {
   return HUSSAM_ACCESS_PASSWORD.length >= 16 && HUSSAM_SESSION_SECRET.length >= 32;
@@ -45,8 +45,9 @@ function sameSecret(a, b) {
 }
 const rateLimiter = createRateLimiter({ maxBuckets: 512 });
 function clientAddress(req) {
-  // Render serves this public service through Cloudflare. Only accept a syntactically
-  // valid CF-Connecting-IP value; otherwise fall back to the socket address.
+  // Best-effort client identity only: the app cannot independently prove that a
+  // caller-supplied CF-Connecting-IP value is trusted at every ingress path. A
+  // global login-attempt ceiling below is the safety backstop if callers vary it.
   const forwarded = String(req.headers["cf-connecting-ip"] || "").trim();
   if (isIP(forwarded)) return forwarded;
   return req.socket.remoteAddress || "unknown";
@@ -210,7 +211,10 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(403);
       return res.end(JSON.stringify({ error: "ORIGIN_NOT_ALLOWED" }));
     }
-    if (!allowRate("login:" + clientAddress(req), 8, 15 * 60_000)) {
+    // Per-client throttling is best-effort; global throttling prevents IP-header
+    // rotation from bypassing the total brute-force budget.
+    if (!allowRate("login:global", 100, 15 * 60_000) ||
+        !allowRate("login:" + clientAddress(req), 8, 15 * 60_000)) {
       res.writeHead(429);
       return res.end(JSON.stringify({ error: "LOGIN_RATE_LIMITED", message: "تجاوزت محاولات الدخول المسموح بها مؤقتًا." }));
     }

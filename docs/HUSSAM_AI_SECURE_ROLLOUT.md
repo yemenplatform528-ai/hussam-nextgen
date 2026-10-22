@@ -20,6 +20,14 @@ Configure these only in the backend service's secret environment settings, never
 
 Generate a session secret locally with a cryptographic generator such as `openssl rand -base64 48`. Generate/store the owner password with a password manager. Do not print either value in CI logs. Do not reuse a source-control, database, or provider credential as the session secret.
 
+## Stateless session and logout limitation
+
+- Owner bearer sessions expire after **30 minutes maximum**.
+- Sessions are stateless HMAC-signed tokens. The current design has **no server-side revocation list** and logout is local to the current browser tab: it clears that tab's token and hides authenticated views.
+- A copied token may remain usable until its expiry; restarting the backend does not revoke it. Do not describe the logout control as server-side revocation.
+- Login throttling uses best-effort client identity plus a global ceiling of 100 attempts per 15 minutes. The application does not claim that a forwarded IP header is trusted at every ingress path; the global ceiling is the safety backstop if a caller varies that header. This reduces brute-force throughput but cannot eliminate denial-of-service risk.
+- Rotating `HUSSAM_SESSION_SECRET` invalidates outstanding tokens but is an operator action and forces all owners to sign in again. If immediate revocation becomes a requirement, implement and verify a durable shared revocation mechanism before claiming it.
+
 ## Deploy sequence
 
 1. Apply server environment values before deploying the auth-protected backend. The backend intentionally returns `ACCESS_CONTROL_NOT_CONFIGURED` when the access password or session secret is missing or too short.
@@ -27,7 +35,7 @@ Generate a session secret locally with a cryptographic generator such as `openss
 3. Verify `/health` reports `status: online`, `accessControlConfigured: true`, and the configured provider. `liveModelVerified` remains false until a real generation succeeds.
 4. In a clean browser session, verify login succeeds only from the exact allowed portal origin. Verify wrong passwords fail and repeated attempts receive HTTP 429.
 5. Send one non-sensitive prompt and verify a successful response contains `truth: VERIFIED_RESPONSE`. If the provider reports quota exhaustion or an upstream error, stop; do not repeatedly retry or switch to a paid provider.
-6. Verify logged-out users cannot open chat/dashboard or import/export history. Verify reloading the page requires login again. Verify a disallowed origin receives HTTP 403 and a missing/invalid/expired bearer token receives HTTP 401.
+6. Verify local logout hides authenticated views and clears the current tab's token, and that reloading the page requires login again. Verify a disallowed origin receives HTTP 403 and a missing/invalid/expired bearer token receives HTTP 401. A copied token is not revoked by logout and remains valid only until its 30-minute maximum expiry.
 7. Check sanitized service logs for errors without exposing prompts, tokens, passwords, provider keys, or response bodies.
 8. If any required check fails, roll back the backend to the previous deployment and remove/rotate any exposed secret. Do not claim the assistant is live until the real generation check passes.
 
