@@ -50,6 +50,13 @@ def test_postgres_backup_restore_drill_requires_distinct_restore_target():
     from pathlib import Path
     script = Path("scripts/postgres_backup_restore_drill.sh").read_text()
     assert 'RESTORE_DATABASE_URL must point to a distinct restore target' in script
+    assert 'RESTORE_TARGET_DISPOSABLE' in script
+    assert 'urlsplit' in script
+    assert 'sha256sum' in script
+    assert 'BACKUP_SIZE_BYTES' in script
+    assert 'realpath' in script
+    assert script.index('RESTORE_TARGET_DISPOSABLE') < script.index('pg_dump --format=custom')
+    assert script.index('urlsplit') < script.index('pg_dump --format=custom')
     assert 'EXPECTED_ALEMBIC_REVISION' in script
 
 def test_backup_restore_drill_contains_archive_verification_and_revision_check():
