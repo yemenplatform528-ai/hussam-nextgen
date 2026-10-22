@@ -2,46 +2,72 @@ name: Render Read-Only Account Audit
 
 on:
   workflow_dispatch:
+  issue_comment:
+    types: [created]
 
 permissions:
   contents: read
+  issues: write
 
 jobs:
   audit:
-    # Requires an owner-configured RENDER_API_KEY repository/environment secret.
-    # This workflow makes GET requests only and does not deploy or modify resources.
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'issue_comment' && github.event.issue.pull_request == null && github.event.comment.body == '/render-audit' && github.event.comment.user.login == github.repository_owner) }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    environment: render-readonly
     steps:
       - uses: actions/checkout@v4
       - name: Validate the read-only auditor
         run: python -m unittest tests.test_render_operator_audit -v
-      - name: Inventory Render account
+      - name: Inventory the authorized Yemen workspace only
         env:
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_AUDIT_WORKSPACE_ID: tea-db0p6749v7es73ceig1g
         run: |
-          set -eu
+          set +e
           mkdir -p evidence/render-audit
-          python scripts/render_operator_audit.py > evidence/render-audit/account-inventory.json
+          python scripts/render_operator_audit.py > evidence/render-audit/workspace-inventory.json
+          rc=$?
+          set -e
+          if [ "$rc" -ne 0 ] && [ "$rc" -ne 2 ]; then
+            echo "Unexpected audit error; sanitized output retained for diagnosis."
+            exit "$rc"
+          fi
+          sha256sum evidence/render-audit/workspace-inventory.json > evidence/render-audit/SHA256SUMS.txt
           python - <<'PY'
           import json
-          p = "evidence/render-audit/account-inventory.json"
+          p = "evidence/render-audit/workspace-inventory.json"
           data = json.load(open(p, encoding="utf-8"))
           print(json.dumps({
               "timestamp_utc": data.get("timestamp_utc"),
               "mode": data.get("mode"),
+              "status": data.get("status", "COMPLETE"),
+              "workspace": data.get("workspace"),
               "counts": data.get("counts"),
-              "workspaces": data.get("workspaces"),
-              "service_names": [x.get("name") for x in data.get("services", [])],
-              "postgres_names": [x.get("name") for x in data.get("postgres", [])],
-              "key_value_names": [x.get("name") for x in data.get("key_value", [])],
+              "error": data.get("error"),
           }, indent=2))
           PY
-          sha256sum evidence/render-audit/account-inventory.json > evidence/render-audit/SHA256SUMS.txt
-      - name: Upload sanitized audit artifact
+      - name: Upload sanitized workspace audit
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: render-read-only-account-audit
+          name: render-yemen-workspace-audit
           path: evidence/render-audit/
           retention-days: 7
-          if-no-files-found: error
+          if-no-files-found: warn
+      - name: Report audit result on triggering issue
+        if: ${{ github.event_name == 'issue_comment' && github.event.issue.pull_request == null }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          if [ -f evidence/render-audit/workspace-inventory.json ]; then
+            status=$(python -c 'import json; print(json.load(open("evidence/render-audit/workspace-inventory.json")).get("status", "COMPLETE"))')
+            if [ "$status" = "BLOCKED" ]; then
+              gh issue comment "$ISSUE_NUMBER" --body "Render read-only audit status: BLOCKED. Configure the protected `render-readonly` environment secret `RENDER_API_KEY` (never paste the key into chat or an issue), then comment `/render-audit` again."
+            else
+              gh issue comment "$ISSUE_NUMBER" --body "Render read-only audit completed for the authorized Yemen workspace. Sanitized evidence is attached to the GitHub Actions run artifact; no Render resources were modified."
+            fi
+          else
+            gh issue comment "$ISSUE_NUMBER" --body "Render read-only audit failed before producing an evidence artifact. Review the Actions run logs; secrets and arbitrary API response bodies are not intentionally printed."
+          fi
