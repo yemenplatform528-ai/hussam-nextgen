@@ -45,12 +45,15 @@ class RenderOperatorAuditTests(unittest.TestCase):
         self.assertEqual(audit.unwrap({"id": "plain"}), {"id": "plain"})
 
     def test_list_pages_uses_sibling_cursor_and_marks_page_cap(self):
-        page_one = [{"cursor": "cursor-1", "owner": {"id": "one"}}]
+        page_one = [
+            {"cursor": f"cursor-{i}", "owner": {"id": f"owner-{i}"}}
+            for i in range(audit.PAGE_SIZE)
+        ]
         with patch.object(audit, "MAX_PAGES", 1), patch.object(
             audit, "get_json", return_value=page_one
         ) as get_json:
             rows, truncated = audit.list_pages("/owners")
-        self.assertEqual(rows, [{"id": "one"}])
+        self.assertEqual(len(rows), audit.PAGE_SIZE)
         self.assertTrue(truncated)
         self.assertEqual(get_json.call_args.args[1], {"limit": audit.PAGE_SIZE})
 
