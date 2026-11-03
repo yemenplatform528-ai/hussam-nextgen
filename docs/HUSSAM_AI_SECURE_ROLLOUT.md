@@ -16,6 +16,7 @@ Configure these only in the backend service's secret environment settings, never
 - `HUSSAM_ACCESS_PASSWORD`: a newly generated owner-only password with at least 16 characters.
 - `HUSSAM_SESSION_SECRET`: a cryptographically random secret with at least 32 characters.
 - `ALLOWED_ORIGIN`: `https://hussam-ai-standalone-portal.onrender.com` (exact origin, no trailing slash).
+- `HUSSAM_GEMINI_FREE_TIER_ENABLED`: leave unset or set to `false` by default. Set to `true` only after the owner verifies in the provider account that the selected Gemini model is eligible for the free tier and quota is available; a key alone does not prove zero cost.
 - `HUSSAM_ALLOW_BILLABLE_AI`: leave unset or set to `false`; OpenAI is disabled by default and may be enabled only after a separate explicit owner approval.
 - One already-authorized inference provider credential, if live model responses are expected. Do not create or enable paid billing as part of this step.
 
