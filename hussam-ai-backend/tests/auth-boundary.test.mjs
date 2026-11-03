@@ -20,6 +20,7 @@ test("chat fails closed without session; login enforces exact origin and passwor
       ...process.env,
       PORT: String(port),
       GEMINI_API_KEY: "fake-key",
+      HUSSAM_GEMINI_FREE_TIER_ENABLED: "true",
       OPENAI_API_KEY: "",
       ALLOWED_ORIGIN: "http://127.0.0.1",
       HUSSAM_ACCESS_PASSWORD: "test password fixture only 2026",
