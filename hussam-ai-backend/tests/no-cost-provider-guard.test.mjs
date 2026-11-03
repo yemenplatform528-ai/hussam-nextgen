@@ -10,15 +10,16 @@ const backend = resolve(here, "..");
 const serverFile = resolve(backend, "server.js");
 const preloadFile = resolve(here, "mock-provider-no-cost.mjs");
 
-test("OpenAI is not selected or called unless billable inference is explicitly enabled", async () => {
+test("provider keys are not used without explicit free-tier or billable approval", async () => {
   const port = 18771;
   const child = spawn(process.execPath, ["--import", preloadFile, serverFile], {
     cwd: backend,
     env: {
       ...process.env,
       PORT: String(port),
-      GEMINI_API_KEY: "",
-      OPENAI_API_KEY: "test-only-not-a-real-key",
+      GEMINI_API_KEY: "test-only-gemini-key",
+      HUSSAM_GEMINI_FREE_TIER_ENABLED: "false",
+      OPENAI_API_KEY: "test-only-openai-key",
       HUSSAM_ALLOW_BILLABLE_AI: "false",
       ALLOWED_ORIGIN: "http://127.0.0.1",
       HUSSAM_ACCESS_PASSWORD: "test password fixture only 2026",
