@@ -15,6 +15,7 @@ test("quota exhaustion returns 429 and makes exactly one provider attempt", asyn
   const child = spawn(process.execPath, ["--import", preloadFile, serverFile], {
     cwd: backend,
     env: { ...process.env, PORT: String(port), GEMINI_API_KEY: "fake-key",
+      HUSSAM_GEMINI_FREE_TIER_ENABLED: "true",
       OPENAI_API_KEY: "", ALLOWED_ORIGIN: "http://127.0.0.1",
       HUSSAM_ACCESS_PASSWORD: "test password fixture only 2026", HUSSAM_SESSION_SECRET: "test session secret fixture only for tests" },
     stdio: ["ignore", "pipe", "pipe"]
