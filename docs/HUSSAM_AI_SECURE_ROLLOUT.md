@@ -16,6 +16,7 @@ Configure these only in the backend service's secret environment settings, never
 - `HUSSAM_ACCESS_PASSWORD`: a newly generated owner-only password with at least 16 characters.
 - `HUSSAM_SESSION_SECRET`: a cryptographically random secret with at least 32 characters.
 - `ALLOWED_ORIGIN`: `https://hussam-ai-standalone-portal.onrender.com` (exact origin, no trailing slash).
+- `HUSSAM_ALLOW_BILLABLE_AI`: leave unset or set to `false`; OpenAI is disabled by default and may be enabled only after a separate explicit owner approval.
 - One already-authorized inference provider credential, if live model responses are expected. Do not create or enable paid billing as part of this step.
 
 Generate a session secret locally with a cryptographic generator such as `openssl rand -base64 48`. Generate/store the owner password with a password manager. Do not print either value in CI logs. Do not reuse a source-control, database, or provider credential as the session secret.
