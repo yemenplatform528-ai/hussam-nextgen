@@ -87,9 +87,12 @@ let activeUploads = 0;
 let liveModelVerified = false; // Process-local evidence; resets on restart.
 
 
+// Billable providers are opt-in. OpenAI remains disabled unless the owner
+// explicitly sets HUSSAM_ALLOW_BILLABLE_AI=true in the backend secret environment.
+const ALLOW_BILLABLE_AI = process.env.HUSSAM_ALLOW_BILLABLE_AI === "true";
 function activeProvider() {
   if (GEMINI_API_KEY) return { provider: "gemini", model: GEMINI_MODEL };
-  if (OPENAI_API_KEY) return { provider: "openai", model: OPENAI_MODEL };
+  if (OPENAI_API_KEY && ALLOW_BILLABLE_AI) return { provider: "openai", model: OPENAI_MODEL };
   return { provider: "none", model: null };
 }
 
