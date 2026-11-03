@@ -87,11 +87,12 @@ let activeUploads = 0;
 let liveModelVerified = false; // Process-local evidence; resets on restart.
 
 
-// Billable providers are opt-in. OpenAI remains disabled unless the owner
-// explicitly sets HUSSAM_ALLOW_BILLABLE_AI=true in the backend secret environment.
+// No-cost provider access is explicit too: a Gemini key alone does not prove
+// free-tier eligibility. OpenAI remains billable and is separately opt-in.
+const GEMINI_FREE_TIER_ENABLED = process.env.HUSSAM_GEMINI_FREE_TIER_ENABLED === "true";
 const ALLOW_BILLABLE_AI = process.env.HUSSAM_ALLOW_BILLABLE_AI === "true";
 function activeProvider() {
-  if (GEMINI_API_KEY) return { provider: "gemini", model: GEMINI_MODEL };
+  if (GEMINI_API_KEY && GEMINI_FREE_TIER_ENABLED) return { provider: "gemini", model: GEMINI_MODEL };
   if (OPENAI_API_KEY && ALLOW_BILLABLE_AI) return { provider: "openai", model: OPENAI_MODEL };
   return { provider: "none", model: null };
 }
