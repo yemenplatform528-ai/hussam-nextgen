@@ -68,6 +68,7 @@ window.__e2eCODCollections=[];
     if (url.includes('/platform/yemen/checkout-context/YEM')) { window.__e2eCheckoutContextUrl=url; return json({schema_version:'1.0',market:{code:'YEM',locale:'ar-YE'},money:{currency:'YER',label:'ريال يمني',conversion:{automatic_conversion:false}},payments:{methods:[{code:'cod',name:'Cash on delivery',method_type:'cod',requires_provider:false,available:true},{code:'transfer',name:'Manual transfer',method_type:'transfer',requires_provider:true,available:false}],cod:{available:true}},delivery:{destination:{coverage:'available'}},sellers:[{seller_tenant_id:1,delivery:{available:true},payment:{cod_available:true}}]}); }
     if (url.endsWith('/marketplace/buyer/shipping-quotes')) return json({id:301,seller_tenant_id:1,address_id:20,fee:'250',currency:'YER',expires_at:'2099-01-01T00:00:00Z'});
     if (url.endsWith('/marketplace/buyer/checkout')) { window.__e2eCheckoutCalls += 1; window.__e2eLastCheckoutHeaders = Object.fromEntries(new Headers(options.headers||{}).entries()); window.__e2eLastCheckoutBody = JSON.parse(options.body||'{}'); if(window.__e2eLoseFirstCheckoutResponse){window.__e2eLoseFirstCheckoutResponse=false;return Promise.reject(new TypeError('simulated response loss after server acceptance'));} return json({orders:[{id:101,reference:'YEM-E2E-001',currency:'YER',total:'1500'}]}); }
+    if (url.endsWith('/marketplace/buyer/customer-orders')) return json({items:[{id:700,reference:'YEM-E2E-001',status:'shipped',currency:'YER',subtotal:'1500',shipping_fee:'250',total:'1750',created_at:'2026-11-09T00:00:00Z',seller_orders:[{id:701,seller_tenant_id:1,marketplace_order_id:101,reference:'YEM-E2E-001-S1',status:'shipped',subtotal:'1500',shipping_fee:'250',total:'1750',fulfillment:{id:801,method:'external_carrier',status:'in_transit',shipment_id:901,carrier:'Yemen Local Delivery',shipment:{id:901,reference:'SHP-E2E-001',carrier:'Yemen Local Delivery',tracking_number:'TRK-E2E-BUYER',status:'in_transit',destination:'Taiz'}}}]}]});
     if (url.endsWith('/marketplace/buyer/orders')) return json({items:[{id:101,reference:'YEM-E2E-001',seller_tenant_id:1,total:'1500',currency:'YER',status:'pending_payment',payment_reference:null}]});
     return originalFetch(input, options);
   };
@@ -261,6 +262,8 @@ def run():
                     assert page.evaluate("window.__e2eLastCheckoutHeaders['idempotency-key']") == first_key
                     assert page.evaluate("window.__e2eLastCheckoutBody.shipping_quote_ids") == [301]
                     assert page.evaluate("window.__e2eLastCheckoutBody.shipping_fee") == 250
+                    assert page.locator("text=TRK-E2E-BUYER").is_visible()
+                    assert page.locator("text=SHP-E2E-001").is_visible()
                 finally:
                     page.close()
         finally:
