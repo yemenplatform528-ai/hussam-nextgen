@@ -607,7 +607,7 @@ def buyer_dispute(dispute_id:int,ctx=Depends(get_context),db=Depends(get_session
 def seller_returns(ctx=Depends(get_context),db=Depends(get_session)):
     seller_guard(ctx)
     rows=db.scalars(select(MarketplaceReturnRequest).join(MarketplaceOrder,MarketplaceOrder.id==MarketplaceReturnRequest.marketplace_order_id).where(MarketplaceOrder.seller_tenant_id==ctx.tenant_id).order_by(desc(MarketplaceReturnRequest.id))).all()
-    return {'items':[{'id':x.id,'order_id':x.marketplace_order_id,'reason':x.reason,'description':x.description,'status':x.status,'refund_amount':str(x.refund_amount) if x.refund_amount is not None else None,'refund_currency':x.refund_currency,'refund_reference':x.refund_reference,'refund_scope':x.refund_scope} for x in rows]}
+    return {'items':[{'id':x.id,'order_id':x.marketplace_order_id,'order_reference':x.marketplace_order.reference,'payment_method_code':x.marketplace_order.payment_method_code,'currency':x.marketplace_order.currency,'reason':x.reason,'description':x.description,'status':x.status,'refund_amount':str(x.refund_amount) if x.refund_amount is not None else None,'refund_currency':x.refund_currency,'refund_reference':x.refund_reference,'refund_scope':x.refund_scope} for x in rows]}
 
 @router.post('/seller/returns/{return_id}/review')
 def seller_review_return(return_id:int,body:ReturnReviewIn,ctx=Depends(get_context),db=Depends(get_session)):
