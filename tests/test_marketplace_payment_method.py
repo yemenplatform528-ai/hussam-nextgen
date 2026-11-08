@@ -63,6 +63,8 @@ def test_cod_order_enters_processing_without_fabricating_payment():
 
     with pytest.raises(MarketplaceError, match="COD orders cannot create electronic payment intents"):
         service.attach_payment_intent(buyer.id, order.id, "not-a-provider")
+    with pytest.raises(MarketplaceError, match="COD orders cannot be marked paid"):
+        service.mark_paid(seller.id, order.id, "not-a-provider")
     with pytest.raises(MarketplaceError, match="COD orders do not create electronic payment sessions"):
         service.create_payment_session(buyer.id, order.customer_order_id, "not-a-provider")
 
