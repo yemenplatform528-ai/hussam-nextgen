@@ -1,4 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import select
+from app.core.models.market import MarketGeography
 from app.api.dependencies import get_context, get_session
 from app.core.services.market_context import MarketContextService
 from app.core.services.yemen_checkout_context import YemenCheckoutContextService
@@ -145,6 +147,56 @@ def client_market_context(
     if market.status != "active":
         raise HTTPException(status_code=409, detail="market is not active")
     return _public_runtime_context(service.runtime_context(market))
+
+
+@router.get("/market-context/{market_code}/geography")
+def client_market_geography(
+    market_code: str,
+    level: str,
+    parent_id: int | None = None,
+    ctx=Depends(get_context),
+    db=Depends(get_session),
+):
+    """Return only active, market-scoped geography nodes for address capture."""
+    allowed_parents = {"governorate": "country", "district": "governorate", "locality": "district"}
+    if level not in allowed_parents:
+        raise HTTPException(status_code=422, detail="unsupported geography level")
+    market = MarketContextService(db).get_market(market_code)
+    if not market:
+        raise HTTPException(status_code=404, detail="market not found")
+    if market.status != "active":
+        raise HTTPException(status_code=409, detail="market is not active")
+    parent_level = allowed_parents[level]
+    if level == "governorate":
+        parent = db.scalar(select(MarketGeography).where(
+            MarketGeography.market_id == market.id,
+            MarketGeography.level == "country",
+            MarketGeography.status == "active",
+            MarketGeography.parent_id.is_(None),
+        ))
+        if parent is None:
+            return {"items": []}
+        parent_id = parent.id
+    else:
+        if parent_id is None:
+            raise HTTPException(status_code=422, detail="parent_id is required")
+        parent = db.scalar(select(MarketGeography).where(
+            MarketGeography.id == parent_id,
+            MarketGeography.market_id == market.id,
+            MarketGeography.level == parent_level,
+            MarketGeography.status == "active",
+        ))
+        if parent is None:
+            raise HTTPException(status_code=404, detail="parent geography not found")
+    rows = db.scalars(select(MarketGeography).where(
+        MarketGeography.market_id == market.id,
+        MarketGeography.parent_id == parent_id,
+        MarketGeography.level == level,
+        MarketGeography.status == "active",
+    ).order_by(MarketGeography.name_ar, MarketGeography.name)).all()
+    return {"items": [{"id": row.id, "code": row.code, "level": row.level,
+                       "name": row.name, "name_ar": row.name_ar,
+                       "parent_id": row.parent_id} for row in rows]}
 
 
 @router.get("/yemen/checkout-context/{market_code}")
