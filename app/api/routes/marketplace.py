@@ -32,7 +32,7 @@ class AddressIn(BaseModel):
     geo_lat:Decimal|None=Field(default=None,ge=-90,le=90); geo_lng:Decimal|None=Field(default=None,ge=-180,le=180)
     address_confidence:str='low'; delivery_instructions:str|None=None
 class CartIn(BaseModel): listing_id:int; quantity:Decimal=Field(gt=0)
-class CheckoutIn(BaseModel): shipping_address_id:int|None=None; shipping_fee:Decimal=Field(default=Decimal('0'),ge=0); shipping_quote_id:int|None=None; shipping_quote_ids:list[int]=Field(default_factory=list, max_length=50); market_id:int|None=None; payment_method_code:str|None=None
+class CheckoutIn(BaseModel): shipping_address_id:int|None=None; shipping_fee:Decimal=Field(default=Decimal('0'),ge=0); shipping_quote_id:int|None=None; shipping_quote_ids:list[int]=Field(default_factory=list, max_length=50); market_id:int|None=None; payment_method_code:str=Field(min_length=1,max_length=80)
 class ReviewIn(BaseModel): listing_id:int; rating:int=Field(ge=1,le=5); title:str=''; body:str=''
 class DisputeIn(BaseModel): reason:str; description:str
 class PaymentIn(BaseModel): provider:str=Field(min_length=1,max_length=80)
