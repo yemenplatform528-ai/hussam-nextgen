@@ -64,7 +64,7 @@ const canProcess=o.status==='paid'||(o.status==='pending_payment'&&o.payment_met
 const canCreate=(o.status==='processing'||o.status==='ready_for_fulfillment')&&o.seller_order_id&&!o.fulfillment_id;
 let actions='';
 if(canProcess)actions+='<button class="btn secondary" data-processing="'+o.id+'">بدء التجهيز</button>';
-if(canCreate)actions+='<div class="toolbar"><select id="fulfillment-method-'+o.id+'"><option value="seller_fulfilled">توصيل المتجر</option><option value="hussam_delivery">توصيل Hussam</option><option value="external_carrier">شركة شحن خارجية</option><option value="pickup" ${o.payment_method_code==='cod'?'disabled':''}>استلام من المتجر ${o.payment_method_code==='cod'?'(غير متاح لطلبات COD)':''}</option></select><button class="btn" data-create-fulfillment="'+o.seller_order_id+'" data-order="'+o.id+'">إنشاء تنفيذ</button></div>';
+if(canCreate)actions+='<div class="toolbar"><select id="fulfillment-method-'+o.id+'"><option value="seller_fulfilled">توصيل المتجر</option><option value="hussam_delivery">توصيل Hussam</option><option value="external_carrier">شركة شحن خارجية</option>'+(o.payment_method_code==='cod'?'':'<option value="pickup">استلام من المتجر</option>')+'</select><button class="btn" data-create-fulfillment="'+o.seller_order_id+'" data-order="'+o.id+'">إنشاء تنفيذ</button></div>';
 if(o.fulfillment_id)actions+='<button class="btn secondary" data-ws="fulfillment">متابعة التنفيذ #'+o.fulfillment_id+'</button>';
 return '<tr><td>'+esc(o.reference)+'</td><td>'+esc(o.buyer_user_id)+'</td><td>'+money(o.total,o.currency)+'</td><td><span class="badge warn">'+esc(o.status)+'</span><small>'+esc(o.payment_method_code||'')+'</small></td><td>'+actions+'</td></tr>';
 }).join('');
