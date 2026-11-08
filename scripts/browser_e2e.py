@@ -141,6 +141,7 @@ def run():
                     page.locator("#inventoryMovementForm input[name='quantity']").fill("50")
                     page.locator("#inventoryMovementForm input[name='reference']").fill("opening-stock-001")
                     page.locator("#inventoryMovementForm button").click()
+                    page.wait_for_function("window.__e2eInventoryRequests.filter(x => x.url.endsWith('/inventory/movements') && x.method === 'GET').length >= 4", timeout=5000)
                     page.locator("#stockLookupForm select[name='item_id']").select_option("rice-10kg")
                     page.locator("#stockLookupForm select[name='warehouse_id']").select_option("main-warehouse")
                     page.locator("#stockLookupForm button").click()
