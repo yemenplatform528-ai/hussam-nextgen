@@ -7,6 +7,7 @@ from app.core.models.market import PaymentMethodCatalogEntry
 from app.core.models.marketplace import MarketplaceCustomerOrder
 from app.engines.marketplace import MarketplaceError
 from app.api.routes.marketplace import CheckoutIn
+from pydantic import ValidationError
 from tests.test_marketplace_completion import setup
 
 
@@ -48,7 +49,7 @@ def test_cod_selection_is_persisted_without_creating_provider_payment():
 
 
 def test_public_checkout_contract_requires_explicit_payment_method():
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         CheckoutIn()
 
 def test_cod_order_enters_processing_without_fabricating_payment():
