@@ -54,6 +54,8 @@ class FulfillmentService:
     def transition(self, seller_tenant_id, fulfillment_id, status, event_id=None, location=None, note=None):
         if status not in _ALLOWED: raise FulfillmentError('unsupported fulfillment status')
         f = self._fulfillment(seller_tenant_id, fulfillment_id, True)
+        if f.method == 'pickup' and status == f.status:
+            return f
         if event_id is None: event_id = f'FUL:{f.id}:{status}:{uuid4().hex[:12]}'
         # The logistics layer owns physical shipment state and event idempotency.
         # Fulfillment mirrors it; it must never create a second shipment event for
