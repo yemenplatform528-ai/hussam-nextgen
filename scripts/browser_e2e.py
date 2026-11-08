@@ -16,6 +16,7 @@ window.__e2eCartMutationCalls=0;
 window.__e2eLastCartMutationHeaders=null;
 window.__e2eOfflineReads=false;
 window.__e2eCheckoutContextUrl='';
+window.__e2eAddresses=[];
 (() => {
   const originalFetch = window.fetch.bind(window);
   const listing = {id: 1, title: 'E2E Phone', description: 'Browser journey product', unit_price: '1500', currency: 'YER', stock: null, seller: {tenant_id: 1, slug: 'e2e-store', display_name: 'E2E Store', description: 'Browser test store'}};
@@ -32,7 +33,9 @@ window.__e2eCheckoutContextUrl='';
     if (url.endsWith('/marketplace/buyer/cart')) return json({id:1,status:'active',market_id:1,market_code:'YEM',items:[{id:1,quantity:'1',line_total:'1500',listing}]});
     if (url.endsWith('/marketplace/buyer/cart/items')) { window.__e2eCartMutationCalls += 1; window.__e2eLastCartMutationHeaders = Object.fromEntries(new Headers(options.headers||{}).entries()); return json({id:1,status:'active',market_id:1,market_code:'YEM',items:[{id:1,quantity:'1',line_total:'1500',listing}]}); }
     if (url.includes('/marketplace/buyer/cart/items/')) { window.__e2eCartMutationCalls += 1; window.__e2eLastCartMutationHeaders = Object.fromEntries(new Headers(options.headers||{}).entries()); return json({id:1,status:'active',market_id:1,market_code:'YEM',items:[]}); }
-    if (url.includes('/marketplace/buyer/addresses')) return json({items:[{id:20,label:'المنزل',city:'Khor Maksar',address_line:'Main road'},{id:21,label:'عنوان بديل',city:'Aden',address_line:'Second road'}]});
+    if (url.includes('/marketplace/buyer/addresses') && (options.method||'GET') === 'POST') { const body=JSON.parse(options.body||'{}'); const address={id:20,...body}; window.__e2eAddresses.push(address); return json(address,201); }
+    if (url.endsWith('/marketplace/buyer/addresses')) return json({items:window.__e2eAddresses});
+    if (url.includes('/platform/market-context/YEM/geography')) { const query=new URL(url,window.location.origin).searchParams; const level=query.get('level'); if(level==='governorate') return json({items:[{id:10,code:'YE-TA',level:'governorate',name:'Taiz',name_ar:'تعز',parent_id:1}]}); if(level==='district'&&query.get('parent_id')==='10') return json({items:[{id:20,code:'YE-TA-CAI',level:'district',name:'Al Qahirah',name_ar:'القاهرة',parent_id:10}]}); return json({items:[]}); }
     if (url.includes('/platform/market-context')) return json({items:[{id:1,code:'YEM',locale:'ar-YE'}]});
     if (url.includes('/platform/yemen/checkout-context/YEM')) { window.__e2eCheckoutContextUrl=url; return json({schema_version:'1.0',market:{code:'YEM',locale:'ar-YE'},money:{currency:'YER',label:'ريال يمني',conversion:{automatic_conversion:false}},payments:{methods:[{code:'cod',name:'Cash on delivery',method_type:'cod',requires_provider:false,available:true},{code:'transfer',name:'Manual transfer',method_type:'transfer',requires_provider:true,available:false}],cod:{available:true}},delivery:{destination:{coverage:'available'}},sellers:[{seller_tenant_id:1,delivery:{available:true},payment:{cod_available:true}}]}); }
     if (url.endsWith('/marketplace/buyer/shipping-quotes')) return json({id:301,seller_tenant_id:1,address_id:20,fee:'250',currency:'YER',expires_at:'2099-01-01T00:00:00Z'});
@@ -106,6 +109,19 @@ def run():
                     page.locator("button[data-action='checkout']:visible").click()
                     page.wait_for_timeout(150)
                     assert page.locator("h1", has_text="إتمام الطلب").is_visible()
+                    page.locator("#showAddressForm").click()
+                    page.locator("#addressForm input[name='label']").fill("المنزل")
+                    page.locator("#addressForm input[name='recipient_name']").fill("مشتري الاختبار")
+                    page.locator("#addressForm input[name='phone']").fill("777000000")
+                    page.locator("#addressGovernorate").select_option("10")
+                    page.locator("#addressDistrict option[value='20']").wait_for(state="attached", timeout=5000)
+                    page.locator("#addressDistrict").select_option("20")
+                    page.locator("#addressForm textarea[name='address_line']").fill("شارع الاختبار بجوار المعلم")
+                    page.locator("#addressForm button").click()
+                    page.locator("select[name='shipping_address_id'] option[value='20']").wait_for(state="attached", timeout=5000)
+                    assert page.evaluate("window.__e2eAddresses[0].market_id") == 1
+                    assert page.evaluate("window.__e2eAddresses[0].governorate_id") == 10
+                    assert page.evaluate("window.__e2eAddresses[0].district_id") == 20
                     assert page.locator("text=ريال يمني").is_visible()
                     assert page.locator("text=الدفع عند الاستلام: متاح").is_visible()
                     assert page.locator("text=التوصيل متاح للعنوان المحدد.").is_visible()
