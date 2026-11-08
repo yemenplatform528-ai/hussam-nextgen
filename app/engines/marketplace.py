@@ -1486,6 +1486,34 @@ class MarketplaceService:
         if p and p.status=='held' and p.settlement_reference: p.status='eligible'; p.eligible_at=datetime.now(timezone.utc)
         self._event(seller_tenant_id,'marketplace.order.completed','marketplace_order',o.id,{'shipment_id':shipment_id}); self.db.commit(); return o
 
+    def mark_pickup_delivered(self, seller_tenant_id:int, seller_order_id:int):
+        so=self.db.scalar(select(MarketplaceSellerOrder).where(
+            MarketplaceSellerOrder.id==seller_order_id,
+            MarketplaceSellerOrder.seller_tenant_id==seller_tenant_id,
+        ).with_for_update())
+        if not so: raise MarketplaceError('seller order not found in seller tenant')
+        fulfillment=self.db.scalar(select(MarketplaceFulfillment).where(
+            MarketplaceFulfillment.seller_order_id==so.id,
+            MarketplaceFulfillment.seller_tenant_id==seller_tenant_id,
+        ).order_by(desc(MarketplaceFulfillment.id)))
+        if not fulfillment or fulfillment.method!='pickup' or fulfillment.status!='delivered':
+            raise MarketplaceError('completed pickup fulfillment is required')
+        if so.status!='fulfilled': raise MarketplaceError('seller order is not fulfilled')
+        order=self._order(None,so.marketplace_order_id,seller_tenant_id,True)
+        if order.status not in {'paid','processing'}:
+            raise MarketplaceError('marketplace order cannot complete from current status')
+        order.status='completed'; order.updated_at=datetime.now(timezone.utc)
+        self._sync_customer_order(so.customer_order_id)
+        payout=self.db.scalar(select(MarketplacePayout).where(
+            MarketplacePayout.marketplace_order_id==order.id,
+            MarketplacePayout.seller_tenant_id==seller_tenant_id,
+        ).with_for_update())
+        if payout and payout.status=='held' and payout.settlement_reference:
+            payout.status='eligible'; payout.eligible_at=datetime.now(timezone.utc)
+        self._event(seller_tenant_id,'marketplace.order.completed','marketplace_order',order.id,
+                    {'seller_order_id':so.id,'fulfillment_id':fulfillment.id,'method':'pickup'})
+        self.db.commit(); return order
+
     def cancel(self,buyer_user_id,order_id):
         o=self._order(buyer_user_id,order_id,lock=True)
         if o.status != 'pending_payment': raise MarketplaceError('paid or processing orders require dispute/refund workflow; direct cancellation is not allowed')
