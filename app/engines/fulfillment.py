@@ -66,6 +66,10 @@ class FulfillmentService:
         so = self._seller_order(seller_tenant_id, f.seller_order_id, True)
         if so.status not in {'processing','ready_for_fulfillment'}:
             raise FulfillmentError('seller order must be processing or ready_for_fulfillment for fulfillment transition')
+        if status == 'delivered' and f.method == 'pickup':
+            marketplace_order = self.db.scalar(select(MarketplaceOrder).where(MarketplaceOrder.id == so.marketplace_order_id, MarketplaceOrder.seller_tenant_id == seller_tenant_id))
+            if marketplace_order and marketplace_order.payment_method_code == 'cod':
+                raise FulfillmentError('COD pickup collection is not supported; use a shipment-based COD fulfillment')
         if status in {'picked_up','in_transit','out_for_delivery','delivered'} and f.method != 'pickup' and not f.shipment_id:
             raise FulfillmentError('shipment is required before physical delivery transition')
         if status == 'delivered' and f.method == 'pickup' and not note:
