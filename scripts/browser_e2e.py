@@ -28,6 +28,7 @@ window.__e2eSellerOrders=[];
 window.__e2ePackages=[];
 window.__e2eCODCollections=[];
 window.__e2eBuyerReturns=[];
+window.__e2eDisputes=[];
 window.__e2eReturns=[];
 (() => {
   const originalFetch = window.fetch.bind(window);
@@ -77,6 +78,8 @@ window.__e2eReturns=[];
     if (url.endsWith('/marketplace/buyer/checkout')) { window.__e2eCheckoutCalls += 1; window.__e2eLastCheckoutHeaders = Object.fromEntries(new Headers(options.headers||{}).entries()); window.__e2eLastCheckoutBody = JSON.parse(options.body||'{}'); if(window.__e2eLoseFirstCheckoutResponse){window.__e2eLoseFirstCheckoutResponse=false;return Promise.reject(new TypeError('simulated response loss after server acceptance'));} return json({orders:[{id:101,reference:'YEM-E2E-001',currency:'YER',total:'1500'}]}); }
     if (url.endsWith('/marketplace/buyer/customer-orders')) return json({items:[{id:700,reference:'YEM-E2E-001',status:'completed',currency:'YER',subtotal:'1500',shipping_fee:'250',total:'1750',created_at:'2026-11-09T00:00:00Z',seller_orders:[{id:701,seller_tenant_id:1,marketplace_order_id:101,reference:'YEM-E2E-001-S1',status:'fulfilled',subtotal:'1500',shipping_fee:'250',total:'1750',fulfillment:{id:801,method:'external_carrier',status:'delivered',shipment_id:901,carrier:'Yemen Local Delivery',shipment:{id:901,reference:'SHP-E2E-001',carrier:'Yemen Local Delivery',tracking_number:'TRK-E2E-BUYER',status:'delivered',destination:'Taiz'}}}]}]});
     if (url.endsWith('/marketplace/buyer/returns')) return json({items:window.__e2eBuyerReturns});
+    if (url.endsWith('/marketplace/platform/disputes')) return json({items:window.__e2eDisputes});
+    if (url.match(/\/marketplace\/platform\/disputes\/\d+\/resolve$/) && options.method==='POST') { const id=Number(url.match(/disputes\/(\d+)\/resolve$/)[1]); const body=JSON.parse(options.body||'{}'); const x=window.__e2eDisputes.find(d=>d.id===id); x.status=body.decision; x.resolution=body.resolution; return json({id,status:x.status,resolution:x.resolution}); }
     if (url.match(/\/marketplace\/buyer\/orders\/\d+\/returns$/) && options.method==='POST') { const id=Number(url.match(/orders\/(\d+)\/returns$/)[1]); const body=JSON.parse(options.body||'{}'); const item={id:window.__e2eBuyerReturns.length+1,order_id:id,reason:body.reason,description:body.description,status:'requested'}; window.__e2eBuyerReturns.push(item); return json(item,201); }
     if (url.endsWith('/marketplace/buyer/orders')) return json({items:[{id:101,reference:'YEM-E2E-001',seller_tenant_id:1,total:'1500',currency:'YER',status:'pending_payment',payment_reference:null}]});
     if (url.endsWith('/marketplace/buyer/orders')) return json({items:[{id:101,reference:'YEM-E2E-001',seller_tenant_id:1,total:'1500',currency:'YER',status:'pending_payment',payment_reference:null}]});
@@ -299,6 +302,17 @@ def run():
                     page.locator("button[data-buyer-return='101']").click()
                     page.wait_for_function("window.__e2eBuyerReturns.length===1")
                     assert page.evaluate("window.__e2eBuyerReturns[0].status") == "requested"
+                    page.evaluate("""window.__e2eDisputes=[{id:900,order_id:101,opened_by_user_id:'buyer-e2e',reason:'item_not_as_described',description:'Product differs from listing',status:'open',resolution:null}]""")
+                    page.locator("button[data-action='account']").click()
+                    page.locator("button[data-action='admin']").wait_for(state="visible", timeout=5000)
+                    page.locator("button[data-action='admin']").click()
+                    page.locator("button[data-ws='trust']").click()
+                    page.locator("button[data-dispute-resolve='900']").wait_for(state="visible", timeout=5000)
+                    page.locator("select[data-dispute-decision='900']").select_option("resolved")
+                    page.locator("textarea[data-dispute-resolution='900']").fill("تمت مراجعة الأدلة والتوصل إلى حل")
+                    page.locator("button[data-dispute-resolve='900']").click()
+                    page.wait_for_function("window.__e2eDisputes[0].status==='resolved'")
+                    assert page.evaluate("window.__e2eDisputes[0].resolution") == "تمت مراجعة الأدلة والتوصل إلى حل"
                 finally:
                     page.close()
         finally:
