@@ -32,7 +32,10 @@ def setup():
     m.moderate_listing(l.id, admin.id, 'approved'); m.publish_listing(seller.id, l.id)
     m.add_to_cart(buyer.id, l.id, 1); order = m.checkout(buyer.id, a.id, payment_method_code='cod')[0]
     so = db.scalar(select(MarketplaceSellerOrder).where(MarketplaceSellerOrder.marketplace_order_id == order.id))
-    so.status = 'processing'; db.commit()
+    order = m.mark_processing(seller.id, order.id)
+    db.refresh(so)
+    assert order.status == 'processing' and so.status == 'processing'
+    assert order.payment_reference is None
     fs = FulfillmentService(db); f = fs.create(seller.id, so.id, 'hussam_delivery'); fs.transition(seller.id, f.id, 'assigned'); fs.transition(seller.id, f.id, 'ready')
     f, shipment = fs.create_shipment(seller.id, f.id, 'Hussam Delivery', 'TRK-1')
     return db, fs, seller, f, shipment
