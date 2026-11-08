@@ -1,0 +1,94 @@
+name: Independent live readiness probe
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "23 6 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: independent-live-readiness-probe
+  cancel-in-progress: false
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Probe public service endpoints (read-only GET)
+        env:
+          PYTHONUNBUFFERED: "1"
+        run: |
+          python - <<'PY'
+          import datetime, json, urllib.error, urllib.request
+          from pathlib import Path
+
+          targets = [
+              ("hussam_backend_health", "https://hussam-ai-inference-bridge.onrender.com/health"),
+              ("hussam_portal", "https://hussam-ai-standalone-portal.onrender.com/hussam-ai/"),
+              ("yib_health", "https://yib-world-independent.onrender.com/health"),
+          ]
+          allowed_fields = {
+              "provider", "model", "modelConfigured", "liveModelVerified",
+              "providerConfigured", "credentialPresent", "truth", "auth",
+              "persistence", "freeTierGate", "paidOpenAIAllowed", "highRisk",
+              "status", "ok"
+          }
+          results = []
+          for name, url in targets:
+              item = {
+                  "target": name,
+                  "method": "GET",
+                  "url": url,
+                  "observed_at_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+              }
+              request = urllib.request.Request(
+                  url,
+                  headers={"User-Agent": "Hussam-ReadOnly-Readiness-Probe/1.0"},
+                  method="GET",
+              )
+              try:
+                  with urllib.request.urlopen(request, timeout=12) as response:
+                      raw = response.read(65536)
+                      item["http_status"] = response.status
+                      item["reachable"] = 200 <= response.status < 400
+                      item["content_type"] = response.headers.get("Content-Type", "").split(";")[0]
+                      if "json" in item["content_type"].lower():
+                          try:
+                              payload = json.loads(raw.decode("utf-8", errors="replace"))
+                              if isinstance(payload, dict):
+                                  item["safe_health_fields"] = {
+                                      k: payload[k] for k in allowed_fields if k in payload
+                                  }
+                          except (ValueError, UnicodeDecodeError):
+                              item["json_parse"] = "failed"
+              except urllib.error.HTTPError as exc:
+                  item["http_status"] = exc.code
+                  item["reachable"] = False
+                  item["error_class"] = "HTTPError"
+              except Exception as exc:
+                  item["reachable"] = False
+                  item["error_class"] = type(exc).__name__
+              results.append(item)
+
+          report = {
+              "schema": "hussam-live-readiness-probe/v1",
+              "generated_at_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+              "scope": "public HTTP GET only; no login, chat generation, database access, mutation, or secrets",
+              "results": results,
+          }
+          Path("live-readiness-report.json").write_text(
+              json.dumps(report, ensure_ascii=False, indent=2) + "\n",
+              encoding="utf-8",
+          )
+          print(json.dumps(report, ensure_ascii=False, indent=2))
+          PY
+      - name: Upload bounded readiness evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-readiness-report-${{ github.run_id }}
+          path: live-readiness-report.json
+          if-no-files-found: error
+          retention-days: 30
