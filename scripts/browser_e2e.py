@@ -24,6 +24,9 @@ window.__e2eInventoryRequests=[];
 window.__e2eWarehouses=[];
 window.__e2eInventoryMovements=[];
 window.__e2eCatalogItems=[];
+window.__e2eSellerOrders=[];
+window.__e2ePackages=[];
+window.__e2eCODCollections=[];
 (() => {
   const originalFetch = window.fetch.bind(window);
   const listing = {id: 1, title: 'E2E Phone', description: 'Browser journey product', unit_price: '1500', currency: 'YER', stock: null, seller: {tenant_id: 1, slug: 'e2e-store', display_name: 'E2E Store', description: 'Browser test store'}};
@@ -39,6 +42,13 @@ window.__e2eCatalogItems=[];
     if (url.endsWith('/marketplace/seller') && options.method==='POST') { window.__e2eSellerRegistered=true; window.__e2eSellerVerification='pending'; return json({tenant_id:1,slug:'taiz-market',display_name:'متجر تعز',status:'pending'},201); }
     if (url.endsWith('/marketplace/seller/verification') && options.method==='POST') { window.__e2eSellerVerification='pending'; return json({id:1,status:'pending'}); }
     if (url.endsWith('/marketplace/seller/center')) return json(window.__e2eSellerRegistered?{registered:true,seller:{tenant_id:1,slug:'taiz-market',display_name:'متجر تعز',status:window.__e2eSellerVerification==='approved'?'active':'pending',verification:window.__e2eSellerVerification},metrics:{listings_published:1,listings_total:1,orders_actionable:0,fulfillments_actionable:0,net:0,currency:'YER'},actions:[],recent_orders:[]}:{registered:false,actions:[],metrics:{}});
+    if (url.endsWith('/marketplace/seller/orders')) return json({items:window.__e2eSellerOrders});
+    if (url.endsWith('/marketplace/seller/orders/99/processing') && options.method==='POST') { window.__e2eSellerOrders[0].status='processing'; return json({id:99,status:'processing'}); }
+    if (url.endsWith('/marketplace/seller/orders/199/fulfillments') && options.method==='POST') { const body=JSON.parse(options.body||'{}'); Object.assign(window.__e2eSellerOrders[0],{fulfillment_id:701,fulfillment_status:'pending',fulfillment_method:body.method,shipment_id:null,carrier:null}); return json({id:701,seller_order_id:199,method:body.method,status:'pending'},201); }
+    if (url.endsWith('/marketplace/seller/fulfillments/701/transition') && options.method==='POST') { const body=JSON.parse(options.body||'{}'); window.__e2eSellerOrders[0].fulfillment_status=body.status; if(body.status==='delivered') window.__e2eSellerOrders[0].status='completed'; return json({id:701,status:body.status,shipment_id:window.__e2eSellerOrders[0].shipment_id}); }
+    if (url.endsWith('/marketplace/seller/fulfillments/701/packages') && options.method==='POST') { const body=JSON.parse(options.body||'{}'); window.__e2ePackages.push(body); return json({id:801,fulfillment_id:701,reference:body.reference,status:'packed'},201); }
+    if (url.endsWith('/marketplace/seller/fulfillments/701/shipment') && options.method==='POST') { const body=JSON.parse(options.body||'{}'); Object.assign(window.__e2eSellerOrders[0],{shipment_id:901,carrier:body.carrier,fulfillment_status:'ready'}); return json({fulfillment_id:701,shipment:{id:901,reference:'SHP-E2E',status:'ready',carrier:body.carrier,tracking_number:body.tracking_number}},201); }
+    if (url.endsWith('/marketplace/seller/fulfillments/701/cod-collection') && options.method==='POST') { const body=JSON.parse(options.body||'{}'); window.__e2eCODCollections.push(body); window.__e2eSellerOrders[0].cod_collection_id=1001; window.__e2eSellerOrders[0].cod_collection_status='collected'; return json({id:1001,shipment_id:901,reference:body.reference,amount:body.amount,currency:body.currency,status:'collected'},201); }
     if (url.endsWith('/inventory/items') && options.method==='POST') { const item=JSON.parse(options.body||'{}'); window.__e2eInventoryItems.push({...item,active:true}); return json(item,201); }
     if (url.includes('/warehouses') && String(options.method || 'GET').toUpperCase()==='POST') { const warehouse=JSON.parse(options.body||'{}'); window.__e2eWarehouses.push({...warehouse,active:true}); return json(warehouse,201); }
     if (url.endsWith('/inventory/movements') && options.method==='POST') { const movement=JSON.parse(options.body||'{}'); window.__e2eInventoryMovements.push({...movement,id:window.__e2eInventoryMovements.length+1}); return json({id:1,reference:movement.reference,direction:movement.direction,quantity:movement.quantity},201); }
@@ -158,6 +168,37 @@ def run():
                     page.locator("#catalogBundleForm input[name='listing_slug']").fill("basmati-rice-10kg")
                     page.locator("#catalogBundleForm button").click()
                     page.locator("small", has_text="basmati-rice-10kg").wait_for(state="visible", timeout=5000)
+                    page.evaluate("""window.__e2eSellerOrders=[{id:99,seller_order_id:199,reference:'ORD-E2E-001',buyer_user_id:'buyer-e2e',total:'2500',currency:'YER',status:'pending_payment',payment_method_code:'cod',sales_order_id:501,fulfillment_id:null,fulfillment_status:null,fulfillment_method:null,shipment_id:null,carrier:null,cod_collection_id:null,cod_collection_status:null}]""")
+                    page.locator("button[data-ws='orders']").click()
+                    page.locator("button[data-processing='99']").click()
+                    page.wait_for_function("window.__e2eSellerOrders[0].status === 'processing'")
+                    page.locator("button[data-create-fulfillment='199']").wait_for(state="visible", timeout=5000)
+                    page.locator("#fulfillment-method-99").select_option("external_carrier")
+                    page.locator("button[data-create-fulfillment='199']").click()
+                    page.locator("button[data-fulfillment-transition='701'][data-status='assigned']").wait_for(state="visible", timeout=5000)
+                    page.locator("button[data-fulfillment-transition='701'][data-status='assigned']").click()
+                    page.locator("button[data-fulfillment-transition='701'][data-status='ready']").wait_for(state="visible", timeout=5000)
+                    page.locator("input[data-package-ref='701']").fill("PKG-E2E-001")
+                    page.locator("button[data-create-package='701']").click()
+                    page.locator("button[data-fulfillment-transition='701'][data-status='ready']").wait_for(state="visible", timeout=5000)
+                    page.locator("button[data-fulfillment-transition='701'][data-status='ready']").click()
+                    page.locator("input[data-carrier='701']").fill("Yemen Local Delivery")
+                    page.locator("input[data-tracking='701']").fill("TRK-E2E-001")
+                    page.locator("button[data-create-shipment='701']").click()
+                    page.locator("button[data-fulfillment-transition='701'][data-status='picked_up']").wait_for(state="visible", timeout=5000)
+                    page.locator("button[data-fulfillment-transition='701'][data-status='picked_up']").click()
+                    page.locator("button[data-fulfillment-transition='701'][data-status='in_transit']").wait_for(state="visible", timeout=5000)
+                    page.locator("button[data-fulfillment-transition='701'][data-status='in_transit']").click()
+                    page.locator("button[data-fulfillment-transition='701'][data-status='out_for_delivery']").wait_for(state="visible", timeout=5000)
+                    page.locator("button[data-fulfillment-transition='701'][data-status='out_for_delivery']").click()
+                    page.locator("button[data-fulfillment-transition='701'][data-status='delivered']").wait_for(state="visible", timeout=5000)
+                    page.locator("button[data-fulfillment-transition='701'][data-status='delivered']").click()
+                    page.locator("button[data-collect-cod='701']").wait_for(state="visible", timeout=5000)
+                    page.locator("input[data-cod-ref='701']").fill("COD-E2E-001")
+                    page.locator("button[data-collect-cod='701']").click()
+                    page.wait_for_function("window.__e2eSellerOrders[0].cod_collection_status === 'collected'")
+                    assert page.evaluate("window.__e2ePackages.length") == 1
+                    assert page.evaluate("window.__e2eCODCollections[0].amount") == "2500"
                     page.locator("button[data-action='home']").click()
                     page.wait_for_timeout(100)
                     page.locator("button[data-add='1']").first.click()
