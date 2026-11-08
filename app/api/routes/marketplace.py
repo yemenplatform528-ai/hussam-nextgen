@@ -1,4 +1,5 @@
 from decimal import Decimal
+from typing import Literal
 from datetime import date
 import hashlib
 import json
@@ -24,7 +25,7 @@ class SellerIn(BaseModel):
     slug:str=Field(min_length=2,max_length=120)
     display_name:str=Field(min_length=2,max_length=200)
     description:str=Field(default='',max_length=2000)
-    seller_type:str=Field(default='business',pattern='^(business|individual|institution)')
+    seller_type:Literal['business','individual','institution']='business'
 class VerificationSubmissionIn(BaseModel): notes:str=Field(default='',max_length=4000)
 class CategoryIn(BaseModel): slug:str; name:str; parent_id:int|None=None; market_id:int|None=None
 class ListingIn(BaseModel):
