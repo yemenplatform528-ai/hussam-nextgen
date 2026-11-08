@@ -128,7 +128,8 @@ def run():
                     page.locator("#inventoryWarehouseForm input[name='id']").fill("main-warehouse")
                     page.locator("#inventoryWarehouseForm input[name='name']").fill("المستودع الرئيسي")
                     page.locator("#inventoryWarehouseForm button").click()
-                    page.wait_for_function("window.__e2eWarehouses.some(x => x.id === 'main-warehouse')", timeout=5000)
+                    page.wait_for_timeout(250)
+                    assert page.evaluate("window.__e2eWarehouses.some(x => x.id === 'main-warehouse')"), f"warehouse POST was not mocked; requests={page.evaluate('window.__e2eInventoryRequests')}"
                     page.wait_for_timeout(500)
                     page.wait_for_function("window.__e2eWarehouses.length === 1", timeout=5000)
                     assert page.evaluate("window.__e2eWarehouses[0].id") == "main-warehouse"
