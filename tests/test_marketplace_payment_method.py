@@ -4,8 +4,10 @@ import pytest
 from sqlalchemy import select
 
 from app.core.models.market import PaymentMethodCatalogEntry
-from app.core.models.marketplace import MarketplaceCustomerOrder
+from app.core.models.marketplace import MarketplaceCustomerOrder, MarketplacePayout
 from app.engines.marketplace import MarketplaceError
+from app.api.routes.marketplace import CheckoutIn
+from pydantic import ValidationError
 from tests.test_marketplace_completion import setup
 
 
@@ -43,6 +45,45 @@ def test_cod_selection_is_persisted_without_creating_provider_payment():
     assert customer_order.payment_method_code == "cod"
     assert order.payment_reference is None
 
+
+
+
+def test_public_checkout_contract_requires_explicit_payment_method():
+    with pytest.raises(ValidationError):
+        CheckoutIn()
+
+def test_cod_order_enters_processing_without_fabricating_payment():
+    db, seller, buyer, seller_user, listing, address, service = setup()
+    _add_payment_methods(db, address.market_id)
+    service.add_to_cart(buyer.id, listing.id, 1)
+    order = service.checkout(
+        buyer.id, address.id, Decimal("0"), None, None, None,
+        payment_method_code="cod",
+    )[0]
+
+    with pytest.raises(MarketplaceError, match="COD orders cannot create electronic payment intents"):
+        service.attach_payment_intent(buyer.id, order.id, "not-a-provider")
+    with pytest.raises(MarketplaceError, match="COD orders cannot be marked paid"):
+        service.mark_paid(seller.id, order.id, "not-a-provider")
+    with pytest.raises(MarketplaceError, match="COD orders do not create electronic payment sessions"):
+        service.create_payment_session(buyer.id, order.customer_order_id, "not-a-provider")
+
+    processing = service.mark_processing(seller.id, order.id)
+    payout = db.scalar(select(MarketplacePayout).where(MarketplacePayout.marketplace_order_id == order.id))
+
+    assert processing.status == "processing"
+    assert processing.payment_reference is None
+    assert processing.payment_method_code == "cod"
+    assert payout.status == "held"
+
+
+def test_unpaid_non_cod_order_cannot_enter_processing():
+    db, seller, buyer, seller_user, listing, address, service = setup()
+    service.add_to_cart(buyer.id, listing.id, 1)
+    order = service.checkout(buyer.id, address.id)[0]
+
+    with pytest.raises(MarketplaceError, match="captured-payment or COD"):
+        service.mark_processing(seller.id, order.id)
 
 def test_checkout_rejects_payment_method_not_active_in_market():
     db, seller, buyer, seller_user, listing, address, service = setup()

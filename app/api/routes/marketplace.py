@@ -13,6 +13,7 @@ from app.engines.marketplace import MarketplaceService, ListingInput
 from app.engines.catalog import CatalogService, CatalogError, ProductInput, SKUInput, OfferInput
 from app.engines.payments import PaymentProductionService
 from app.engines.fulfillment import FulfillmentService, FulfillmentError
+from app.engines.logistics import LogisticsProductionService
 
 router=APIRouter(prefix='/marketplace',tags=['marketplace'])
 
@@ -32,12 +33,13 @@ class AddressIn(BaseModel):
     geo_lat:Decimal|None=Field(default=None,ge=-90,le=90); geo_lng:Decimal|None=Field(default=None,ge=-180,le=180)
     address_confidence:str='low'; delivery_instructions:str|None=None
 class CartIn(BaseModel): listing_id:int; quantity:Decimal=Field(gt=0)
-class CheckoutIn(BaseModel): shipping_address_id:int|None=None; shipping_fee:Decimal=Field(default=Decimal('0'),ge=0); shipping_quote_id:int|None=None; shipping_quote_ids:list[int]=Field(default_factory=list, max_length=50); market_id:int|None=None; payment_method_code:str|None=None
+class CheckoutIn(BaseModel): shipping_address_id:int|None=None; shipping_fee:Decimal=Field(default=Decimal('0'),ge=0); shipping_quote_id:int|None=None; shipping_quote_ids:list[int]=Field(default_factory=list, max_length=50); market_id:int|None=None; payment_method_code:str=Field(min_length=1,max_length=80)
 class ReviewIn(BaseModel): listing_id:int; rating:int=Field(ge=1,le=5); title:str=''; body:str=''
 class DisputeIn(BaseModel): reason:str; description:str
 class PaymentIn(BaseModel): provider:str=Field(min_length=1,max_length=80)
 class PaymentCaptureIn(BaseModel): provider_payment_id:str=Field(min_length=1,max_length=255)
 class PayoutIn(BaseModel): external_reference:str=Field(min_length=1,max_length=255)
+class CODCollectionIn(BaseModel): reference:str=Field(min_length=1,max_length=255); amount:Decimal=Field(gt=0); currency:str=Field(min_length=3,max_length=10)
 class FeeRuleIn(BaseModel):
     name:str=Field(min_length=1,max_length=160); scope:str='global'; seller_tenant_id:int|None=None; category_id:int|None=None
     commission_bps:int=Field(ge=0,le=3000); fixed_fee:Decimal=Field(default=Decimal('0'),ge=0); currency:str|None=None; priority:int=Field(default=100,ge=0); active:bool=True
@@ -347,6 +349,19 @@ def create_package(fulfillment_id:int,body:PackageIn,ctx=Depends(get_context),db
 @router.post('/seller/fulfillments/{fulfillment_id}/shipment', status_code=201)
 def create_fulfillment_shipment(fulfillment_id:int,body:ShipmentForFulfillmentIn,ctx=Depends(get_context),db=Depends(get_session)):
     seller_guard(ctx); f,s=FulfillmentService(db).create_shipment(ctx.tenant_id,fulfillment_id,body.carrier,body.tracking_number); return {'fulfillment_id':f.id,'shipment':{'id':s.id,'reference':s.reference,'status':s.status,'tracking_number':s.tracking_number,'carrier':s.carrier}}
+
+@router.post('/seller/fulfillments/{fulfillment_id}/cod-collection', status_code=201)
+def collect_fulfillment_cod(fulfillment_id:int,body:CODCollectionIn,ctx=Depends(get_context),db=Depends(get_session)):
+    seller_guard(ctx)
+    fulfillment=FulfillmentService(db)._fulfillment(ctx.tenant_id,fulfillment_id)
+    if not fulfillment.shipment_id:
+        raise HTTPException(status_code=409, detail='fulfillment has no shipment for COD collection')
+    collection=LogisticsProductionService(db).create_cod_collection(
+        ctx.tenant_id,fulfillment.shipment_id,reference=body.reference,
+        amount=body.amount,currency=body.currency.upper(),
+    )
+    return {'id':collection.id,'shipment_id':collection.shipment_id,'reference':collection.reference,'amount':str(collection.amount),'currency':collection.currency,'status':collection.status,'collected_at':collection.collected_at.isoformat() if collection.collected_at else None}
+
 
 @router.get('/seller/fulfillments/{fulfillment_id}')
 def seller_fulfillment(fulfillment_id:int,ctx=Depends(get_context),db=Depends(get_session)):

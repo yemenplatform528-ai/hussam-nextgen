@@ -117,10 +117,13 @@ class LogisticsProductionService:
         if s.status != 'delivered': raise LogisticsError('COD can only be collected after delivery')
         if amount != Decimal(str(s.cod_amount)) or currency != s.currency:
             raise LogisticsError('collection amount/currency must match COD')
+        existing = self.db.scalar(select(ShipmentCollection).where(ShipmentCollection.tenant_id == tenant_id, ShipmentCollection.shipment_id == shipment_id).with_for_update())
+        if existing:
+            if existing.reference == reference and Decimal(str(existing.amount)) == amount and existing.currency == currency and existing.status == 'collected':
+                return existing
+            raise LogisticsError('shipment COD collection already exists with different collection details')
         if self.db.scalar(select(ShipmentCollection).where(ShipmentCollection.tenant_id == tenant_id, ShipmentCollection.reference == reference)):
             raise LogisticsError('duplicate collection reference')
-        if self.db.scalar(select(ShipmentCollection).where(ShipmentCollection.tenant_id == tenant_id, ShipmentCollection.shipment_id == shipment_id)):
-            raise LogisticsError('shipment COD collection already exists')
         c = ShipmentCollection(tenant_id=tenant_id, shipment_id=shipment_id, reference=reference,
                                amount=amount, currency=currency, status='collected', collected_at=datetime.now(timezone.utc))
         self.db.add(c); self.db.flush()
@@ -129,4 +132,13 @@ class LogisticsProductionService:
         try:
             self.db.commit(); self.db.refresh(c); return c
         except IntegrityError:
-            self.db.rollback(); raise LogisticsError('duplicate COD collection')
+            self.db.rollback()
+            existing = self.db.scalar(select(ShipmentCollection).where(
+                ShipmentCollection.tenant_id == tenant_id,
+                ShipmentCollection.shipment_id == shipment_id,
+            ))
+            if (existing and existing.reference == reference and
+                    Decimal(str(existing.amount)) == amount and
+                    existing.currency == currency and existing.status == 'collected'):
+                return existing
+            raise LogisticsError('duplicate COD collection')

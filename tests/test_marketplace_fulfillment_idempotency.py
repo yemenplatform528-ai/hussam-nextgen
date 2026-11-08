@@ -4,7 +4,7 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 from app.core.persistence import Base
 from app.core.contracts import StockMovement
-from app.core.models.marketplace import MarketplaceSellerOrder, MarketplaceFulfillment
+from app.core.models.marketplace import MarketplaceSellerOrder, MarketplaceFulfillment, MarketplaceOrder, MarketplacePayout
 from app.core.models.market import PaymentMethodCatalogEntry
 from app.core.models.logistics import ShipmentCollection
 from app.core.models.logistics import ShipmentEvent
@@ -32,7 +32,10 @@ def setup():
     m.moderate_listing(l.id, admin.id, 'approved'); m.publish_listing(seller.id, l.id)
     m.add_to_cart(buyer.id, l.id, 1); order = m.checkout(buyer.id, a.id, payment_method_code='cod')[0]
     so = db.scalar(select(MarketplaceSellerOrder).where(MarketplaceSellerOrder.marketplace_order_id == order.id))
-    so.status = 'processing'; db.commit()
+    order = m.mark_processing(seller.id, order.id)
+    db.refresh(so)
+    assert order.status == 'processing' and so.status == 'processing'
+    assert order.payment_reference is None
     fs = FulfillmentService(db); f = fs.create(seller.id, so.id, 'hussam_delivery'); fs.transition(seller.id, f.id, 'assigned'); fs.transition(seller.id, f.id, 'ready')
     f, shipment = fs.create_shipment(seller.id, f.id, 'Hussam Delivery', 'TRK-1')
     return db, fs, seller, f, shipment
@@ -61,9 +64,21 @@ def test_cod_selection_becomes_shipment_collection_amount():
     fs.transition(seller.id, f.id, 'in_transit', event_id='cod-transit')
     fs.transition(seller.id, f.id, 'out_for_delivery', event_id='cod-out')
     fs.transition(seller.id, f.id, 'delivered', event_id='cod-delivered')
+    seller_order = db.get(MarketplaceSellerOrder, f.seller_order_id)
+    order = db.get(MarketplaceOrder, seller_order.marketplace_order_id)
+    marketplace = MarketplaceService(db)
+    marketplace.mark_shipped(seller.id, order.id, shipment.id)
+    marketplace.mark_delivered(seller.id, order.id, shipment.id)
     from app.engines.logistics import LogisticsProductionService
     collected = LogisticsProductionService(db).create_cod_collection(
         seller.id, shipment.id, reference='COD-COL-1', amount=Decimal('1000'), currency='YER'
     )
     assert collected.status == 'collected'
     assert collected.amount == Decimal('1000.0000')
+    replay = LogisticsProductionService(db).create_cod_collection(
+        seller.id, shipment.id, reference='COD-COL-1', amount=Decimal('1000'), currency='YER'
+    )
+    assert replay.id == collected.id
+    payout = db.scalar(select(MarketplacePayout).where(MarketplacePayout.marketplace_order_id == order.id))
+    assert order.status == 'completed'
+    assert payout.status == 'held'
