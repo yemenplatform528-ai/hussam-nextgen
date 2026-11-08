@@ -45,6 +45,7 @@ def test_pickup_delivery_completes_marketplace_order_idempotently():
     fs.transition(seller.id,f.id,'assigned')
     fs.transition(seller.id,f.id,'ready')
     fs.transition(seller.id,f.id,'delivered',event_id='pickup-delivered-1',note='Collected by buyer')
+    fs.transition(seller.id,f.id,'delivered',event_id='pickup-delivered-1',note='Collected by buyer')
     completed=m.mark_pickup_delivered(seller.id,so.id)
     assert completed.status=='completed'
     assert db.get(MarketplaceSellerOrder,so.id).status=='fulfilled'
