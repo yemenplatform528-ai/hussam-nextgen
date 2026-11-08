@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import desc, select, func
 from app.api.dependencies import get_context, get_session
 from app.core.models.core import MutationRecord
-from app.core.models.marketplace import MarketplaceSellerProfile, MarketplaceOfferCompetition, MarketplaceCategory, MarketplaceListing, MarketplaceOrder, MarketplaceOrderLine, MarketplacePayout, MarketplaceReview, MarketplaceDispute, MarketplaceAddress, MarketplaceSellerVerification, MarketplaceReturnRequest, MarketplaceReturnLine, MarketplaceFeeRule, MarketplaceCart, MarketplaceSellerOrder, MarketplaceFulfillment
+from app.core.models.marketplace import MarketplaceSellerProfile, MarketplaceOfferCompetition, MarketplaceCategory, MarketplaceListing, MarketplaceOrder, MarketplaceOrderLine, MarketplacePayout, MarketplaceReview, MarketplaceDispute, MarketplaceAddress, MarketplaceSellerVerification, MarketplaceReturnRequest, MarketplaceReturnLine, MarketplaceFeeRule, MarketplaceCart, MarketplaceSellerOrder, MarketplaceFulfillment, MarketplaceSellerBalanceEntry
 from app.core.models.payments import PaymentIntent
 from app.core.models.logistics import ShipmentCollection
 from app.engines.marketplace import MarketplaceService, ListingInput
@@ -420,9 +420,25 @@ def seller_orders(ctx=Depends(get_context),db=Depends(get_session)):
 def settlement_link(order_id:int, settlement_reference:str,ctx=Depends(get_context),db=Depends(get_session)):
     seller_guard(ctx); x=MarketplaceService(db).settle_order_payment(ctx.tenant_id,order_id,settlement_reference); return {'id':x.id,'status':x.status,'payment_reference':x.payment_reference,'settlement_reference':x.settlement_reference}
 
+@router.post('/seller/orders/{order_id}/payout-request')
+def payout_request(order_id:int,ctx=Depends(get_context),db=Depends(get_session)):
+    seller_guard(ctx); x=MarketplaceService(db).request_payout(ctx.tenant_id,order_id)
+    return {'id':x.id,'order_id':x.marketplace_order_id,'status':x.status,'payout_reference':x.payout_reference,'provider':x.payout_provider,'destination_reference':x.payout_destination_reference,'net_amount':str(x.net_amount),'currency':x.currency}
+
 @router.post('/seller/orders/{order_id}/payout-paid')
 def payout_paid(order_id:int,body:PayoutIn,ctx=Depends(get_context),db=Depends(get_session)):
     seller_guard(ctx); x=MarketplaceService(db).mark_payout_paid(ctx.tenant_id,order_id,body.external_reference); return {'id':x.id,'status':x.status,'net_amount':str(x.net_amount),'currency':x.currency}
+
+@router.get('/seller/balances')
+def seller_balances(ctx=Depends(get_context),db=Depends(get_session)):
+    seller_guard(ctx)
+    rows=db.scalars(select(MarketplaceSellerBalanceEntry).where(MarketplaceSellerBalanceEntry.seller_tenant_id==ctx.tenant_id).order_by(MarketplaceSellerBalanceEntry.market_id,MarketplaceSellerBalanceEntry.currency,MarketplaceSellerBalanceEntry.id)).all()
+    totals={}
+    for entry in rows:
+        key=(entry.market_id,entry.currency)
+        signed=Decimal(str(entry.amount)) if entry.entry_type=='credit' else -Decimal(str(entry.amount))
+        totals[key]=totals.get(key,Decimal('0'))+signed
+    return {'items':[{'market_id':market_id,'currency':currency,'available_balance':str(amount)} for (market_id,currency),amount in sorted(totals.items())]}
 
 @router.get('/seller/statement')
 def seller_statement(market_id:int, currency:str, from_at:str|None=None, to_at:str|None=None, ctx=Depends(get_context),db=Depends(get_session)):
@@ -436,7 +452,7 @@ def seller_statement(market_id:int, currency:str, from_at:str|None=None, to_at:s
 
 @router.get('/seller/payouts')
 def seller_payouts(ctx=Depends(get_context),db=Depends(get_session)):
-    seller_guard(ctx); rows=db.scalars(select(MarketplacePayout).where(MarketplacePayout.seller_tenant_id==ctx.tenant_id).order_by(desc(MarketplacePayout.id))).all(); return {'items':[{'id':x.id,'order_id':x.marketplace_order_id,'reference':x.reference,'gross_amount':str(x.gross_amount),'platform_fee':str(x.platform_fee),'net_amount':str(x.net_amount),'currency':x.currency,'status':x.status,'eligible_at':x.eligible_at.isoformat() if x.eligible_at else None,'paid_at':x.paid_at.isoformat() if x.paid_at else None} for x in rows]}
+    seller_guard(ctx); rows=db.scalars(select(MarketplacePayout).where(MarketplacePayout.seller_tenant_id==ctx.tenant_id).order_by(desc(MarketplacePayout.id))).all(); return {'items':[{'id':x.id,'order_id':x.marketplace_order_id,'reference':x.reference,'gross_amount':str(x.gross_amount),'platform_fee':str(x.platform_fee),'net_amount':str(x.net_amount),'currency':x.currency,'status':x.status,'payout_reference':x.payout_reference,'payout_provider':x.payout_provider,'payout_destination_reference':x.payout_destination_reference,'external_reference':x.external_reference,'settlement_reference':x.settlement_reference,'eligible_at':x.eligible_at.isoformat() if x.eligible_at else None,'requested_at':x.requested_at.isoformat() if x.requested_at else None,'paid_at':x.paid_at.isoformat() if x.paid_at else None} for x in rows]}
 
 @router.post('/buyer/reviews',status_code=201)
 def review(body:ReviewIn,order_id:int,ctx=Depends(get_context),db=Depends(get_session)):
@@ -607,7 +623,7 @@ def buyer_dispute(dispute_id:int,ctx=Depends(get_context),db=Depends(get_session
 def seller_returns(ctx=Depends(get_context),db=Depends(get_session)):
     seller_guard(ctx)
     rows=db.scalars(select(MarketplaceReturnRequest).join(MarketplaceOrder,MarketplaceOrder.id==MarketplaceReturnRequest.marketplace_order_id).where(MarketplaceOrder.seller_tenant_id==ctx.tenant_id).order_by(desc(MarketplaceReturnRequest.id))).all()
-    return {'items':[{'id':x.id,'order_id':x.marketplace_order_id,'reason':x.reason,'description':x.description,'status':x.status,'refund_amount':str(x.refund_amount) if x.refund_amount is not None else None,'refund_currency':x.refund_currency,'refund_reference':x.refund_reference,'refund_scope':x.refund_scope} for x in rows]}
+    return {'items':[{'id':x.id,'order_id':x.marketplace_order_id,'reason':x.reason,'description':x.description,'status':x.status,'refund_amount':str(x.refund_amount) if x.refund_amount is not None else None,'refund_currency':x.refund_currency,'refund_reference':x.refund_reference,'refund_scope':x.refund_scope,'created_at':x.created_at.isoformat(),'resolved_at':x.resolved_at.isoformat() if x.resolved_at else None} for x in rows]}
 
 @router.post('/seller/returns/{return_id}/review')
 def seller_review_return(return_id:int,body:ReturnReviewIn,ctx=Depends(get_context),db=Depends(get_session)):
