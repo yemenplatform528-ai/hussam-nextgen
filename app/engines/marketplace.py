@@ -242,6 +242,12 @@ class MarketplaceService:
 
     def register_seller(self, tenant_id:int, slug:str, display_name:str, description:str='', seller_type:str='business'):
         if not slug or not display_name: raise MarketplaceError('seller slug and display name are required')
+        slug = slug.strip()
+        if (len(slug) < 2 or len(slug) > 120 or not slug.isascii() or slug.lower() != slug
+                or not slug[0].isalnum() or any(not (char.isalnum() or char == '-') for char in slug)):
+            raise MarketplaceError('seller slug must use lowercase ASCII letters, numbers, and hyphens')
+        if seller_type not in {'business', 'individual', 'institution'}:
+            raise MarketplaceError('invalid seller type')
         tenant=self.db.scalar(select(Tenant).where(Tenant.id==tenant_id,Tenant.status=='active'))
         if not tenant: raise MarketplaceError('active tenant required')
         if self.db.scalar(select(MarketplaceSellerProfile).where(MarketplaceSellerProfile.tenant_id==tenant_id)): raise MarketplaceError('seller profile already exists')
