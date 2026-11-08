@@ -54,6 +54,8 @@ class FulfillmentService:
     def transition(self, seller_tenant_id, fulfillment_id, status, event_id=None, location=None, note=None):
         if status not in _ALLOWED: raise FulfillmentError('unsupported fulfillment status')
         f = self._fulfillment(seller_tenant_id, fulfillment_id, True)
+        if f.method == 'pickup' and status == f.status:
+            return f
         if event_id is None: event_id = f'FUL:{f.id}:{status}:{uuid4().hex[:12]}'
         # The logistics layer owns physical shipment state and event idempotency.
         # Fulfillment mirrors it; it must never create a second shipment event for
@@ -66,6 +68,10 @@ class FulfillmentService:
         so = self._seller_order(seller_tenant_id, f.seller_order_id, True)
         if so.status not in {'processing','ready_for_fulfillment'}:
             raise FulfillmentError('seller order must be processing or ready_for_fulfillment for fulfillment transition')
+        if status == 'delivered' and f.method == 'pickup':
+            marketplace_order = self.db.scalar(select(MarketplaceOrder).where(MarketplaceOrder.id == so.marketplace_order_id, MarketplaceOrder.seller_tenant_id == seller_tenant_id))
+            if marketplace_order and marketplace_order.payment_method_code == 'cod':
+                raise FulfillmentError('COD pickup collection is not supported; use a shipment-based COD fulfillment')
         if status in {'picked_up','in_transit','out_for_delivery','delivered'} and f.method != 'pickup' and not f.shipment_id:
             raise FulfillmentError('shipment is required before physical delivery transition')
         if status == 'delivered' and f.method == 'pickup' and not note:

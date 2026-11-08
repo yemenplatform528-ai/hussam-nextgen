@@ -357,7 +357,25 @@ def create_fulfillment(seller_order_id:int,body:FulfillmentIn,ctx=Depends(get_co
 
 @router.post('/seller/fulfillments/{fulfillment_id}/transition')
 def transition_fulfillment(fulfillment_id:int,body:FulfillmentTransitionIn,ctx=Depends(get_context),db=Depends(get_session)):
-    seller_guard(ctx); f=FulfillmentService(db).transition(ctx.tenant_id,fulfillment_id,body.status,body.event_id,body.location,body.note); return {'id':f.id,'status':f.status,'shipment_id':f.shipment_id}
+    seller_guard(ctx)
+    f=FulfillmentService(db).transition(ctx.tenant_id,fulfillment_id,body.status,body.event_id or f'seller-ui:{ctx.tenant_id}:{fulfillment_id}:{body.status}',body.location,body.note)
+    marketplace=MarketplaceService(db)
+    if f.shipment_id:
+        seller_order=db.scalar(select(MarketplaceSellerOrder).where(MarketplaceSellerOrder.id==f.seller_order_id,MarketplaceSellerOrder.seller_tenant_id==ctx.tenant_id))
+        if seller_order:
+            order=db.get(MarketplaceOrder,seller_order.marketplace_order_id)
+            if body.status in {'picked_up','in_transit','out_for_delivery'} and order and order.status in {'paid','processing'}:
+                marketplace.mark_shipped(ctx.tenant_id,order.id,f.shipment_id)
+            if body.status=='delivered':
+                order=db.get(MarketplaceOrder,seller_order.marketplace_order_id)
+                if order and order.status in {'paid','processing'}:
+                    marketplace.mark_shipped(ctx.tenant_id,order.id,f.shipment_id)
+                    order=db.get(MarketplaceOrder,seller_order.marketplace_order_id)
+                if order and order.status in {'shipped','delivered'}:
+                    marketplace.mark_delivered(ctx.tenant_id,seller_order.marketplace_order_id,f.shipment_id)
+    elif body.status=='delivered' and f.method=='pickup':
+        marketplace.mark_pickup_delivered(ctx.tenant_id,f.seller_order_id)
+    return {'id':f.id,'status':f.status,'shipment_id':f.shipment_id}
 
 @router.post('/seller/fulfillments/{fulfillment_id}/packages', status_code=201)
 def create_package(fulfillment_id:int,body:PackageIn,ctx=Depends(get_context),db=Depends(get_session)):
