@@ -1500,6 +1500,7 @@ class MarketplaceService:
             raise MarketplaceError('completed pickup fulfillment is required')
         if so.status!='fulfilled': raise MarketplaceError('seller order is not fulfilled')
         order=self._order(None,so.marketplace_order_id,seller_tenant_id,True)
+        if order.status=='completed': return order
         if order.status not in {'paid','processing'}:
             raise MarketplaceError('marketplace order cannot complete from current status')
         order.status='completed'; order.updated_at=datetime.now(timezone.utc)
