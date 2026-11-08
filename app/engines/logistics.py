@@ -132,4 +132,13 @@ class LogisticsProductionService:
         try:
             self.db.commit(); self.db.refresh(c); return c
         except IntegrityError:
-            self.db.rollback(); raise LogisticsError('duplicate COD collection')
+            self.db.rollback()
+            existing = self.db.scalar(select(ShipmentCollection).where(
+                ShipmentCollection.tenant_id == tenant_id,
+                ShipmentCollection.shipment_id == shipment_id,
+            ))
+            if (existing and existing.reference == reference and
+                    Decimal(str(existing.amount)) == amount and
+                    existing.currency == currency and existing.status == 'collected'):
+                return existing
+            raise LogisticsError('duplicate COD collection')
