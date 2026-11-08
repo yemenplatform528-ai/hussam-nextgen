@@ -127,6 +127,7 @@ def run():
                     page.locator("#inventoryWarehouseForm input[name='name']").fill("المستودع الرئيسي")
                     page.locator("#inventoryWarehouseForm button").click()
                     page.locator("#inventoryMovementForm select[name='item_id'] option[value='rice-10kg']").wait_for(state="attached", timeout=5000)
+                    page.locator("#inventoryMovementForm select[name='warehouse_id'] option[value='main-warehouse']").wait_for(state="attached", timeout=5000)
                     page.locator("#inventoryMovementForm select[name='item_id']").select_option("rice-10kg")
                     page.locator("#inventoryMovementForm select[name='warehouse_id']").select_option("main-warehouse")
                     page.locator("#inventoryMovementForm input[name='quantity']").fill("50")
