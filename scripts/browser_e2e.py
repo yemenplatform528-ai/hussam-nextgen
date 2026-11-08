@@ -19,6 +19,10 @@ window.__e2eLastCartMutationHeaders=null;
 window.__e2eOfflineReads=false;
 window.__e2eCheckoutContextUrl='';
 window.__e2eAddresses=[];
+window.__e2eInventoryItems=[];
+window.__e2eWarehouses=[];
+window.__e2eInventoryMovements=[];
+window.__e2eCatalogItems=[];
 (() => {
   const originalFetch = window.fetch.bind(window);
   const listing = {id: 1, title: 'E2E Phone', description: 'Browser journey product', unit_price: '1500', currency: 'YER', stock: null, seller: {tenant_id: 1, slug: 'e2e-store', display_name: 'E2E Store', description: 'Browser test store'}};
@@ -33,7 +37,15 @@ window.__e2eAddresses=[];
     if (url.endsWith('/marketplace/seller') && options.method==='POST') { window.__e2eSellerRegistered=true; window.__e2eSellerVerification='pending'; return json({tenant_id:1,slug:'taiz-market',display_name:'متجر تعز',status:'pending'},201); }
     if (url.endsWith('/marketplace/seller/verification') && options.method==='POST') { window.__e2eSellerVerification='pending'; return json({id:1,status:'pending'}); }
     if (url.endsWith('/marketplace/seller/center')) return json(window.__e2eSellerRegistered?{registered:true,seller:{tenant_id:1,slug:'taiz-market',display_name:'متجر تعز',status:window.__e2eSellerVerification==='approved'?'active':'pending',verification:window.__e2eSellerVerification},metrics:{listings_published:1,listings_total:1,orders_actionable:0,fulfillments_actionable:0,net:0,currency:'YER'},actions:[],recent_orders:[]}:{registered:false,actions:[],metrics:{}});
-    if (url.endsWith('/marketplace/seller/catalog')) return json({items:[]});
+    if (url.endsWith('/inventory/items') && options.method==='POST') { const item=JSON.parse(options.body||'{}'); window.__e2eInventoryItems.push({...item,active:true}); return json(item,201); }
+    if (url.endsWith('/inventory/warehouses') && options.method==='POST') { const warehouse=JSON.parse(options.body||'{}'); window.__e2eWarehouses.push({...warehouse,active:true}); return json(warehouse,201); }
+    if (url.endsWith('/inventory/movements') && options.method==='POST') { const movement=JSON.parse(options.body||'{}'); window.__e2eInventoryMovements.push({...movement,id:window.__e2eInventoryMovements.length+1}); return json({id:1,reference:movement.reference,direction:movement.direction,quantity:movement.quantity},201); }
+    if (url.endsWith('/inventory/movements')) return json({items:window.__e2eInventoryMovements});
+    if (url.includes('/inventory/stock/')) return json({item_id:'rice-10kg',warehouse_id:'main-warehouse',on_hand:'50',reserved:'0',available:'50'});
+    if (url.endsWith('/products')) return json({items:window.__e2eInventoryItems,limit:50,offset:0});
+    if (url.endsWith('/warehouses')) return json({items:window.__e2eWarehouses,limit:50,offset:0});
+    if (url.endsWith('/marketplace/seller/catalog/bundle') && options.method==='POST') { const body=JSON.parse(options.body||'{}'); window.__e2eCatalogItems.push({name:body.product.name,slug:body.product.slug,skus:[{sku_code:body.sku.sku_code,offer:{unit_price:body.offer.unit_price,currency:body.offer.currency,status:'active'},listing:{slug:body.listing_slug,status:'draft'}}]}); return json({product:{id:1,slug:body.product.slug,name:body.product.name},sku:{id:1,sku_code:body.sku.sku_code},offer:{id:1,currency:body.offer.currency,unit_price:body.offer.unit_price},listing:{id:1,slug:body.listing_slug,status:'draft',moderation_status:'pending'}},201); }
+    if (url.endsWith('/marketplace/seller/catalog')) return json({items:window.__e2eCatalogItems});
     if (url.endsWith('/marketplace/buyer/cart')) return json({id:1,status:'active',market_id:1,market_code:'YEM',items:[{id:1,quantity:'1',line_total:'1500',listing}]});
     if (url.endsWith('/marketplace/buyer/cart/items')) { window.__e2eCartMutationCalls += 1; window.__e2eLastCartMutationHeaders = Object.fromEntries(new Headers(options.headers||{}).entries()); return json({id:1,status:'active',market_id:1,market_code:'YEM',items:[{id:1,quantity:'1',line_total:'1500',listing}]}); }
     if (url.includes('/marketplace/buyer/cart/items/')) { window.__e2eCartMutationCalls += 1; window.__e2eLastCartMutationHeaders = Object.fromEntries(new Headers(options.headers||{}).entries()); return json({id:1,status:'active',market_id:1,market_code:'YEM',items:[]}); }
@@ -104,6 +116,38 @@ def run():
                     page.locator("#sellerVerificationForm").wait_for(state="visible", timeout=5000)
                     assert page.evaluate("window.__e2eSellerRegistered") is True
                     assert page.evaluate("window.__e2eSellerVerification") == 'pending'
+                    page.locator("button[data-ws='inventory']").click()
+                    page.locator("#inventoryItemForm").wait_for(state="visible", timeout=5000)
+                    page.locator("#inventoryItemForm input[name='id']").fill("rice-10kg")
+                    page.locator("#inventoryItemForm input[name='name']").fill("أرز بسمتي 10 كجم")
+                    page.locator("#inventoryItemForm input[name='unit_code']").fill("bag")
+                    page.locator("#inventoryItemForm button").click()
+                    page.locator("#inventoryWarehouseForm").wait_for(state="visible", timeout=5000)
+                    page.locator("#inventoryWarehouseForm input[name='id']").fill("main-warehouse")
+                    page.locator("#inventoryWarehouseForm input[name='name']").fill("المستودع الرئيسي")
+                    page.locator("#inventoryWarehouseForm button").click()
+                    page.locator("#inventoryMovementForm select[name='item_id'] option[value='rice-10kg']").wait_for(state="attached", timeout=5000)
+                    page.locator("#inventoryMovementForm select[name='item_id']").select_option("rice-10kg")
+                    page.locator("#inventoryMovementForm select[name='warehouse_id']").select_option("main-warehouse")
+                    page.locator("#inventoryMovementForm input[name='quantity']").fill("50")
+                    page.locator("#inventoryMovementForm input[name='reference']").fill("opening-stock-001")
+                    page.locator("#inventoryMovementForm button").click()
+                    page.locator("#stockLookupForm select[name='item_id']").select_option("rice-10kg")
+                    page.locator("#stockLookupForm select[name='warehouse_id']").select_option("main-warehouse")
+                    page.locator("#stockLookupForm button").click()
+                    page.wait_for_function("document.querySelector('#stockBalance').innerText.includes('50')")
+                    page.locator("button[data-ws='products']").click()
+                    page.locator("#catalogBundleForm select[name='item_id'] option[value='rice-10kg']").wait_for(state="attached", timeout=5000)
+                    page.locator("#catalogBundleForm input[name='name']").fill("أرز بسمتي 10 كجم")
+                    page.locator("#catalogBundleForm input[name='product_slug']").fill("basmati-rice-10kg")
+                    page.locator("#catalogBundleForm input[name='sku_code']").fill("RICE-10KG")
+                    page.locator("#catalogBundleForm select[name='item_id']").select_option("rice-10kg")
+                    page.locator("#catalogBundleForm select[name='warehouse_id']").select_option("main-warehouse")
+                    page.locator("#catalogBundleForm input[name='unit_price']").fill("2500")
+                    page.locator("#catalogBundleForm input[name='currency']").fill("YER")
+                    page.locator("#catalogBundleForm input[name='listing_slug']").fill("basmati-rice-10kg")
+                    page.locator("#catalogBundleForm button").click()
+                    page.locator("text=basmati-rice-10kg").wait_for(state="visible", timeout=5000)
                     page.locator("button[data-action='home']").click()
                     page.wait_for_timeout(100)
                     page.locator("button[data-add='1']").first.click()
