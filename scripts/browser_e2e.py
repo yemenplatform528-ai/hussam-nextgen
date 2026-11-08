@@ -128,6 +128,7 @@ def run():
                     page.locator("#inventoryWarehouseForm button").click()
                     page.wait_for_timeout(500)
                     page.wait_for_function("window.__e2eWarehouses.length === 1", timeout=5000)
+                    assert page.evaluate("window.__e2eWarehouses[0].id") == "main-warehouse"
                     page.locator("#inventoryMovementForm select[name='item_id'] option[value='rice-10kg']").wait_for(state="attached", timeout=5000)
                     page.locator("#inventoryMovementForm select[name='warehouse_id'] option[value='main-warehouse']").wait_for(state="attached", timeout=5000)
                     page.locator("#inventoryMovementForm select[name='item_id']").select_option("rice-10kg")
