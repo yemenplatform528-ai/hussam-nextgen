@@ -241,7 +241,7 @@ def run():
                     page.locator("#payoutDestinationReference").fill("TEST-ACCOUNT-001")
                     page.locator("button[data-save-payout-destination]").click()
                     page.wait_for_function("window.__e2ePayoutDestination && window.__e2ePayoutDestination.status==='pending'")
-                    assert page.locator("text=بانتظار مراجعة المنصة").is_visible()
+                    page.locator("text=بانتظار مراجعة المنصة").wait_for(state="visible", timeout=5000)
                     page.locator("button[data-action='home']").click()
                     page.wait_for_timeout(100)
                     page.locator("button[data-add='1']").first.click()
