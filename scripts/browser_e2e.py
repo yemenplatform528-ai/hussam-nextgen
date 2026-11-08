@@ -207,9 +207,11 @@ def run():
                     page.wait_for_function("window.__e2eSellerOrders[0].cod_collection_status === 'collected'")
                     assert page.evaluate("window.__e2ePackages.length") == 1
                     assert page.evaluate("window.__e2eCODCollections[0].amount") == "2500"
-                    page.evaluate("""window.__e2eReturns=[{id:501,order_id:101,reason:'damaged_item',description:'Damaged packaging',status:'requested',refund_amount:null,refund_currency:null,refund_reference:null,refund_scope:'order'}]""")
+                    page.evaluate("""window.__e2eReturns=[{id:501,order_id:101,reason:'damaged_item',description:'Damaged packaging',status:'requested',refund_amount:null,refund_currency:null,refund_reference:null,refund_scope:'order',payment_method_code:'card'},{id:502,order_id:102,reason:'damaged_item',description:'COD return',status:'inspected',refund_amount:null,refund_currency:null,refund_reference:null,refund_scope:'order',payment_method_code:'cod'}]""")
                     page.locator("button[data-ws='returns']").click()
                     page.locator("button[data-return-review='501'][data-decision='approved']").wait_for(state="visible", timeout=5000)
+                    assert page.locator("button[data-return-refund-approve='502']").count() == 0
+                    assert page.locator("text=لا يوجد سجل دفع إلكتروني").is_visible()
                     page.locator("button[data-return-review='501'][data-decision='approved']").click()
                     page.wait_for_function("window.__e2eReturns[0].status==='approved'")
                     page.locator("button[data-return-transition='501'][data-status='pickup']").click()
