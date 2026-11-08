@@ -1398,6 +1398,7 @@ class MarketplaceService:
     def mark_paid(self,seller_tenant_id:int, order_id:int, payment_reference:str):
         o=self._order(None,order_id,seller_tenant_id,True)
         if o.status!='pending_payment': raise MarketplaceError('order is not awaiting payment')
+        if o.payment_method_code == 'cod': raise MarketplaceError('COD orders cannot be marked paid by electronic capture')
         p=self.db.scalar(select(PaymentIntent).where(PaymentIntent.tenant_id==seller_tenant_id,PaymentIntent.reference==payment_reference))
         if not p or p.status!='captured': raise MarketplaceError('payment must be captured before marketplace order is paid')
         if p.currency!=o.currency or _money(p.amount)!=_money(o.total): raise MarketplaceError('captured payment does not match marketplace order')
