@@ -18,6 +18,8 @@ from app.core.models import (
     Tenant,
 )
 from app.core.services.yemen_checkout_context import YemenCheckoutContextService
+from app.engines.marketplace import MarketplaceService, MarketplaceError
+from app.api.routes.platform import client_market_geography
 
 
 def make_db():
@@ -79,6 +81,35 @@ def seed():
     db.commit()
     return db
 
+
+
+def test_address_geography_resolves_and_validates_full_parent_chain():
+    db = seed()
+    db.add(MarketGeography(id=13, market_id=1, parent_id=12, code='YE-ADN-KHM-LOC', level='locality', name='Locality', name_ar='محلة'))
+    db.add(MarketGeography(id=14, market_id=1, parent_id=10, code='YE-TAZ', level='governorate', name='Taiz', name_ar='تعز'))
+    db.add(MarketGeography(id=15, market_id=1, parent_id=14, code='YE-TAZ-CAI', level='district', name='Al Qahirah', name_ar='القاهرة'))
+    db.add(MarketGeography(id=16, market_id=1, parent_id=10, code='YE-BAD-DISTRICT', level='district', name='Invalid parent', name_ar='أب'))
+    db.commit()
+    service = MarketplaceService(db)
+
+    governorate_id, district_id, locality_id, nodes = service._resolve_geography(1, locality_id=13)
+    assert (governorate_id, district_id, locality_id) == (11, 12, 13)
+    assert nodes['governorate_id'].name == 'Aden'
+
+    with pytest.raises(MarketplaceError, match='district does not belong to governorate'):
+        service._resolve_geography(1, governorate_id=11, district_id=15)
+    with pytest.raises(MarketplaceError, match='district parent governorate is invalid'):
+        service._resolve_geography(1, district_id=16)
+
+
+def test_market_geography_endpoint_is_market_scoped_and_hierarchical():
+    db = seed()
+    govs = client_market_geography('YEM', level='governorate', db=db)
+    assert govs['items'][0]['id'] == 11
+    districts = client_market_geography('YEM', level='district', parent_id=11, db=db)
+    assert districts['items'][0]['id'] == 12
+    with pytest.raises(Exception, match='parent geography not found'):
+        client_market_geography('YEM', level='district', parent_id=999, db=db)
 
 def test_checkout_context_is_explicit_and_cod_first_class():
     db = seed()

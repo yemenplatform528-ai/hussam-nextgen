@@ -68,3 +68,10 @@ The evidence gate remains open for a different reason: Hussam has not yet preser
 
 Reviewed: 2026-09-19
 Disposition: PENDING_ARTIFACT_RECONCILIATION
+
+
+## 2026-11-09 — official COD status dashboard re-check
+
+The OCHA COD status dashboard was re-checked against its 2026-11-08 daily update (`https://ocha-dap.github.io/cod-site/status/`). The Yemen row reports COD-AB levels of 22 governorates and 335 districts, with a COD-AB reference year of 2019. The COD work tracker lists Yemen in `Backlog` for a boundary update, with no work order opened in the displayed cycle.
+
+This confirms the published hierarchy counts but also confirms that the current COD-AB reference is not a newly refreshed 2026 dataset. It does **not** provide the exact resource bytes, checksum, licensing metadata, or P-code/parent comparison required by Hussam's admission contract. Therefore the canonical geography gate remains `PENDING_ARTIFACT_RECONCILIATION`; no import or production coverage activation is authorized by this status-page check alone.

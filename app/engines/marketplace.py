@@ -133,10 +133,32 @@ class MarketplaceService:
             if not node or node.level != levels[field]:
                 raise MarketplaceError(f'{field} does not belong to market or has invalid level')
             nodes[field]=node
-        if nodes.get('district_id') and nodes.get('governorate_id') and nodes['district_id'].parent_id != nodes['governorate_id'].id:
-            raise MarketplaceError('district does not belong to governorate')
-        if nodes.get('locality_id') and nodes.get('district_id') and nodes['locality_id'].parent_id != nodes['district_id'].id:
-            raise MarketplaceError('locality does not belong to district')
+        if nodes.get('locality_id'):
+            district = self.db.scalar(select(MarketGeography).where(
+                MarketGeography.id == nodes['locality_id'].parent_id,
+                MarketGeography.market_id == market_id,
+                MarketGeography.level == 'district',
+                MarketGeography.status == 'active',
+            ))
+            if not district:
+                raise MarketplaceError('locality parent district is invalid')
+            if nodes.get('district_id') and nodes['district_id'].id != district.id:
+                raise MarketplaceError('locality does not belong to district')
+            district_id = district.id
+            nodes['district_id'] = district
+        if nodes.get('district_id'):
+            governorate = self.db.scalar(select(MarketGeography).where(
+                MarketGeography.id == nodes['district_id'].parent_id,
+                MarketGeography.market_id == market_id,
+                MarketGeography.level == 'governorate',
+                MarketGeography.status == 'active',
+            ))
+            if not governorate:
+                raise MarketplaceError('district parent governorate is invalid')
+            if nodes.get('governorate_id') and nodes['governorate_id'].id != governorate.id:
+                raise MarketplaceError('district does not belong to governorate')
+            governorate_id = governorate.id
+            nodes['governorate_id'] = governorate
         if governorate_id is None and governorate:
             candidates=self.db.scalars(select(MarketGeography).where(MarketGeography.market_id==market_id,MarketGeography.level=='governorate',MarketGeography.status=='active',MarketGeography.name==governorate.strip())).all()
             if len(candidates)==1:
