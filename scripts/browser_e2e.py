@@ -157,7 +157,7 @@ def run():
                     page.locator("#catalogBundleForm input[name='currency']").fill("YER")
                     page.locator("#catalogBundleForm input[name='listing_slug']").fill("basmati-rice-10kg")
                     page.locator("#catalogBundleForm button").click()
-                    page.locator("text=basmati-rice-10kg").wait_for(state="visible", timeout=5000)
+                    page.locator("small", has_text="basmati-rice-10kg").wait_for(state="visible", timeout=5000)
                     page.locator("button[data-action='home']").click()
                     page.wait_for_timeout(100)
                     page.locator("button[data-add='1']").first.click()
