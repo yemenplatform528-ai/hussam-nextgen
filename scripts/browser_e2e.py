@@ -46,6 +46,8 @@ window.__e2eReturns=[];
     if (url.endsWith('/marketplace/seller/center')) return json(window.__e2eSellerRegistered?{registered:true,seller:{tenant_id:1,slug:'taiz-market',display_name:'متجر تعز',status:window.__e2eSellerVerification==='approved'?'active':'pending',verification:window.__e2eSellerVerification},metrics:{listings_published:1,listings_total:1,orders_actionable:0,fulfillments_actionable:0,net:0,currency:'YER'},actions:[],recent_orders:[]}:{registered:false,actions:[],metrics:{}});
     if (url.endsWith('/marketplace/seller/orders')) return json({items:window.__e2eSellerOrders});
     if (url.endsWith('/marketplace/seller/returns')) return json({items:window.__e2eReturns});
+    if (url.endsWith('/marketplace/seller/payout-destination') && options.method!=='POST') return json({destination:window.__e2ePayoutDestination});
+    if (url.endsWith('/marketplace/seller/payout-destination') && options.method==='POST') { const body=JSON.parse(options.body||'{}'); window.__e2ePayoutDestination={provider:body.provider,external_reference:body.external_reference,status:'pending'}; return json({seller_tenant_id:1,...window.__e2ePayoutDestination},201); }
     if (url.match(/\/marketplace\/seller\/returns\/\d+\/review$/) && options.method==='POST') { const id=Number(url.match(/returns\/(\d+)\/review$/)[1]); const body=JSON.parse(options.body||'{}'); const x=window.__e2eReturns.find(r=>r.id===id); x.status=body.decision; return json({id,status:x.status}); }
     if (url.match(/\/marketplace\/seller\/returns\/\d+\/transition$/) && options.method==='POST') { const id=Number(url.match(/returns\/(\d+)\/transition$/)[1]); const body=JSON.parse(options.body||'{}'); const x=window.__e2eReturns.find(r=>r.id===id); x.status=body.status; return json({id,status:x.status}); }
     if (url.match(/\/marketplace\/seller\/returns\/\d+\/approve-refund$/) && options.method==='POST') { const id=Number(url.match(/returns\/(\d+)\/approve-refund$/)[1]); const x=window.__e2eReturns.find(r=>r.id===id); x.status='refund_approved'; x.refund_amount='2500'; x.refund_currency='YER'; x.refund_reference='REFUND-E2E-001'; return json({return_id:id,status:x.status,refund:{reference:x.refund_reference,amount:x.refund_amount,currency:x.refund_currency,status:'pending'}}); }
@@ -229,6 +231,12 @@ def run():
                     page.locator("button[data-return-refund-complete='501']").click()
                     page.wait_for_function("window.__e2eReturns[0].status==='refunded'")
                     assert page.evaluate("window.__e2eReturns[0].status") == "refunded"
+                    page.locator("button[data-ws='payments']").click()
+                    page.locator("#payoutDestinationProvider").fill("Yemen Bank")
+                    page.locator("#payoutDestinationReference").fill("TEST-ACCOUNT-001")
+                    page.locator("button[data-save-payout-destination]").click()
+                    page.wait_for_function("window.__e2ePayoutDestination && window.__e2ePayoutDestination.status==='pending'")
+                    assert page.locator("text=بانتظار مراجعة المنصة").is_visible()
                     page.locator("button[data-action='home']").click()
                     page.wait_for_timeout(100)
                     page.locator("button[data-add='1']").first.click()
