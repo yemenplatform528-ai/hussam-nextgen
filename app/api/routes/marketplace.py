@@ -4,7 +4,7 @@ from datetime import date
 import hashlib
 import json
 from fastapi import APIRouter, Depends, Query, HTTPException, Header
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import desc, select, func
 from app.api.dependencies import get_context, get_session
 from app.core.models.core import MutationRecord
@@ -26,6 +26,16 @@ class SellerIn(BaseModel):
     display_name:str=Field(min_length=2,max_length=200)
     description:str=Field(default='',max_length=2000)
     seller_type:Literal['business','individual','institution']='business'
+
+    @field_validator('slug')
+    @classmethod
+    def validate_slug(cls, value):
+        value = value.strip()
+        if (len(value) < 2 or len(value) > 120 or not value.isascii() or value.lower() != value
+                or not value[0].isalnum() or any(not (char.isalnum() or char == '-') for char in value)):
+            raise ValueError('seller slug must use lowercase ASCII letters, numbers, and hyphens')
+        return value
+
 class VerificationSubmissionIn(BaseModel): notes:str=Field(default='',max_length=4000)
 class CategoryIn(BaseModel): slug:str; name:str; parent_id:int|None=None; market_id:int|None=None
 class ListingIn(BaseModel):
