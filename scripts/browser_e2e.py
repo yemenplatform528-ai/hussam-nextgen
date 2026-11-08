@@ -23,12 +23,14 @@ window.__e2eInventoryItems=[];
 window.__e2eWarehouses=[];
 window.__e2eInventoryMovements=[];
 window.__e2eCatalogItems=[];
+window.__e2eCalls=[];
 (() => {
   const originalFetch = window.fetch.bind(window);
   const listing = {id: 1, title: 'E2E Phone', description: 'Browser journey product', unit_price: '1500', currency: 'YER', stock: null, seller: {tenant_id: 1, slug: 'e2e-store', display_name: 'E2E Store', description: 'Browser test store'}};
   const json = (data, status=200) => Promise.resolve(new Response(JSON.stringify(data), {status, headers: {'Content-Type': 'application/json'}}));
   window.fetch = (input, options={}) => {
     const url = String(input);
+    window.__e2eCalls.push({url,method:options.method||'GET'});
     if (window.__e2eOfflineReads && (url.includes('/marketplace/listings?') || url.endsWith('/marketplace/categories') || url.includes('/marketplace/sellers?'))) return Promise.reject(new TypeError('offline'));
     if (url.includes('/marketplace/listings?')) return json({items:[listing], total:1, limit:24, offset:0, sort:'relevance'});
     if (url.endsWith('/marketplace/categories')) return json({items:[{id:1, slug:'e2e-category', name:'E2E Category', parent_id:null}]});
@@ -126,6 +128,8 @@ def run():
                     page.locator("#inventoryWarehouseForm input[name='id']").fill("main-warehouse")
                     page.locator("#inventoryWarehouseForm input[name='name']").fill("المستودع الرئيسي")
                     page.locator("#inventoryWarehouseForm button").click()
+                    page.wait_for_timeout(250)
+                    print('WAREHOUSE DEBUG', page.evaluate("({calls:window.__e2eCalls.filter(x=>x.url.includes('warehouse')),warehouses:window.__e2eWarehouses,form:document.getElementById('inventoryWarehouseForm').onsubmit!==null})"))
                     page.wait_for_function("window.__e2eWarehouses.length === 1", timeout=5000)
                     page.locator("#inventoryMovementForm select[name='item_id'] option[value='rice-10kg']").wait_for(state="attached", timeout=5000)
                     page.locator("#inventoryMovementForm select[name='warehouse_id'] option[value='main-warehouse']").wait_for(state="attached", timeout=5000)
