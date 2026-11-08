@@ -20,6 +20,7 @@ window.__e2eOfflineReads=false;
 window.__e2eCheckoutContextUrl='';
 window.__e2eAddresses=[];
 window.__e2eInventoryItems=[];
+window.__e2eInventoryRequests=[];
 window.__e2eWarehouses=[];
 window.__e2eInventoryMovements=[];
 window.__e2eCatalogItems=[];
@@ -29,8 +30,7 @@ window.__e2eCatalogItems=[];
   const json = (data, status=200) => Promise.resolve(new Response(JSON.stringify(data), {status, headers: {'Content-Type': 'application/json'}}));
   window.fetch = (input, options={}) => {
     const url = String(input);
-    const method = String(options.method || 'GET').toUpperCase();
-    const pathname = new URL(url, window.location.href).pathname.replace(/\/$/, '');
+    window.__e2eInventoryRequests.push({url, method: options.method || 'GET'});
     if (window.__e2eOfflineReads && (url.includes('/marketplace/listings?') || url.endsWith('/marketplace/categories') || url.includes('/marketplace/sellers?'))) return Promise.reject(new TypeError('offline'));
     if (url.includes('/marketplace/listings?')) return json({items:[listing], total:1, limit:24, offset:0, sort:'relevance'});
     if (url.endsWith('/marketplace/categories')) return json({items:[{id:1, slug:'e2e-category', name:'E2E Category', parent_id:null}]});
@@ -39,14 +39,14 @@ window.__e2eCatalogItems=[];
     if (url.endsWith('/marketplace/seller') && options.method==='POST') { window.__e2eSellerRegistered=true; window.__e2eSellerVerification='pending'; return json({tenant_id:1,slug:'taiz-market',display_name:'متجر تعز',status:'pending'},201); }
     if (url.endsWith('/marketplace/seller/verification') && options.method==='POST') { window.__e2eSellerVerification='pending'; return json({id:1,status:'pending'}); }
     if (url.endsWith('/marketplace/seller/center')) return json(window.__e2eSellerRegistered?{registered:true,seller:{tenant_id:1,slug:'taiz-market',display_name:'متجر تعز',status:window.__e2eSellerVerification==='approved'?'active':'pending',verification:window.__e2eSellerVerification},metrics:{listings_published:1,listings_total:1,orders_actionable:0,fulfillments_actionable:0,net:0,currency:'YER'},actions:[],recent_orders:[]}:{registered:false,actions:[],metrics:{}});
-    if (pathname.endsWith('/inventory/items') && method==='POST') { const item=JSON.parse(options.body||'{}'); window.__e2eInventoryItems.push({...item,active:true}); return json(item,201); }
-    if (pathname.endsWith('/inventory/warehouses') && method==='POST') { const warehouse=JSON.parse(options.body||'{}'); window.__e2eWarehouses.push({...warehouse,active:true}); return json(warehouse,201); }
-    if (pathname.endsWith('/inventory/movements') && method==='POST') { const movement=JSON.parse(options.body||'{}'); window.__e2eInventoryMovements.push({...movement,id:window.__e2eInventoryMovements.length+1}); return json({id:1,reference:movement.reference,direction:movement.direction,quantity:movement.quantity},201); }
+    if (url.endsWith('/inventory/items') && options.method==='POST') { const item=JSON.parse(options.body||'{}'); window.__e2eInventoryItems.push({...item,active:true}); return json(item,201); }
+    if (url.includes('/warehouses') && options.method==='POST') { const warehouse=JSON.parse(options.body||'{}'); window.__e2eWarehouses.push({...warehouse,active:true}); return json(warehouse,201); }
+    if (url.endsWith('/inventory/movements') && options.method==='POST') { const movement=JSON.parse(options.body||'{}'); window.__e2eInventoryMovements.push({...movement,id:window.__e2eInventoryMovements.length+1}); return json({id:1,reference:movement.reference,direction:movement.direction,quantity:movement.quantity},201); }
     if (url.endsWith('/inventory/movements')) return json({items:window.__e2eInventoryMovements});
     if (url.includes('/inventory/stock/')) return json({item_id:'rice-10kg',warehouse_id:'main-warehouse',on_hand:'50',reserved:'0',available:'50'});
-    if (pathname.endsWith('/products')) return json({items:window.__e2eInventoryItems,limit:50,offset:0});
-    if (pathname.endsWith('/warehouses')) return json({items:window.__e2eWarehouses,limit:50,offset:0});
-    if (pathname.endsWith('/marketplace/seller/catalog/bundle') && method==='POST') { const body=JSON.parse(options.body||'{}'); window.__e2eCatalogItems.push({name:body.product.name,slug:body.product.slug,skus:[{sku_code:body.sku.sku_code,offer:{unit_price:body.offer.unit_price,currency:body.offer.currency,status:'active'},listing:{slug:body.listing_slug,status:'draft'}}]}); return json({product:{id:1,slug:body.product.slug,name:body.product.name},sku:{id:1,sku_code:body.sku.sku_code},offer:{id:1,currency:body.offer.currency,unit_price:body.offer.unit_price},listing:{id:1,slug:body.listing_slug,status:'draft',moderation_status:'pending'}},201); }
+    if (url.endsWith('/products')) return json({items:window.__e2eInventoryItems,limit:50,offset:0});
+    if (url.endsWith('/warehouses') || url.includes('/warehouses?')) return json({items:window.__e2eWarehouses,limit:50,offset:0});
+    if (url.endsWith('/marketplace/seller/catalog/bundle') && options.method==='POST') { const body=JSON.parse(options.body||'{}'); window.__e2eCatalogItems.push({name:body.product.name,slug:body.product.slug,skus:[{sku_code:body.sku.sku_code,offer:{unit_price:body.offer.unit_price,currency:body.offer.currency,status:'active'},listing:{slug:body.listing_slug,status:'draft'}}]}); return json({product:{id:1,slug:body.product.slug,name:body.product.name},sku:{id:1,sku_code:body.sku.sku_code},offer:{id:1,currency:body.offer.currency,unit_price:body.offer.unit_price},listing:{id:1,slug:body.listing_slug,status:'draft',moderation_status:'pending'}},201); }
     if (url.endsWith('/marketplace/seller/catalog')) return json({items:window.__e2eCatalogItems});
     if (url.endsWith('/marketplace/buyer/cart')) return json({id:1,status:'active',market_id:1,market_code:'YEM',items:[{id:1,quantity:'1',line_total:'1500',listing}]});
     if (url.endsWith('/marketplace/buyer/cart/items')) { window.__e2eCartMutationCalls += 1; window.__e2eLastCartMutationHeaders = Object.fromEntries(new Headers(options.headers||{}).entries()); return json({id:1,status:'active',market_id:1,market_code:'YEM',items:[{id:1,quantity:'1',line_total:'1500',listing}]}); }
@@ -128,6 +128,7 @@ def run():
                     page.locator("#inventoryWarehouseForm input[name='id']").fill("main-warehouse")
                     page.locator("#inventoryWarehouseForm input[name='name']").fill("المستودع الرئيسي")
                     page.locator("#inventoryWarehouseForm button").click()
+                    page.wait_for_function("window.__e2eWarehouses.some(x => x.id === 'main-warehouse')", timeout=5000)
                     page.wait_for_timeout(500)
                     page.wait_for_function("window.__e2eWarehouses.length === 1", timeout=5000)
                     assert page.evaluate("window.__e2eWarehouses[0].id") == "main-warehouse"
