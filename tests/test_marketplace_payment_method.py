@@ -4,7 +4,7 @@ import pytest
 from sqlalchemy import select
 
 from app.core.models.market import PaymentMethodCatalogEntry
-from app.core.models.marketplace import MarketplaceCustomerOrder
+from app.core.models.marketplace import MarketplaceCustomerOrder, MarketplacePayout
 from app.engines.marketplace import MarketplaceError
 from app.api.routes.marketplace import CheckoutIn
 from pydantic import ValidationError
@@ -61,11 +61,18 @@ def test_cod_order_enters_processing_without_fabricating_payment():
         payment_method_code="cod",
     )[0]
 
+    with pytest.raises(MarketplaceError, match="COD orders cannot create electronic payment intents"):
+        service.attach_payment_intent(buyer.id, order.id, "not-a-provider")
+    with pytest.raises(MarketplaceError, match="COD orders do not create electronic payment sessions"):
+        service.create_payment_session(buyer.id, order.customer_order_id, "not-a-provider")
+
     processing = service.mark_processing(seller.id, order.id)
+    payout = db.scalar(select(MarketplacePayout).where(MarketplacePayout.marketplace_order_id == order.id))
 
     assert processing.status == "processing"
     assert processing.payment_reference is None
     assert processing.payment_method_code == "cod"
+    assert payout.status == "held"
 
 
 def test_unpaid_non_cod_order_cannot_enter_processing():
