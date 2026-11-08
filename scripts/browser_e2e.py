@@ -27,6 +27,10 @@ window.__e2eCatalogItems=[];
 window.__e2eSellerOrders=[];
 window.__e2ePackages=[];
 window.__e2eCODCollections=[];
+window.__e2ePayoutDestination={provider:'',external_reference:'',status:'pending'};
+window.__e2ePayouts=[];
+window.__e2eBalances=[{market_id:1,currency:'YER',available_balance:'2500'}];
+window.__e2eReturns=[];
 (() => {
   const originalFetch = window.fetch.bind(window);
   const listing = {id: 1, title: 'E2E Phone', description: 'Browser journey product', unit_price: '1500', currency: 'YER', stock: null, seller: {tenant_id: 1, slug: 'e2e-store', display_name: 'E2E Store', description: 'Browser test store'}};
@@ -43,6 +47,17 @@ window.__e2eCODCollections=[];
     if (url.endsWith('/marketplace/seller/verification') && options.method==='POST') { window.__e2eSellerVerification='pending'; return json({id:1,status:'pending'}); }
     if (url.endsWith('/marketplace/seller/center')) return json(window.__e2eSellerRegistered?{registered:true,seller:{tenant_id:1,slug:'taiz-market',display_name:'متجر تعز',status:window.__e2eSellerVerification==='approved'?'active':'pending',verification:window.__e2eSellerVerification},metrics:{listings_published:1,listings_total:1,orders_actionable:0,fulfillments_actionable:0,net:0,currency:'YER'},actions:[],recent_orders:[]}:{registered:false,actions:[],metrics:{}});
     if (url.endsWith('/marketplace/seller/orders')) return json({items:window.__e2eSellerOrders});
+    if (url.endsWith('/marketplace/seller/payout-destination') && method==='GET') return json({destination:window.__e2ePayoutDestination});
+    if (url.endsWith('/marketplace/seller/payout-destination') && method==='POST') { const body=JSON.parse(options.body||'{}'); window.__e2ePayoutDestination={...body,status:'pending'}; return json({seller_tenant_id:1,...window.__e2ePayoutDestination},201); }
+    if (url.endsWith('/marketplace/seller/payouts')) return json({items:window.__e2ePayouts});
+    if (url.endsWith('/marketplace/seller/balances')) return json({items:window.__e2eBalances});
+    if (url.includes('/marketplace/seller/statement?')) return json({market_id:1,currency:'YER',opening_balance:'0',credits:'2500',refunds:'0',payouts:'0',available_balance:'2500',items:[]});
+    if (url.endsWith('/marketplace/seller/orders/99/payout-request') && method==='POST') { window.__e2ePayouts[0].status='processing'; window.__e2ePayouts[0].payout_reference='PAYOUT-E2E-001'; return json({id:1,order_id:99,status:'processing',payout_reference:'PAYOUT-E2E-001',net_amount:'2500',currency:'YER'},201); }
+    if (url.endsWith('/marketplace/seller/returns')) return json({items:window.__e2eReturns});
+    if (url.endsWith('/marketplace/seller/returns/55/review') && method==='POST') { window.__e2eReturns[0].status=JSON.parse(options.body||'{}').decision; return json({id:55,status:window.__e2eReturns[0].status}); }
+    if (url.endsWith('/marketplace/seller/returns/55/transition') && method==='POST') { window.__e2eReturns[0].status=JSON.parse(options.body||'{}').status; return json({id:55,status:window.__e2eReturns[0].status}); }
+    if (url.endsWith('/marketplace/seller/returns/55/approve-refund') && method==='POST') { Object.assign(window.__e2eReturns[0],{status:'refund_approved',refund_amount:'2500',refund_currency:'YER',refund_reference:'REFUND-E2E-001'}); return json({return_id:55,status:'refund_approved',refund:{reference:'REFUND-E2E-001',amount:'2500',currency:'YER',status:'pending'}},201); }
+    if (url.endsWith('/marketplace/seller/returns/55/complete-refund') && method==='POST') { window.__e2eReturns[0].status='refunded'; return json({return_id:55,status:'refunded',refund_reference:'REFUND-E2E-001',provider_refund_id:JSON.parse(options.body||'{}').provider_refund_id}); }
     if (url.endsWith('/marketplace/seller/orders/99/processing') && options.method==='POST') { window.__e2eSellerOrders[0].status='processing'; return json({id:99,status:'processing'}); }
     if (url.endsWith('/marketplace/seller/orders/199/fulfillments') && options.method==='POST') { const body=JSON.parse(options.body||'{}'); Object.assign(window.__e2eSellerOrders[0],{fulfillment_id:701,fulfillment_status:'pending',fulfillment_method:body.method,shipment_id:null,carrier:null}); return json({id:701,seller_order_id:199,method:body.method,status:'pending'},201); }
     if (url.endsWith('/marketplace/seller/fulfillments/701/transition') && options.method==='POST') { const body=JSON.parse(options.body||'{}'); window.__e2eSellerOrders[0].fulfillment_status=body.status; if(body.status==='delivered') window.__e2eSellerOrders[0].status='completed'; return json({id:701,status:body.status,shipment_id:window.__e2eSellerOrders[0].shipment_id}); }
@@ -199,6 +214,34 @@ def run():
                     page.wait_for_function("window.__e2eSellerOrders[0].cod_collection_status === 'collected'")
                     assert page.evaluate("window.__e2ePackages.length") == 1
                     assert page.evaluate("window.__e2eCODCollections[0].amount") == "2500"
+                    page.evaluate("""window.__e2ePayouts=[{id:1,order_id:99,reference:'PAY-ORD-001',gross_amount:'2500',platform_fee:'0',net_amount:'2500',currency:'YER',status:'eligible'}]""")
+                    page.locator("button[data-ws='payments']").click()
+                    page.locator("#payoutDestinationForm input[name='provider']").fill("approved-provider")
+                    page.locator("#payoutDestinationForm input[name='external_reference']").fill("destination-001")
+                    page.locator("#payoutDestinationForm button").click()
+                    page.wait_for_function("window.__e2ePayoutDestination.status === 'pending'")
+                    page.evaluate("window.__e2ePayoutDestination.status='verified'")
+                    page.locator("button[data-request-payout='99']").wait_for(state="visible", timeout=5000)
+                    page.locator("button[data-request-payout='99']").click()
+                    page.wait_for_function("window.__e2ePayouts[0].status === 'processing'")
+                    page.locator("button[data-statement-market='1'][data-statement-currency='YER']").click()
+                    page.locator("#sellerStatement").wait_for(state="visible", timeout=5000)
+                    page.wait_for_function("document.querySelector('#sellerStatement').innerText.includes('2500')")
+                    page.evaluate("""window.__e2eReturns=[{id:55,order_id:99,reason:'damaged',description:'وصل المنتج تالفاً',status:'requested',refund_scope:'order',refund_amount:null,refund_currency:null,refund_reference:null}]""")
+                    page.locator("button[data-ws='trust']").click()
+                    page.locator("button[data-return-review='55'][data-decision='approved']").click()
+                    page.wait_for_function("window.__e2eReturns[0].status === 'approved'")
+                    page.locator("button[data-return-transition='55'][data-status='pickup']").click()
+                    page.wait_for_function("window.__e2eReturns[0].status === 'pickup'")
+                    page.locator("button[data-return-transition='55'][data-status='received']").click()
+                    page.wait_for_function("window.__e2eReturns[0].status === 'received'")
+                    page.locator("button[data-return-transition='55'][data-status='inspected']").click()
+                    page.wait_for_function("window.__e2eReturns[0].status === 'inspected'")
+                    page.locator("button[data-approve-refund='55']").click()
+                    page.wait_for_function("window.__e2eReturns[0].status === 'refund_approved'")
+                    page.locator("input[data-refund-provider='55']").fill("provider-refund-001")
+                    page.locator("button[data-complete-refund='55']").click()
+                    page.wait_for_function("window.__e2eReturns[0].status === 'refunded'")
                     page.locator("button[data-action='home']").click()
                     page.wait_for_timeout(100)
                     page.locator("button[data-add='1']").first.click()
