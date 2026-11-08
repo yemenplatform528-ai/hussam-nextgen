@@ -370,7 +370,9 @@ def transition_fulfillment(fulfillment_id:int,body:FulfillmentTransitionIn,ctx=D
                 order=db.get(MarketplaceOrder,seller_order.marketplace_order_id)
                 if order and order.status in {'paid','processing'}:
                     marketplace.mark_shipped(ctx.tenant_id,order.id,f.shipment_id)
-                marketplace.mark_delivered(ctx.tenant_id,seller_order.marketplace_order_id,f.shipment_id)
+                    order=db.get(MarketplaceOrder,seller_order.marketplace_order_id)
+                if order and order.status in {'shipped','delivered'}:
+                    marketplace.mark_delivered(ctx.tenant_id,seller_order.marketplace_order_id,f.shipment_id)
     elif body.status=='delivered' and f.method=='pickup':
         marketplace.mark_pickup_delivered(ctx.tenant_id,f.seller_order_id)
     return {'id':f.id,'status':f.status,'shipment_id':f.shipment_id}
