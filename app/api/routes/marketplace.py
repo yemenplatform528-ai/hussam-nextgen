@@ -21,7 +21,11 @@ def seller_guard(ctx):
     if ctx.role not in {'owner','admin'}: raise HTTPException(status_code=403, detail='seller administration requires owner or admin role')
 
 class SellerIn(BaseModel):
-    slug:str=Field(min_length=2,max_length=120,pattern=r'^[a-z0-9][a-z0-9-]*
+    slug:str=Field(min_length=2,max_length=120)
+    display_name:str=Field(min_length=2,max_length=200)
+    description:str=Field(default='',max_length=2000)
+    seller_type:str=Field(default='business',pattern='^(business|individual|institution)')
+class VerificationSubmissionIn(BaseModel): notes:str=Field(default='',max_length=4000)
 class CategoryIn(BaseModel): slug:str; name:str; parent_id:int|None=None; market_id:int|None=None
 class ListingIn(BaseModel):
     slug:str; title:str; description:str=''; listing_type:str='product'; currency:str; unit_price:Decimal=Field(ge=0)
