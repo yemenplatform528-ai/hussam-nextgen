@@ -281,7 +281,7 @@ def run():
                     assert page.evaluate("window.__e2eCheckoutCalls") == 1
                     page.locator("select[name='shipping_address_id']").select_option("20")
                     page.locator("#checkoutForm button").click()
-                    page.locator("text=YEM-E2E-001").wait_for(state="visible", timeout=10000)
+                    page.locator("h2", has_text="YEM-E2E-001").wait_for(state="visible", timeout=10000)
                     assert page.evaluate("window.__e2eCheckoutCalls") == 2
                     assert page.evaluate("window.__e2eLastCheckoutHeaders['idempotency-key']") == first_key
                     assert page.evaluate("window.__e2eLastCheckoutBody.shipping_quote_ids") == [301]
