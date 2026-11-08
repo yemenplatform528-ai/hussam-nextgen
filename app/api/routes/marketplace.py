@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import desc, select, func
 from app.api.dependencies import get_context, get_session
 from app.core.models.core import MutationRecord
-from app.core.models.marketplace import MarketplaceSellerProfile, MarketplaceOfferCompetition, MarketplaceCategory, MarketplaceListing, MarketplaceOrder, MarketplaceOrderLine, MarketplacePayout, MarketplaceReview, MarketplaceDispute, MarketplaceAddress, MarketplaceSellerVerification, MarketplaceReturnRequest, MarketplaceReturnLine, MarketplaceFeeRule, MarketplaceCart
+from app.core.models.marketplace import MarketplaceSellerProfile, MarketplaceOfferCompetition, MarketplaceCategory, MarketplaceListing, MarketplaceOrder, MarketplaceOrderLine, MarketplacePayout, MarketplaceReview, MarketplaceDispute, MarketplaceAddress, MarketplaceSellerVerification, MarketplaceReturnRequest, MarketplaceReturnLine, MarketplaceFeeRule, MarketplaceCart, MarketplaceSellerOrder, MarketplaceFulfillment
 from app.core.models.payments import PaymentIntent
 from app.engines.marketplace import MarketplaceService, ListingInput
 from app.engines.catalog import CatalogService, CatalogError, ProductInput, SKUInput, OfferInput
@@ -385,7 +385,14 @@ def seller_fulfillment(fulfillment_id:int,ctx=Depends(get_context),db=Depends(ge
 
 @router.get('/seller/orders')
 def seller_orders(ctx=Depends(get_context),db=Depends(get_session)):
-    seller_guard(ctx); rows=db.scalars(select(MarketplaceOrder).where(MarketplaceOrder.seller_tenant_id==ctx.tenant_id).order_by(desc(MarketplaceOrder.id))).all(); return {'items':[{'id':x.id,'reference':x.reference,'buyer_user_id':x.buyer_user_id,'total':str(x.total),'currency':x.currency,'status':x.status} for x in rows]}
+    seller_guard(ctx)
+    rows=db.scalars(select(MarketplaceOrder).where(MarketplaceOrder.seller_tenant_id==ctx.tenant_id).order_by(desc(MarketplaceOrder.id))).all()
+    seller_orders=db.scalars(select(MarketplaceSellerOrder).where(MarketplaceSellerOrder.seller_tenant_id==ctx.tenant_id)).all()
+    seller_order_by_marketplace={x.marketplace_order_id:x for x in seller_orders}
+    fulfillments=db.scalars(select(MarketplaceFulfillment).where(MarketplaceFulfillment.seller_tenant_id==ctx.tenant_id).order_by(desc(MarketplaceFulfillment.id))).all()
+    fulfillment_by_seller_order={}
+    for item in fulfillments: fulfillment_by_seller_order.setdefault(item.seller_order_id,item)
+    return {'items':[{'id':x.id,'reference':x.reference,'buyer_user_id':x.buyer_user_id,'total':str(x.total),'currency':x.currency,'status':x.status,'payment_method_code':x.payment_method_code,'sales_order_id':x.sales_order_id,'seller_order_id':seller_order_by_marketplace[x.id].id if x.id in seller_order_by_marketplace else None,'fulfillment_id':fulfillment_by_seller_order[seller_order_by_marketplace[x.id].id].id if x.id in seller_order_by_marketplace and seller_order_by_marketplace[x.id].id in fulfillment_by_seller_order else None,'fulfillment_status':fulfillment_by_marketplace[seller_order_by_marketplace[x.id].id].status if x.id in seller_order_by_marketplace and seller_order_by_marketplace[x.id].id in fulfillment_by_seller_order else None,'fulfillment_method':fulfillment_by_marketplace[seller_order_by_marketplace[x.id].id].method if x.id in seller_order_by_marketplace and seller_order_by_marketplace[x.id].id in fulfillment_by_seller_order else None,'shipment_id':fulfillment_by_marketplace[seller_order_by_marketplace[x.id].id].shipment_id if x.id in seller_order_by_marketplace and seller_order_by_marketplace[x.id].id in fulfillment_by_seller_order else None,'carrier':fulfillment_by_seller_order[seller_order_by_marketplace[x.id].id].carrier if x.id in seller_order_by_marketplace and seller_order_by_marketplace[x.id].id in fulfillment_by_seller_order else None} for x in rows]}
 
 @router.post('/seller/orders/{order_id}/settlement-link')
 def settlement_link(order_id:int, settlement_reference:str,ctx=Depends(get_context),db=Depends(get_session)):
