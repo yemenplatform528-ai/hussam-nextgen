@@ -30,7 +30,7 @@ window.__e2eCatalogItems=[];
   window.fetch = (input, options={}) => {
     const url = String(input);
     const method = String(options.method || 'GET').toUpperCase();
-    const pathname = new URL(url, window.location.href).pathname.replace(/\\/$/, '');
+    const pathname = new URL(url, window.location.href).pathname.replace(/\/$/, '');
     if (window.__e2eOfflineReads && (url.includes('/marketplace/listings?') || url.endsWith('/marketplace/categories') || url.includes('/marketplace/sellers?'))) return Promise.reject(new TypeError('offline'));
     if (url.includes('/marketplace/listings?')) return json({items:[listing], total:1, limit:24, offset:0, sort:'relevance'});
     if (url.endsWith('/marketplace/categories')) return json({items:[{id:1, slug:'e2e-category', name:'E2E Category', parent_id:null}]});
