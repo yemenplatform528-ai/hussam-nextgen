@@ -70,3 +70,7 @@ def test_cod_selection_becomes_shipment_collection_amount():
     )
     assert collected.status == 'collected'
     assert collected.amount == Decimal('1000.0000')
+    replay = LogisticsProductionService(db).create_cod_collection(
+        seller.id, shipment.id, reference='COD-COL-1', amount=Decimal('1000'), currency='YER'
+    )
+    assert replay.id == collected.id
