@@ -187,7 +187,7 @@ def run():
                     page.locator("button[data-ws='trust']").click()
                     page.locator("h1", has_text="الثقة والتحقق").wait_for(state="visible", timeout=5000)
                     assert page.locator("text=قيد التحقق").is_visible()
-                    assert page.locator("text=basmati-rice-10kg").is_visible()
+                    assert page.locator("text=أرز بسمتي 10 كجم").is_visible()
                     assert page.locator("text=pending").is_visible()
                     page.locator("button[data-ws='orders']").click()
                     page.evaluate("""window.__e2eSellerOrders=[{id:99,seller_order_id:199,reference:'ORD-E2E-001',buyer_user_id:'buyer-e2e',total:'2500',currency:'YER',status:'pending_payment',payment_method_code:'cod',sales_order_id:501,fulfillment_id:null,fulfillment_status:null,fulfillment_method:null,shipment_id:null,carrier:null,cod_collection_id:null,cod_collection_status:null}]""")
