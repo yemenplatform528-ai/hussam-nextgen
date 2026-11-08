@@ -124,6 +124,7 @@ def run():
                     page.locator("#inventoryItemForm input[name='name']").fill("أرز بسمتي 10 كجم")
                     page.locator("#inventoryItemForm input[name='unit_code']").fill("bag")
                     page.locator("#inventoryItemForm button").click()
+                    page.wait_for_function("window.__e2eInventoryRequests.filter(x => x.url.endsWith('/products') && x.method === 'GET').length >= 3", timeout=5000)
                     page.locator("#inventoryWarehouseForm").wait_for(state="visible", timeout=5000)
                     page.locator("#inventoryWarehouseForm input[name='id']").fill("main-warehouse")
                     page.locator("#inventoryWarehouseForm input[name='name']").fill("المستودع الرئيسي")
