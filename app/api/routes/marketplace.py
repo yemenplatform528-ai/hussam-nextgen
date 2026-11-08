@@ -358,7 +358,7 @@ def create_fulfillment(seller_order_id:int,body:FulfillmentIn,ctx=Depends(get_co
 @router.post('/seller/fulfillments/{fulfillment_id}/transition')
 def transition_fulfillment(fulfillment_id:int,body:FulfillmentTransitionIn,ctx=Depends(get_context),db=Depends(get_session)):
     seller_guard(ctx)
-    f=FulfillmentService(db).transition(ctx.tenant_id,fulfillment_id,body.status,body.event_id,body.location,body.note)
+    f=FulfillmentService(db).transition(ctx.tenant_id,fulfillment_id,body.status,body.event_id or f'seller-ui:{ctx.tenant_id}:{fulfillment_id}:{body.status}',body.location,body.note)
     marketplace=MarketplaceService(db)
     if f.shipment_id:
         seller_order=db.scalar(select(MarketplaceSellerOrder).where(MarketplaceSellerOrder.id==f.seller_order_id,MarketplaceSellerOrder.seller_tenant_id==ctx.tenant_id))
