@@ -27,6 +27,7 @@ window.__e2eCatalogItems=[];
 window.__e2eSellerOrders=[];
 window.__e2ePackages=[];
 window.__e2eCODCollections=[];
+window.__e2eReturns=[];
 (() => {
   const originalFetch = window.fetch.bind(window);
   const listing = {id: 1, title: 'E2E Phone', description: 'Browser journey product', unit_price: '1500', currency: 'YER', stock: null, seller: {tenant_id: 1, slug: 'e2e-store', display_name: 'E2E Store', description: 'Browser test store'}};
@@ -43,6 +44,11 @@ window.__e2eCODCollections=[];
     if (url.endsWith('/marketplace/seller/verification') && options.method==='POST') { window.__e2eSellerVerification='pending'; return json({id:1,status:'pending'}); }
     if (url.endsWith('/marketplace/seller/center')) return json(window.__e2eSellerRegistered?{registered:true,seller:{tenant_id:1,slug:'taiz-market',display_name:'متجر تعز',status:window.__e2eSellerVerification==='approved'?'active':'pending',verification:window.__e2eSellerVerification},metrics:{listings_published:1,listings_total:1,orders_actionable:0,fulfillments_actionable:0,net:0,currency:'YER'},actions:[],recent_orders:[]}:{registered:false,actions:[],metrics:{}});
     if (url.endsWith('/marketplace/seller/orders')) return json({items:window.__e2eSellerOrders});
+    if (url.endsWith('/marketplace/seller/returns')) return json({items:window.__e2eReturns});
+    if (url.match(/\/marketplace\/seller\/returns\/\d+\/review$/) && options.method==='POST') { const id=Number(url.match(/returns\/(\d+)\/review$/)[1]); const body=JSON.parse(options.body||'{}'); const x=window.__e2eReturns.find(r=>r.id===id); x.status=body.decision; return json({id,status:x.status}); }
+    if (url.match(/\/marketplace\/seller\/returns\/\d+\/transition$/) && options.method==='POST') { const id=Number(url.match(/returns\/(\d+)\/transition$/)[1]); const body=JSON.parse(options.body||'{}'); const x=window.__e2eReturns.find(r=>r.id===id); x.status=body.status; return json({id,status:x.status}); }
+    if (url.match(/\/marketplace\/seller\/returns\/\d+\/approve-refund$/) && options.method==='POST') { const id=Number(url.match(/returns\/(\d+)\/approve-refund$/)[1]); const x=window.__e2eReturns.find(r=>r.id===id); x.status='refund_approved'; x.refund_amount='2500'; x.refund_currency='YER'; x.refund_reference='REFUND-E2E-001'; return json({return_id:id,status:x.status,refund:{reference:x.refund_reference,amount:x.refund_amount,currency:x.refund_currency,status:'pending'}}); }
+    if (url.match(/\/marketplace\/seller\/returns\/\d+\/complete-refund$/) && options.method==='POST') { const id=Number(url.match(/returns\/(\d+)\/complete-refund$/)[1]); const body=JSON.parse(options.body||'{}'); const x=window.__e2eReturns.find(r=>r.id===id); x.status='refunded'; return json({return_id:id,status:x.status,provider_refund_id:body.provider_refund_id}); }
     if (url.endsWith('/marketplace/seller/orders/99/processing') && options.method==='POST') { window.__e2eSellerOrders[0].status='processing'; return json({id:99,status:'processing'}); }
     if (url.endsWith('/marketplace/seller/orders/199/fulfillments') && options.method==='POST') { const body=JSON.parse(options.body||'{}'); Object.assign(window.__e2eSellerOrders[0],{fulfillment_id:701,fulfillment_status:'pending',fulfillment_method:body.method,shipment_id:null,carrier:null}); return json({id:701,seller_order_id:199,method:body.method,status:'pending'},201); }
     if (url.endsWith('/marketplace/seller/fulfillments/701/transition') && options.method==='POST') { const body=JSON.parse(options.body||'{}'); window.__e2eSellerOrders[0].fulfillment_status=body.status; if(body.status==='delivered') window.__e2eSellerOrders[0].status='completed'; return json({id:701,status:body.status,shipment_id:window.__e2eSellerOrders[0].shipment_id}); }
@@ -69,6 +75,7 @@ window.__e2eCODCollections=[];
     if (url.endsWith('/marketplace/buyer/shipping-quotes')) return json({id:301,seller_tenant_id:1,address_id:20,fee:'250',currency:'YER',expires_at:'2099-01-01T00:00:00Z'});
     if (url.endsWith('/marketplace/buyer/checkout')) { window.__e2eCheckoutCalls += 1; window.__e2eLastCheckoutHeaders = Object.fromEntries(new Headers(options.headers||{}).entries()); window.__e2eLastCheckoutBody = JSON.parse(options.body||'{}'); if(window.__e2eLoseFirstCheckoutResponse){window.__e2eLoseFirstCheckoutResponse=false;return Promise.reject(new TypeError('simulated response loss after server acceptance'));} return json({orders:[{id:101,reference:'YEM-E2E-001',currency:'YER',total:'1500'}]}); }
     if (url.endsWith('/marketplace/buyer/customer-orders')) return json({items:[{id:700,reference:'YEM-E2E-001',status:'shipped',currency:'YER',subtotal:'1500',shipping_fee:'250',total:'1750',created_at:'2026-11-09T00:00:00Z',seller_orders:[{id:701,seller_tenant_id:1,marketplace_order_id:101,reference:'YEM-E2E-001-S1',status:'shipped',subtotal:'1500',shipping_fee:'250',total:'1750',fulfillment:{id:801,method:'external_carrier',status:'in_transit',shipment_id:901,carrier:'Yemen Local Delivery',shipment:{id:901,reference:'SHP-E2E-001',carrier:'Yemen Local Delivery',tracking_number:'TRK-E2E-BUYER',status:'in_transit',destination:'Taiz'}}}]}]});
+    if (url.endsWith('/marketplace/buyer/orders')) return json({items:[{id:101,reference:'YEM-E2E-001',seller_tenant_id:1,total:'1500',currency:'YER',status:'pending_payment',payment_reference:null}]});
     if (url.endsWith('/marketplace/buyer/orders')) return json({items:[{id:101,reference:'YEM-E2E-001',seller_tenant_id:1,total:'1500',currency:'YER',status:'pending_payment',payment_reference:null}]});
     return originalFetch(input, options);
   };
@@ -200,6 +207,23 @@ def run():
                     page.wait_for_function("window.__e2eSellerOrders[0].cod_collection_status === 'collected'")
                     assert page.evaluate("window.__e2ePackages.length") == 1
                     assert page.evaluate("window.__e2eCODCollections[0].amount") == "2500"
+                    page.evaluate("""window.__e2eReturns=[{id:501,order_id:101,reason:'damaged_item',description:'Damaged packaging',status:'requested',refund_amount:null,refund_currency:null,refund_reference:null,refund_scope:'order'}]""")
+                    page.locator("button[data-ws='returns']").click()
+                    page.locator("button[data-return-review='501'][data-decision='approved']").wait_for(state="visible", timeout=5000)
+                    page.locator("button[data-return-review='501'][data-decision='approved']").click()
+                    page.wait_for_function("window.__e2eReturns[0].status==='approved'")
+                    page.locator("button[data-return-transition='501'][data-status='pickup']").click()
+                    page.wait_for_function("window.__e2eReturns[0].status==='pickup'")
+                    page.locator("button[data-return-transition='501'][data-status='received']").click()
+                    page.wait_for_function("window.__e2eReturns[0].status==='received'")
+                    page.locator("button[data-return-transition='501'][data-status='inspected']").click()
+                    page.wait_for_function("window.__e2eReturns[0].status==='inspected'")
+                    page.locator("button[data-return-refund-approve='501']").click()
+                    page.wait_for_function("window.__e2eReturns[0].status==='refund_approved'")
+                    page.locator("input[data-refund-provider='501']").fill("PROVIDER-REFUND-E2E-001")
+                    page.locator("button[data-return-refund-complete='501']").click()
+                    page.wait_for_function("window.__e2eReturns[0].status==='refunded'")
+                    assert page.evaluate("window.__e2eReturns[0].status") == "refunded"
                     page.locator("button[data-action='home']").click()
                     page.wait_for_timeout(100)
                     page.locator("button[data-add='1']").first.click()
@@ -257,7 +281,7 @@ def run():
                     assert page.evaluate("window.__e2eCheckoutCalls") == 1
                     page.locator("select[name='shipping_address_id']").select_option("20")
                     page.locator("#checkoutForm button").click()
-                    page.locator("h2", has_text="YEM-E2E-001").wait_for(state="visible", timeout=10000)
+                    page.locator("text=YEM-E2E-001").wait_for(state="visible", timeout=10000)
                     assert page.evaluate("window.__e2eCheckoutCalls") == 2
                     assert page.evaluate("window.__e2eLastCheckoutHeaders['idempotency-key']") == first_key
                     assert page.evaluate("window.__e2eLastCheckoutBody.shipping_quote_ids") == [301]
