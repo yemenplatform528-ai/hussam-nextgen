@@ -51,6 +51,35 @@ def test_pickup_delivery_completes_marketplace_order_idempotently():
     assert db.get(MarketplaceCustomerOrder,so.customer_order_id).status=='completed'
     assert m.mark_pickup_delivered(seller.id,so.id).id==completed.id
 
+def test_pickup_delivery_completes_marketplace_order_idempotently():
+    db,m,ids,seller,admin,buyer,order,a=setup()
+    so=db.scalar(select(MarketplaceSellerOrder).where(MarketplaceSellerOrder.marketplace_order_id==order.id))
+    order.status='paid'; so.status='paid'; db.commit()
+    m.mark_processing(seller.id,order.id)
+    fs=FulfillmentService(db); f=fs.create(seller.id,so.id,'pickup')
+    fs.transition(seller.id,f.id,'assigned')
+    fs.transition(seller.id,f.id,'ready')
+    fs.transition(seller.id,f.id,'delivered',event_id='pickup-delivered-1',note='Collected by buyer')
+    completed=m.mark_pickup_delivered(seller.id,so.id)
+    assert completed.status=='completed'
+    assert db.get(MarketplaceSellerOrder,so.id).status=='fulfilled'
+    assert db.get(MarketplaceCustomerOrder,so.customer_order_id).status=='completed'
+    assert m.mark_pickup_delivered(seller.id,so.id).id==completed.id
+
+def test_cod_pickup_cannot_complete_without_collection_evidence():
+    db,m,ids,seller,admin,buyer,order,a=setup()
+    so=db.scalar(select(MarketplaceSellerOrder).where(MarketplaceSellerOrder.marketplace_order_id==order.id))
+    order.status='processing'; order.payment_method_code='cod'; so.status='processing'; db.commit()
+    fs=FulfillmentService(db); f=fs.create(seller.id,so.id,'pickup')
+    fs.transition(seller.id,f.id,'assigned')
+    fs.transition(seller.id,f.id,'ready')
+    try:
+        fs.transition(seller.id,f.id,'delivered',event_id='cod-pickup-delivered-1',note='Collected by buyer')
+        assert False
+    except FulfillmentError as exc:
+        assert 'COD pickup collection is not supported' in str(exc)
+    assert db.get(MarketplaceFulfillment,f.id).status=='ready'
+
 def test_fulfillment_is_tenant_scoped():
     db,m,ids,seller,admin,buyer,order,a=setup(); so=db.scalar(select(MarketplaceSellerOrder).where(MarketplaceSellerOrder.marketplace_order_id==order.id)); so.status='processing'; db.commit()
     fs=FulfillmentService(db); f=fs.create(seller.id,so.id)
