@@ -45,6 +45,8 @@ window.__e2eReturns=[];
     if (url.endsWith('/marketplace/seller') && options.method==='POST') { window.__e2eSellerRegistered=true; window.__e2eSellerVerification='pending'; return json({tenant_id:1,slug:'taiz-market',display_name:'متجر تعز',status:'pending'},201); }
     if (url.endsWith('/marketplace/seller/verification') && options.method==='POST') { window.__e2eSellerVerification='pending'; return json({id:1,status:'pending'}); }
     if (url.endsWith('/marketplace/seller/center')) return json(window.__e2eSellerRegistered?{registered:true,seller:{tenant_id:1,slug:'taiz-market',display_name:'متجر تعز',status:window.__e2eSellerVerification==='approved'?'active':'pending',verification:window.__e2eSellerVerification},metrics:{listings_published:1,listings_total:1,orders_actionable:0,fulfillments_actionable:0,net:0,currency:'YER'},actions:[],recent_orders:[]}:{registered:false,actions:[],metrics:{}});
+    if (url.endsWith('/marketplace/seller/status')) return json({registered:window.__e2eSellerRegistered,tenant_id:1,slug:'taiz-market',status:window.__e2eSellerVerification==='approved'?'active':'pending',verification:window.__e2eSellerVerification});
+    if (url.endsWith('/marketplace/seller/catalog')) return json({items:window.__e2eCatalogItems});
     if (url.endsWith('/marketplace/seller/orders')) return json({items:window.__e2eSellerOrders});
     if (url.endsWith('/marketplace/seller/returns')) return json({items:window.__e2eReturns});
     if (url.match(/\/marketplace\/seller\/returns\/\d+\/review$/) && options.method==='POST') { const id=Number(url.match(/returns\/(\d+)\/review$/)[1]); const body=JSON.parse(options.body||'{}'); const x=window.__e2eReturns.find(r=>r.id===id); x.status=body.decision; return json({id,status:x.status}); }
@@ -64,7 +66,7 @@ window.__e2eReturns=[];
     if (url.includes('/inventory/stock/')) return json({item_id:'rice-10kg',warehouse_id:'main-warehouse',on_hand:'50',reserved:'0',available:'50'});
     if (url.endsWith('/products')) return json({items:window.__e2eInventoryItems,limit:50,offset:0});
     if ((url.endsWith('/warehouses') || url.includes('/warehouses?')) && String(options.method || 'GET').toUpperCase()!=='POST') return json({items:window.__e2eWarehouses,limit:50,offset:0});
-    if (url.endsWith('/marketplace/seller/catalog/bundle') && options.method==='POST') { const body=JSON.parse(options.body||'{}'); window.__e2eCatalogItems.push({name:body.product.name,slug:body.product.slug,skus:[{sku_code:body.sku.sku_code,offer:{unit_price:body.offer.unit_price,currency:body.offer.currency,status:'active'},listing:{slug:body.listing_slug,status:'draft'}}]}); return json({product:{id:1,slug:body.product.slug,name:body.product.name},sku:{id:1,sku_code:body.sku.sku_code},offer:{id:1,currency:body.offer.currency,unit_price:body.offer.unit_price},listing:{id:1,slug:body.listing_slug,status:'draft',moderation_status:'pending'}},201); }
+    if (url.endsWith('/marketplace/seller/catalog/bundle') && options.method==='POST') { const body=JSON.parse(options.body||'{}'); window.__e2eCatalogItems.push({name:body.product.name,slug:body.product.slug,skus:[{sku_code:body.sku.sku_code,offer:{unit_price:body.offer.unit_price,currency:body.offer.currency,status:'active'},listing:{slug:body.listing_slug,status:'draft',moderation_status:'pending'}}]}); return json({product:{id:1,slug:body.product.slug,name:body.product.name},sku:{id:1,sku_code:body.sku.sku_code},offer:{id:1,currency:body.offer.currency,unit_price:body.offer.unit_price},listing:{id:1,slug:body.listing_slug,status:'draft',moderation_status:'pending'}},201); }
     if (url.endsWith('/marketplace/seller/catalog')) return json({items:window.__e2eCatalogItems});
     if (url.endsWith('/marketplace/buyer/cart')) return json({id:1,status:'active',market_id:1,market_code:'YEM',items:[{id:1,quantity:'1',line_total:'1500',listing}]});
     if (url.endsWith('/marketplace/buyer/cart/items')) { window.__e2eCartMutationCalls += 1; window.__e2eLastCartMutationHeaders = Object.fromEntries(new Headers(options.headers||{}).entries()); return json({id:1,status:'active',market_id:1,market_code:'YEM',items:[{id:1,quantity:'1',line_total:'1500',listing}]}); }
@@ -182,6 +184,12 @@ def run():
                     page.locator("#catalogBundleForm input[name='listing_slug']").fill("basmati-rice-10kg")
                     page.locator("#catalogBundleForm button").click()
                     page.locator("small", has_text="basmati-rice-10kg").wait_for(state="visible", timeout=5000)
+                    page.locator("button[data-ws='trust']").click()
+                    page.locator("h1", has_text="الثقة والتحقق").wait_for(state="visible", timeout=5000)
+                    assert page.locator("text=قيد التحقق").is_visible()
+                    assert page.locator("text=basmati-rice-10kg").is_visible()
+                    assert page.locator("text=pending").is_visible()
+                    page.locator("button[data-ws='orders']").click()
                     page.evaluate("""window.__e2eSellerOrders=[{id:99,seller_order_id:199,reference:'ORD-E2E-001',buyer_user_id:'buyer-e2e',total:'2500',currency:'YER',status:'pending_payment',payment_method_code:'cod',sales_order_id:501,fulfillment_id:null,fulfillment_status:null,fulfillment_method:null,shipment_id:null,carrier:null,cod_collection_id:null,cod_collection_status:null}]""")
                     page.locator("button[data-ws='orders']").click()
                     page.locator("button[data-processing='99']").click()
