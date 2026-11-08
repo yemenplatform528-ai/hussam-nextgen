@@ -1295,6 +1295,7 @@ class MarketplaceService:
         co=self.db.scalar(select(MarketplaceCustomerOrder).where(MarketplaceCustomerOrder.id==customer_order_id, MarketplaceCustomerOrder.buyer_user_id==buyer_user_id).with_for_update())
         if not co: raise MarketplaceError('customer order not found')
         if co.status!='pending_payment': raise MarketplaceError('customer order is not awaiting payment')
+        if co.payment_method_code == 'cod': raise MarketplaceError('COD orders do not create electronic payment sessions')
         existing=self.db.scalar(select(MarketplacePaymentSession).where(MarketplacePaymentSession.customer_order_id==co.id))
         if existing: return existing
         children=self.db.scalars(select(MarketplaceSellerOrder).where(MarketplaceSellerOrder.customer_order_id==co.id).order_by(MarketplaceSellerOrder.id)).all()
@@ -1386,6 +1387,7 @@ class MarketplaceService:
     def attach_payment_intent(self,buyer_user_id:str, order_id:int, provider:str):
         o=self._order(buyer_user_id,order_id,lock=True)
         if o.status!='pending_payment': raise MarketplaceError('order is not awaiting payment')
+        if o.payment_method_code == 'cod': raise MarketplaceError('COD orders cannot create electronic payment intents')
         if o.payment_reference: raise MarketplaceError('payment intent already exists for order')
         ref=f'MKT-PAY:{o.reference}'
         from app.engines.payments import PaymentProductionService
@@ -1419,7 +1421,13 @@ class MarketplaceService:
 
     def mark_processing(self,seller_tenant_id:int,order_id:int):
         o=self._order(None,order_id,seller_tenant_id,True)
-        if o.status!='paid': raise MarketplaceError('only paid orders can enter processing')
+        if o.status == 'pending_payment' and o.payment_method_code == 'cod':
+            # COD is operationally accepted, not prepaid. Keep payment_reference
+            # empty and payout held until cash remittance/reconciliation is proven.
+            if o.payment_reference:
+                raise MarketplaceError('COD order cannot carry an electronic payment reference')
+        elif o.status != 'paid':
+            raise MarketplaceError('only captured-payment or COD orders can enter processing')
         o.status='processing'; o.updated_at=datetime.now(timezone.utc)
         so=self.db.scalar(select(MarketplaceSellerOrder).where(MarketplaceSellerOrder.marketplace_order_id==o.id))
         if so: so.status='processing'; so.updated_at=datetime.now(timezone.utc)
