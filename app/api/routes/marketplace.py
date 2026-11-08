@@ -1,9 +1,10 @@
 from decimal import Decimal
+from typing import Literal
 from datetime import date
 import hashlib
 import json
 from fastapi import APIRouter, Depends, Query, HTTPException, Header
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import desc, select, func
 from app.api.dependencies import get_context, get_session
 from app.core.models.core import MutationRecord
@@ -20,7 +21,22 @@ router=APIRouter(prefix='/marketplace',tags=['marketplace'])
 def seller_guard(ctx):
     if ctx.role not in {'owner','admin'}: raise HTTPException(status_code=403, detail='seller administration requires owner or admin role')
 
-class SellerIn(BaseModel): slug:str; display_name:str; description:str=''; seller_type:str='business'
+class SellerIn(BaseModel):
+    slug:str=Field(min_length=2,max_length=120)
+    display_name:str=Field(min_length=2,max_length=200)
+    description:str=Field(default='',max_length=2000)
+    seller_type:Literal['business','individual','institution']='business'
+
+    @field_validator('slug')
+    @classmethod
+    def validate_slug(cls, value):
+        value=value.strip()
+        if (len(value)<2 or len(value)>120 or not value.isascii() or value.lower()!=value
+                or not value[0].isalnum() or any(not (char.isalnum() or char=='-') for char in value)):
+            raise ValueError('seller slug must use lowercase ASCII letters, numbers, and hyphens')
+        return value
+
+class VerificationSubmissionIn(BaseModel): notes:str=Field(default='',max_length=4000)
 class CategoryIn(BaseModel): slug:str; name:str; parent_id:int|None=None; market_id:int|None=None
 class ListingIn(BaseModel):
     slug:str; title:str; description:str=''; listing_type:str='product'; currency:str; unit_price:Decimal=Field(ge=0)
@@ -415,8 +431,8 @@ class ReturnIn(BaseModel):
     lines:list[ReturnLineIn]=Field(default_factory=list,max_length=100)
 
 @router.post('/seller/verification')
-def submit_verification(body:dict|None=None,ctx=Depends(get_context),db=Depends(get_session)):
-    seller_guard(ctx); x=MarketplaceService(db).submit_seller_verification(ctx.tenant_id,(body or {}).get('notes','')); return {'id':x.id,'status':x.status}
+def submit_verification(body:VerificationSubmissionIn,ctx=Depends(get_context),db=Depends(get_session)):
+    seller_guard(ctx); x=MarketplaceService(db).submit_seller_verification(ctx.tenant_id,body.notes); return {'id':x.id,'status':x.status,'submitted_at':x.submitted_at.isoformat() if x.submitted_at else None}
 
 @router.post('/seller/shipping-rates',status_code=201)
 def add_shipping_rate(body:ShippingRateIn,ctx=Depends(get_context),db=Depends(get_session)):

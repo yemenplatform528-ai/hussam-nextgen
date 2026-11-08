@@ -12,6 +12,8 @@ window.__e2eCheckoutCalls=0;
 window.__e2eLoseFirstCheckoutResponse=true;
 window.__e2eLastCheckoutHeaders=null;
 window.__e2eLastCheckoutBody=null;
+window.__e2eSellerRegistered=true;
+window.__e2eSellerVerification='approved';
 window.__e2eCartMutationCalls=0;
 window.__e2eLastCartMutationHeaders=null;
 window.__e2eOfflineReads=false;
@@ -28,7 +30,9 @@ window.__e2eAddresses=[];
     if (url.endsWith('/marketplace/categories')) return json({items:[{id:1, slug:'e2e-category', name:'E2E Category', parent_id:null}]});
     if (url.includes('/marketplace/sellers?')) return json({items:[{tenant_id:1, slug:'e2e-store', display_name:'E2E Store', description:'Browser test store', seller_type:'business'}]});
     if (url.endsWith('/session')) return json({user_id:'e2e-user', tenant_id:1, membership_id:1});
-    if (url.endsWith('/marketplace/seller/center')) return json({metrics:{listings_published:1,listings_total:1,orders_actionable:0,fulfillments_actionable:0,net:0,currency:'YER'},actions:[],recent_orders:[]});
+    if (url.endsWith('/marketplace/seller') && options.method==='POST') { window.__e2eSellerRegistered=true; window.__e2eSellerVerification='pending'; return json({tenant_id:1,slug:'taiz-market',display_name:'متجر تعز',status:'pending'},201); }
+    if (url.endsWith('/marketplace/seller/verification') && options.method==='POST') { window.__e2eSellerVerification='pending'; return json({id:1,status:'pending'}); }
+    if (url.endsWith('/marketplace/seller/center')) return json(window.__e2eSellerRegistered?{registered:true,seller:{tenant_id:1,slug:'taiz-market',display_name:'متجر تعز',status:window.__e2eSellerVerification==='approved'?'active':'pending',verification:window.__e2eSellerVerification},metrics:{listings_published:1,listings_total:1,orders_actionable:0,fulfillments_actionable:0,net:0,currency:'YER'},actions:[],recent_orders:[]}:{registered:false,actions:[],metrics:{}});
     if (url.endsWith('/marketplace/seller/catalog')) return json({items:[]});
     if (url.endsWith('/marketplace/buyer/cart')) return json({id:1,status:'active',market_id:1,market_code:'YEM',items:[{id:1,quantity:'1',line_total:'1500',listing}]});
     if (url.endsWith('/marketplace/buyer/cart/items')) { window.__e2eCartMutationCalls += 1; window.__e2eLastCartMutationHeaders = Object.fromEntries(new Headers(options.headers||{}).entries()); return json({id:1,status:'active',market_id:1,market_code:'YEM',items:[{id:1,quantity:'1',line_total:'1500',listing}]}); }
@@ -89,6 +93,17 @@ def run():
                     page.locator("button[data-ws='products']").click()
                     page.wait_for_timeout(250)
                     assert page.locator(".workspace-nav button[data-ws='products']").is_visible()
+                    page.evaluate("window.__e2eSellerRegistered=false")
+                    page.locator("button[data-ws='dashboard']").click()
+                    page.locator("#sellerRegistrationForm").wait_for(state="visible", timeout=5000)
+                    page.locator("#sellerRegistrationForm input[name='display_name']").fill("متجر تعز")
+                    page.locator("#sellerRegistrationForm input[name='slug']").fill("taiz-market")
+                    page.locator("#sellerRegistrationForm textarea[name='description']").fill("متجر تجريبي للسوق اليمني")
+                    page.locator("#sellerRegistrationForm textarea[name='notes']").fill("نشاط تجاري داخل تعز")
+                    page.locator("#sellerRegistrationForm button").click()
+                    page.locator("#sellerVerificationForm").wait_for(state="visible", timeout=5000)
+                    assert page.evaluate("window.__e2eSellerRegistered") is True
+                    assert page.evaluate("window.__e2eSellerVerification") == 'pending'
                     page.locator("button[data-action='home']").click()
                     page.wait_for_timeout(100)
                     page.locator("button[data-add='1']").first.click()
