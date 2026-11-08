@@ -107,7 +107,7 @@ return '<tr><td>#'+x.id+'<small>طلب #'+esc(x.order_id)+'</small></td><td>'+es
 }).join('');
 $('workspaceScreen').innerHTML='<div class="workspace-header"><div><h1>'+title+'</h1><span class="muted">إدارة طلبات الإرجاع عبر دورة مراجعة واستلام وفحص واسترداد موثقة. لا يُعد التسليم أو الموافقة دليلاً على تنفيذ رد المبلغ.</span></div></div><div class="table-wrap"><table class="table"><thead><tr><th>المرجع</th><th>السبب والتفاصيل</th><th>الحالة</th><th>الاسترداد</th><th>الإجراءات</th></tr></thead><tbody>'+(rows||'<tr><td colspan="5" class="empty">لا توجد طلبات إرجاع.</td></tr>')+'</tbody></table></div>';return}
 if(screen==='trust'&&state.role==='seller'){
-const [status,catalog]=await Promise.all([api('/marketplace/seller/status'),api('/marketplace/seller/catalog')]);
+const status=await api('/marketplace/seller/status');if(!status.registered){$('workspaceScreen').innerHTML='<div class="panel"><h1>الثقة والتحقق</h1><p>سجّل متجرك أولاً حتى تظهر حالة التحقق ومراجعة قوائم المنتجات.</p><button class="btn" data-ws="dashboard">العودة إلى مركز البائع</button></div>';return}const catalog=await api('/marketplace/seller/catalog');
 const sellerLabels={active:'حساب نشط',pending:'بانتظار المراجعة',suspended:'موقوف',rejected:'مرفوض'};
 const verificationLabels={approved:'تم التحقق',pending:'قيد التحقق',rejected:'يتطلب معالجة',null:'لم يبدأ التحقق'};
 const listings=(catalog.items||[]).flatMap(p=>(p.skus||[]).filter(x=>x.listing).map(x=>({product:p,sku:x,listing:x.listing})));
