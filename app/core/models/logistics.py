@@ -57,8 +57,8 @@ class ShipmentCollection(Base):
         UniqueConstraint('tenant_id', 'shipment_id', name='uq_one_collection_per_shipment'),
         CheckConstraint('amount > 0', name='ck_shipment_collection_positive_amount'),
         CheckConstraint("status IN ('pending','collected','failed','cancelled')", name='ck_shipment_collection_status'),
-        CheckConstraint("evidence_source IN ('seller_attestation','carrier_signed_event','platform_verified_agent_receipt')", name='ck_shipment_collection_evidence_source'),
-        CheckConstraint("(evidence_source = 'seller_attestation' AND independently_verified = false) OR (evidence_source IN ('carrier_signed_event','platform_verified_agent_receipt') AND independently_verified = true)", name='ck_shipment_collection_evidence_verification'),
+        CheckConstraint("evidence_source = 'seller_attestation'", name='ck_shipment_collection_evidence_source'),
+        CheckConstraint("independently_verified = false", name='ck_shipment_collection_evidence_verification'),
     )
 
 
