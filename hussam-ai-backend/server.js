@@ -1,6 +1,7 @@
 import http from "node:http";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { createRateLimiter } from "./rate-limiter.js";
+import { readRequestBody } from "./body-reader.js";
 import { isIP } from "node:net";
 
 const PORT = Number(process.env.PORT || 10000);
@@ -55,34 +56,7 @@ function clientAddress(req) {
 function allowRate(key, limit, windowMs) {
   return rateLimiter.allow(key, limit, windowMs);
 }
-async function readRequestBody(req, maxBytes, timeoutCode = "REQUEST_BODY_TIMEOUT") {
-  let raw = "";
-  let bodyTimeout;
-  try {
-    const bodyRead = (async () => {
-      for await (const chunk of req) {
-        raw += chunk;
-        if (raw.length > maxBytes) {
-          const error = new Error("REQUEST_TOO_LARGE");
-          error.code = "REQUEST_TOO_LARGE";
-          throw error;
-        }
-      }
-    })();
-    const deadline = new Promise((_, reject) => {
-      bodyTimeout = setTimeout(() => {
-        const error = new Error(timeoutCode);
-        error.code = timeoutCode;
-        reject(error);
-      }, Math.max(100, Number(process.env.HUSSAM_REQUEST_BODY_TIMEOUT_MS) || 15_000));
-      bodyTimeout.unref?.();
-    });
-    await Promise.race([bodyRead, deadline]);
-    return raw;
-  } finally {
-    if (bodyTimeout) clearTimeout(bodyTimeout);
-  }
-}
+
 let activeGenerations = 0;
 let activeUploads = 0;
 let liveModelVerified = false; // Process-local evidence; resets on restart.
