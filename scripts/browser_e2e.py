@@ -223,8 +223,8 @@ def run():
                     page.locator("input[data-cod-ref='701']").fill("COD-E2E-001")
                     page.locator("button[data-collect-cod='701']").click()
                     page.wait_for_function("window.__e2eSellerOrders[0].cod_collection_status === 'collected'")
-                    assert page.locator("text=إفادة البائع").is_visible()
-                    assert page.locator("text=لم يتم التحقق من الناقل أو توريد النقد").is_visible()
+                    page.locator("text=إفادة البائع").wait_for(state="visible", timeout=5000)
+                    page.locator("text=لم يتم التحقق من الناقل أو توريد النقد").wait_for(state="visible", timeout=5000)
                     assert page.evaluate("window.__e2ePackages.length") == 1
                     assert page.evaluate("window.__e2eCODCollections[0].amount") == "2500"
                     page.evaluate("""window.__e2eReturns=[{id:501,order_id:101,reason:'damaged_item',description:'Damaged packaging',status:'requested',refund_amount:null,refund_currency:null,refund_reference:null,refund_scope:'order',payment_method_code:'card'},{id:502,order_id:102,reason:'damaged_item',description:'COD return',status:'inspected',refund_amount:null,refund_currency:null,refund_reference:null,refund_scope:'order',payment_method_code:'cod'}]""")
