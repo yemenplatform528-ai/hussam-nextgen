@@ -47,7 +47,7 @@ The posting boundary must validate, at minimum:
 - Journal reference and source event are idempotent and unique.
 - The account mapping version and approver are retained in the audit trail.
 
-The current `post_journal` path now enforces tenant ownership, active status and currency compatibility against the chart of accounts; inactive accounts are permitted only for reversal of an existing journal. Event-specific account-type mapping remains a separate owner-approved prerequisite. A balanced journal alone still does not prove that the selected account type is semantically correct for the business event.
+The current `post_journal` path now enforces tenant ownership, active status and currency compatibility against the chart of accounts; inactive accounts are permitted only for reversal of an existing journal. The legacy `FinancePersistenceService` and `FinanceLifecycleService` delegate to this same posting/reversal authority and require explicit dates. Event-specific account-type mapping remains a separate owner-approved prerequisite. A balanced journal alone still does not prove that the selected account type is semantically correct for the business event.
 
 ## 4. Subledger-to-General-Ledger linkage
 
