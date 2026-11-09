@@ -128,7 +128,7 @@ class LogisticsProductionService:
                                amount=amount, currency=currency, status='collected', evidence_source='seller_attestation', independently_verified=False, collected_at=datetime.now(timezone.utc))
         self.db.add(c); self.db.flush()
         self._event(tenant_id, 'logistics.cod.collected', s.id,
-                    {'reference': reference, 'amount': str(amount), 'currency': currency})
+                    {'reference': reference, 'amount': str(amount), 'currency': currency, 'evidence_source': c.evidence_source, 'independently_verified': c.independently_verified})
         try:
             self.db.commit(); self.db.refresh(c); return c
         except IntegrityError:
