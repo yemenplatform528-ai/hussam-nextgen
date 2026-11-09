@@ -49,7 +49,7 @@ def post_journal(session, *, tenant_id: int, reference: str, currency: str,
                  _allow_inactive_accounts: bool = False) -> Journal:
     if tenant_id <= 0:
         raise TenantAccessDenied("valid tenant context is required")
-    if not reference or not currency:
+    if not reference or not reference.strip() or not currency or not currency.strip():
         raise FinanceError("reference and currency are required")
     _validate_lines(lines)
     normalized_reference = reference.strip()
