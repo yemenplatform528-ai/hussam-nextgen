@@ -94,3 +94,24 @@ A source-level review of the current COD collection endpoint narrows the meaning
 7. A seller-submitted COD collection attestation must never be presented as carrier-verified cash collection or remittance. UI, API responses, and finance decisions must preserve the evidence source and verification level.
 
 The existing fail-closed settlement and refund controls remain correct and must not be weakened while this evidence gap is closed.
+
+
+## 2026-11-09 — Marketplace seller subledger to General Ledger bridge
+
+A source-level review of the current seller settlement and payout paths found an additional accounting boundary that must be closed before seller balances can be treated as fully reconciled financial liabilities:
+
+- `MarketplaceService.settle_order_payment` validates a real `PaymentSettlement` and credits the `MarketplaceSellerBalanceEntry` subledger for an eligible completed order.
+- `MarketplaceService.mark_payout_paid` validates the seller destination/provider gate and debits the same seller subledger when payout is marked paid.
+- These marketplace paths do not call the Finance `post_journal` authority or create a journal-to-subledger linkage. The payment settlement journal records cash/clearing movement, but it does not by itself establish the seller-payable and payout postings.
+- The current Finance `post_journal` function validates balanced lines, tenant context, an open fiscal period, and duplicate journal references, but writes account identifiers as strings without validating that each account exists, is active, belongs to the tenant, or supports the journal currency. The `accounts` table exists, but this posting path does not enforce it.
+- The seller subledger has its own conservation checks, but those checks do not prove General Ledger reconciliation.
+
+### Additional verified engineering gap
+
+| Gap | Classification | Current behavior | Required closure |
+|---|---|---|---|
+| Marketplace seller subledger ↔ General Ledger | Verified engineering gap | Seller settlement and payout mutate `MarketplaceSellerBalanceEntry` without linked Finance journal entries | Define approved account mappings by tenant/market/currency; post idempotent settlement, seller-payable, commission, payout, refund and recovery journals through the existing Finance authority; link subledger entries to journal references/lines; enforce account ownership/activity/currency, fiscal-period controls, reversals, reconciliation and audit provenance |
+
+### Control
+
+The marketplace seller balance remains an operational subledger, not a substitute for the authoritative Finance General Ledger. Do not claim accounting reconciliation or production payout certification from seller-balance conservation alone. Do not invent account codes or post journals until the account mapping and cash-custody policy are approved.
