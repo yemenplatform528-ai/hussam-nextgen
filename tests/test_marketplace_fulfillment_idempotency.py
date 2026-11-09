@@ -77,6 +77,8 @@ def test_cod_selection_becomes_shipment_collection_amount():
     )
     assert collected.status == 'collected'
     assert collected.amount == Decimal('1000.0000')
+    assert collected.evidence_source == 'seller_attestation'
+    assert collected.independently_verified is False
     replay = LogisticsProductionService(db).create_cod_collection(
         seller.id, shipment.id, reference='COD-COL-1', amount=Decimal('1000'), currency='YER'
     )
@@ -90,3 +92,4 @@ def test_cod_selection_becomes_shipment_collection_amount():
     assert seller_order_view['shipment_id'] == shipment.id
     assert seller_order_view['cod_collection_evidence_source'] == 'seller_attestation'
     assert seller_order_view['cod_collection_independently_verified'] is False
+    assert seller_order_view['cod_collection_status'] == 'collected'
