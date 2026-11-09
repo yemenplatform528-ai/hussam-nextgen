@@ -36,6 +36,15 @@ def test_finance_persistence_rejects_accounts_outside_tenant_chart():
         FinancePersistenceService(s).post(t.id,cmd)
 
 
+def test_finance_persistence_requires_posting_date():
+    s=db(); ids=IdentityService(s); t=ids.create_tenant("A")
+    create_account(s, tenant_id=t.id, code="cash", name="Cash", account_type="asset", currency="YER")
+    create_account(s, tenant_id=t.id, code="sales", name="Sales", account_type="revenue", currency="YER")
+    cmd=JournalCommand("NO-POSTING-DATE","YER",(JournalLine("cash",Decimal("1"),Decimal("0")),JournalLine("sales",Decimal("0"),Decimal("1"))))
+    with pytest.raises(AccountingInvariantError, match="posting date is required"):
+        FinancePersistenceService(s).post(t.id,cmd)
+
+
 def test_inventory_records_movement_not_balance():
     s=db(); t=IdentityService(s).create_tenant("A")
     r=InventoryPersistenceService(s).record(t.id,StockMovement("item","wh",Decimal("5"),"in","GRN-1"))
