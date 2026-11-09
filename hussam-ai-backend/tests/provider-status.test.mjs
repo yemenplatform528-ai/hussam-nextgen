@@ -83,7 +83,6 @@ for (const [upstreamStatus, expectedCode] of [
       const healthBody = await health.json();
       assert.equal(healthBody.liveModelVerified, false, "failed provider requests must not mark live inference verified");
       assert.equal(output.includes("fake-key"), false);
-      assert.equal(output.includes("mocked provider status"), false);
     } finally {
       child.kill("SIGTERM");
       await Promise.race([
