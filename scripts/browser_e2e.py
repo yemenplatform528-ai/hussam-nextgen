@@ -24,6 +24,7 @@ window.__e2eInventoryRequests=[];
 window.__e2eWarehouses=[];
 window.__e2eInventoryMovements=[];
 window.__e2eCatalogItems=[];
+window.__e2eCatalogUnavailable=false;
 window.__e2eSellerOrders=[];
 window.__e2ePackages=[];
 window.__e2eCODCollections=[];
@@ -47,7 +48,7 @@ window.__e2eReturns=[];
     if (url.endsWith('/marketplace/seller/verification') && options.method==='POST') { window.__e2eSellerVerification='pending'; return json({id:1,status:'pending'}); }
     if (url.endsWith('/marketplace/seller/center')) return json(window.__e2eSellerRegistered?{registered:true,seller:{tenant_id:1,slug:'taiz-market',display_name:'متجر تعز',status:window.__e2eSellerVerification==='approved'?'active':'pending',verification:window.__e2eSellerVerification},metrics:{listings_published:1,listings_total:1,orders_actionable:0,fulfillments_actionable:0,net:0,currency:'YER'},actions:[],recent_orders:[]}:{registered:false,actions:[],metrics:{}});
     if (url.endsWith('/marketplace/seller/status')) return json({registered:window.__e2eSellerRegistered,tenant_id:1,slug:'taiz-market',status:window.__e2eSellerVerification==='approved'?'active':'pending',verification:window.__e2eSellerVerification});
-    if (url.endsWith('/marketplace/seller/catalog')) return json({items:window.__e2eCatalogItems});
+    if (url.endsWith('/marketplace/seller/catalog')) return window.__e2eCatalogUnavailable ? json({detail:'active verified marketplace seller required'},403) : json({items:window.__e2eCatalogItems});
     if (url.endsWith('/marketplace/seller/orders')) return json({items:window.__e2eSellerOrders});
     if (url.endsWith('/marketplace/seller/returns')) return json({items:window.__e2eReturns});
     if (url.endsWith('/marketplace/seller/payouts')) return json({items:[]});
@@ -62,7 +63,7 @@ window.__e2eReturns=[];
     if (url.endsWith('/marketplace/seller/fulfillments/701/transition') && options.method==='POST') { const body=JSON.parse(options.body||'{}'); window.__e2eSellerOrders[0].fulfillment_status=body.status; if(body.status==='delivered') window.__e2eSellerOrders[0].status='completed'; return json({id:701,status:body.status,shipment_id:window.__e2eSellerOrders[0].shipment_id}); }
     if (url.endsWith('/marketplace/seller/fulfillments/701/packages') && options.method==='POST') { const body=JSON.parse(options.body||'{}'); window.__e2ePackages.push(body); return json({id:801,fulfillment_id:701,reference:body.reference,status:'packed'},201); }
     if (url.endsWith('/marketplace/seller/fulfillments/701/shipment') && options.method==='POST') { const body=JSON.parse(options.body||'{}'); Object.assign(window.__e2eSellerOrders[0],{shipment_id:901,carrier:body.carrier,fulfillment_status:'ready'}); return json({fulfillment_id:701,shipment:{id:901,reference:'SHP-E2E',status:'ready',carrier:body.carrier,tracking_number:body.tracking_number}},201); }
-    if (url.endsWith('/marketplace/seller/fulfillments/701/cod-collection') && options.method==='POST') { const body=JSON.parse(options.body||'{}'); window.__e2eCODCollections.push(body); window.__e2eSellerOrders[0].cod_collection_id=1001; window.__e2eSellerOrders[0].cod_collection_status='collected'; return json({id:1001,shipment_id:901,reference:body.reference,amount:body.amount,currency:body.currency,status:'collected',evidence_source:'seller_attestation',independently_verified:false},201); }
+    if (url.endsWith('/marketplace/seller/fulfillments/701/cod-collection') && options.method==='POST') { const body=JSON.parse(options.body||'{}'); window.__e2eCODCollections.push(body); window.__e2eSellerOrders[0].cod_collection_id=1001; window.__e2eSellerOrders[0].cod_collection_reference=body.reference; window.__e2eSellerOrders[0].cod_collection_status='collected'; return json({id:1001,shipment_id:901,reference:body.reference,amount:body.amount,currency:body.currency,status:'collected',evidence_source:'seller_attestation',independently_verified:false},201); }
     if (url.endsWith('/inventory/items') && options.method==='POST') { const item=JSON.parse(options.body||'{}'); window.__e2eInventoryItems.push({...item,active:true}); return json(item,201); }
     if (url.includes('/warehouses') && String(options.method || 'GET').toUpperCase()==='POST') { const warehouse=JSON.parse(options.body||'{}'); window.__e2eWarehouses.push({...warehouse,active:true}); return json(warehouse,201); }
     if (url.endsWith('/inventory/movements') && options.method==='POST') { const movement=JSON.parse(options.body||'{}'); window.__e2eInventoryMovements.push({...movement,id:window.__e2eInventoryMovements.length+1}); return json({id:1,reference:movement.reference,direction:movement.direction,quantity:movement.quantity},201); }
@@ -71,7 +72,7 @@ window.__e2eReturns=[];
     if (url.endsWith('/products')) return json({items:window.__e2eInventoryItems,limit:50,offset:0});
     if ((url.endsWith('/warehouses') || url.includes('/warehouses?')) && String(options.method || 'GET').toUpperCase()!=='POST') return json({items:window.__e2eWarehouses,limit:50,offset:0});
     if (url.endsWith('/marketplace/seller/catalog/bundle') && options.method==='POST') { const body=JSON.parse(options.body||'{}'); window.__e2eCatalogItems.push({name:body.product.name,slug:body.product.slug,skus:[{sku_code:body.sku.sku_code,offer:{unit_price:body.offer.unit_price,currency:body.offer.currency,status:'active'},listing:{slug:body.listing_slug,status:'draft',moderation_status:'pending'}}]}); return json({product:{id:1,slug:body.product.slug,name:body.product.name},sku:{id:1,sku_code:body.sku.sku_code},offer:{id:1,currency:body.offer.currency,unit_price:body.offer.unit_price},listing:{id:1,slug:body.listing_slug,status:'draft',moderation_status:'pending'}},201); }
-    if (url.endsWith('/marketplace/seller/catalog')) return json({items:window.__e2eCatalogItems});
+    if (url.endsWith('/marketplace/seller/catalog')) return window.__e2eCatalogUnavailable ? json({detail:'active verified marketplace seller required'},403) : json({items:window.__e2eCatalogItems});
     if (url.endsWith('/marketplace/buyer/cart')) return json({id:1,status:'active',market_id:1,market_code:'YEM',items:[{id:1,quantity:'1',line_total:'1500',listing}]});
     if (url.endsWith('/marketplace/buyer/cart/items')) { window.__e2eCartMutationCalls += 1; window.__e2eLastCartMutationHeaders = Object.fromEntries(new Headers(options.headers||{}).entries()); return json({id:1,status:'active',market_id:1,market_code:'YEM',items:[{id:1,quantity:'1',line_total:'1500',listing}]}); }
     if (url.includes('/marketplace/buyer/cart/items/')) { window.__e2eCartMutationCalls += 1; window.__e2eLastCartMutationHeaders = Object.fromEntries(new Headers(options.headers||{}).entries()); return json({id:1,status:'active',market_id:1,market_code:'YEM',items:[]}); }
@@ -188,9 +189,14 @@ def run():
                     page.locator("#catalogBundleForm input[name='listing_slug']").fill("basmati-rice-10kg")
                     page.locator("#catalogBundleForm button").click()
                     page.locator("small", has_text="basmati-rice-10kg").wait_for(state="visible", timeout=5000)
+                    page.evaluate("window.__e2eCatalogUnavailable=true")
                     page.locator("button[data-ws='trust']").click()
                     page.locator("h1", has_text="الثقة والتحقق").wait_for(state="visible", timeout=5000)
                     assert page.locator("text=قيد التحقق").is_visible()
+                    assert page.locator("text=تعذر تحميل قوائم المنتجات حالياً").is_visible()
+                    page.evaluate("window.__e2eCatalogUnavailable=false; window.__e2eSellerVerification='approved'")
+                    page.locator("button[data-ws='trust']").click()
+                    assert page.locator("text=حساب نشط").is_visible()
                     assert page.locator("text=أرز بسمتي 10 كجم").is_visible()
                     assert page.locator("text=pending").is_visible()
                     page.locator("button[data-ws='orders']").click()
@@ -226,6 +232,7 @@ def run():
                     attestation_notice = page.locator(".notice.warn").filter(has_text="إفادة البائع: سُجّل تحصيل")
                     attestation_notice.wait_for(state="visible", timeout=5000)
                     assert "لم يتم التحقق من الناقل أو توريد النقد" in attestation_notice.inner_text()
+                    assert "COD-E2E-001" in attestation_notice.inner_text()
                     assert page.evaluate("window.__e2ePackages.length") == 1
                     assert page.evaluate("window.__e2eCODCollections[0].amount") == "2500"
                     page.evaluate("""window.__e2eReturns=[{id:501,order_id:101,reason:'damaged_item',description:'Damaged packaging',status:'requested',refund_amount:null,refund_currency:null,refund_reference:null,refund_scope:'order',payment_method_code:'card'},{id:502,order_id:102,reason:'damaged_item',description:'COD return',status:'inspected',refund_amount:null,refund_currency:null,refund_reference:null,refund_scope:'order',payment_method_code:'cod'}]""")
