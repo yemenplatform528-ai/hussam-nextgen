@@ -141,6 +141,18 @@ def main():
             assert "انتهت صلاحية الجلسة" in page.locator("#loginStatus").inner_text()
             state["chat_unauthorized"] = False
 
+            page.locator("#accessPassword").fill(PASSWORD)
+            page.locator("#loginButton").click()
+            page.locator("#chatLayout").wait_for(state="visible")
+            page.locator("#navDashboard").click()
+            assert page.locator("#dashboard").is_visible()
+            state["chat_unauthorized"] = True
+            page.locator("#testInference").click()
+            page.locator("#loginPanel").wait_for(state="visible", timeout=5000)
+            assert page.locator("#dashboard").is_hidden(), "a dashboard chat 401 must return the portal to login"
+            assert "انتهت صلاحية الجلسة" in page.locator("#loginStatus").inner_text()
+            state["chat_unauthorized"] = False
+
             state["expires_in"] = 1
             page.locator("#accessPassword").fill(PASSWORD)
             page.locator("#loginButton").click()
