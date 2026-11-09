@@ -1,6 +1,7 @@
 import http from "node:http";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { createRateLimiter } from "./rate-limiter.js";
+import { readRequestBody } from "./body-reader.js";
 import { isIP } from "node:net";
 
 const PORT = Number(process.env.PORT || 10000);
@@ -11,7 +12,7 @@ const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || "https://hussam-ai-standalone-portal.onrender.com";
 const HUSSAM_ACCESS_PASSWORD = process.env.HUSSAM_ACCESS_PASSWORD || "";
 const HUSSAM_SESSION_SECRET = process.env.HUSSAM_SESSION_SECRET || "";
-const SESSION_TTL_SECONDS = 12 * 60 * 60;
+const SESSION_TTL_SECONDS = 30 * 60;
 
 function sessionReady() {
   return HUSSAM_ACCESS_PASSWORD.length >= 16 && HUSSAM_SESSION_SECRET.length >= 32;
@@ -45,8 +46,9 @@ function sameSecret(a, b) {
 }
 const rateLimiter = createRateLimiter({ maxBuckets: 512 });
 function clientAddress(req) {
-  // Render serves this public service through Cloudflare. Only accept a syntactically
-  // valid CF-Connecting-IP value; otherwise fall back to the socket address.
+  // Best-effort client address only. A caller may be able to vary forwarded headers
+  // unless the hosting proxy boundary is verified; the global login ceiling is the
+  // fallback against simple IP rotation, not a complete DoS defense.
   const forwarded = String(req.headers["cf-connecting-ip"] || "").trim();
   if (isIP(forwarded)) return forwarded;
   return req.socket.remoteAddress || "unknown";
@@ -54,34 +56,7 @@ function clientAddress(req) {
 function allowRate(key, limit, windowMs) {
   return rateLimiter.allow(key, limit, windowMs);
 }
-async function readRequestBody(req, maxBytes, timeoutCode = "REQUEST_BODY_TIMEOUT") {
-  let raw = "";
-  let bodyTimeout;
-  try {
-    const bodyRead = (async () => {
-      for await (const chunk of req) {
-        raw += chunk;
-        if (raw.length > maxBytes) {
-          const error = new Error("REQUEST_TOO_LARGE");
-          error.code = "REQUEST_TOO_LARGE";
-          throw error;
-        }
-      }
-    })();
-    const deadline = new Promise((_, reject) => {
-      bodyTimeout = setTimeout(() => {
-        const error = new Error(timeoutCode);
-        error.code = timeoutCode;
-        reject(error);
-      }, Math.max(100, Number(process.env.HUSSAM_REQUEST_BODY_TIMEOUT_MS) || 15_000));
-      bodyTimeout.unref?.();
-    });
-    await Promise.race([bodyRead, deadline]);
-    return raw;
-  } finally {
-    if (bodyTimeout) clearTimeout(bodyTimeout);
-  }
-}
+
 let activeGenerations = 0;
 let activeUploads = 0;
 let liveModelVerified = false; // Process-local evidence; resets on restart.
@@ -210,11 +185,16 @@ const server = http.createServer(async (req, res) => {
     }));
   }
   if (req.method === "POST" && url.pathname === "/api/session/login") {
+    res.setHeader("Cache-Control", "no-store");
+    res.setHeader("Pragma", "no-cache");
     if (origin !== ALLOWED_ORIGIN) {
       res.writeHead(403);
       return res.end(JSON.stringify({ error: "ORIGIN_NOT_ALLOWED" }));
     }
-    if (!allowRate("login:" + clientAddress(req), 8, 15 * 60_000)) {
+    const loginClientKey = "login:" + clientAddress(req);
+    // Reject a client's exhausted bucket before consuming the shared global budget.
+    if (!allowRate(loginClientKey, 8, 15 * 60_000) ||
+        !allowRate("login:global", 100, 15 * 60_000)) {
       res.writeHead(429);
       return res.end(JSON.stringify({ error: "LOGIN_RATE_LIMITED", message: "تجاوزت محاولات الدخول المسموح بها مؤقتًا." }));
     }
@@ -263,6 +243,8 @@ const server = http.createServer(async (req, res) => {
     res.writeHead(404);
     return res.end(JSON.stringify({ error: "NOT_FOUND" }));
   }
+  res.setHeader("Cache-Control", "no-store");
+  res.setHeader("Pragma", "no-cache");
   if (origin !== ALLOWED_ORIGIN) {
     res.writeHead(403);
     return res.end(JSON.stringify({ error: "ORIGIN_NOT_ALLOWED" }));

@@ -75,6 +75,9 @@ test("chat fails closed without session; login enforces exact origin and passwor
     assert.equal(validLogin.status, 200);
     const loginData = await validLogin.json();
     assert.equal(typeof loginData.token, "string");
+    assert.equal(validLogin.headers.get("cache-control"), "no-store");
+    assert.equal(validLogin.headers.get("pragma"), "no-cache");
+    assert.equal(loginData.expiresIn, 30 * 60);
     const validToken = loginData.token;
 
     const nullChat = await fetch(`${base}/api/chat`, {
@@ -83,6 +86,8 @@ test("chat fails closed without session; login enforces exact origin and passwor
       body: "null"
     });
     assert.equal(nullChat.status, 400);
+    assert.equal(nullChat.headers.get("cache-control"), "no-store");
+    assert.equal(nullChat.headers.get("pragma"), "no-cache");
     assert.equal((await nullChat.json()).error, "INVALID_MESSAGES");
     const arrayChat = await fetch(`${base}/api/chat`, {
       method: "POST",
@@ -173,11 +178,33 @@ test("chat fails closed without session; login enforces exact origin and passwor
       body: JSON.stringify({ password: "test password fixture only 2026" })
     });
     assert.equal(throttledLogin.status, 429);
+    for (let i = 0; i < 120; i += 1) {
+      const repeatedBlockedAttempt = await fetch(`${base}/api/session/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Origin: "http://127.0.0.1", "CF-Connecting-IP": loginIp },
+        body: JSON.stringify({ password: "incorrect password for test" })
+      });
+      assert.equal(repeatedBlockedAttempt.status, 429);
+    }
     const otherClientLogin = await fetch(`${base}/api/session/login`, {
       method: "POST", headers: { "Content-Type": "application/json", Origin: "http://127.0.0.1", "CF-Connecting-IP": "198.51.100.20" },
       body: JSON.stringify({ password: "test password fixture only 2026" })
     });
     assert.equal(otherClientLogin.status, 200, "one client's failed attempts must not lock out another client");
+
+    let globalLimitObserved = false;
+    for (let i = 1; i <= 120; i += 1) {
+      const rotatedIpAttempt = await fetch(`${base}/api/session/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Origin: "http://127.0.0.1", "CF-Connecting-IP": `192.0.2.${i}` },
+        body: JSON.stringify({ password: "wrong password fixture only 2026" })
+      });
+      if (rotatedIpAttempt.status === 429) {
+        globalLimitObserved = true;
+        break;
+      }
+    }
+    assert.equal(globalLimitObserved, true, "rotating caller-supplied client IPs must not bypass the global login ceiling");
 
     const forgedOrigin = await fetch(`${base}/api/session/login`, {
       method: "POST", headers: { "Content-Type": "application/json", Origin: "https://attacker.example" },

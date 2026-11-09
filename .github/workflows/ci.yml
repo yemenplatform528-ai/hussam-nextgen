@@ -17,8 +17,8 @@ jobs:
       attestations: write
     steps:
       - uses: actions/checkout@v4
-      - name: Inference bridge provider timeout regression
-        run: node --test hussam-ai-backend/tests/provider-timeout.test.mjs
+      - name: Hussam AI backend security and provider regression suite
+        run: npm test --prefix hussam-ai-backend
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -142,3 +142,5 @@ jobs:
           python -m playwright install --with-deps chromium
       - name: Run desktop and mobile browser contract
         run: python scripts/browser_e2e.py
+      - name: Run Hussam AI portal authentication browser contract
+        run: python scripts/hussam_ai_portal_auth_e2e.py
