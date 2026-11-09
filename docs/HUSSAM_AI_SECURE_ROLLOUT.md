@@ -28,7 +28,7 @@ Generate a session secret locally with a cryptographic generator such as `openss
 - Browser logout clears the token from the current page's JavaScript memory, hides the protected chat/dashboard, and returns to the login panel. Automatic expiry does the same.
 - This is **local logout, not server-side revocation**. A copied token remains valid until its 30-minute expiry or until the signing secret is rotated. Never claim immediate revocation.
 - Chat history is stored in this browser profile's localStorage; it is not encrypted by this application. Local logout does not erase saved history. Anyone with access to the same browser profile may be able to inspect it; export or clear local history before sharing the device.
-- Login throttling uses a per-client best-effort limit plus a global ceiling of 100 attempts per 15 minutes. The global ceiling prevents simple forwarded-IP rotation from bypassing the limit, but it can also create a shared lockout/denial-of-service risk. It is a documented fallback until the hosting proxy trust boundary is verified.
+- Login throttling uses a per-client best-effort limit plus a process-local global ceiling of 100 attempts per 15 minutes. It prevents simple forwarded-IP rotation from bypassing the limit within one process, but resets on restart and is not shared across replicas. It can also create a shared lockout/denial-of-service risk. It is a documented fallback, not distributed edge rate limiting or proof of a trusted proxy boundary.
 
 ## Deploy sequence
 
