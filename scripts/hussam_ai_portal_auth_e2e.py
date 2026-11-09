@@ -25,7 +25,7 @@ def main():
     )
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
-    state = {"expires_in": 1800, "chat_authorized": False}
+    state = {"expires_in": 1800, "chat_authorized": False, "chat_unauthorized": False}
     origin_headers = {
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Headers": "Content-Type, Authorization",
@@ -71,8 +71,9 @@ def main():
             return
         if path == "/api/chat":
             state["chat_authorized"] = request.headers.get("authorization") == "Bearer e2e-session-token"
-            if not state["chat_authorized"]:
-                fulfill(route, 401, {"error": "INVALID_SESSION"})
+            if state["chat_unauthorized"] or not state["chat_authorized"]:
+                state["chat_authorized"] = False
+                fulfill(route, 401, {"error": "INVALID_SESSION", "message": "انتهت صلاحية الجلسة"})
             else:
                 fulfill(route, 200, {
                     "answer": "HUSSAM_AI_PORTAL_AUTH_E2E_OK",
@@ -128,6 +129,17 @@ def main():
             assert page.locator("#chatLayout").is_hidden(), "local logout must hide chat"
             assert page.locator("#dashboard").is_hidden(), "local logout must hide dashboard"
             assert not page.locator("#logoutButton").is_visible(), "logout control must hide after logout"
+
+            state["chat_unauthorized"] = True
+            page.locator("#accessPassword").fill(PASSWORD)
+            page.locator("#loginButton").click()
+            page.locator("#chatLayout").wait_for(state="visible")
+            page.locator("#prompt").fill("force the API to reject this session")
+            page.locator("#form button[type='submit']").click()
+            page.locator("#loginPanel").wait_for(state="visible", timeout=5000)
+            assert page.locator("#chatLayout").is_hidden(), "a chat 401 must return the portal to login"
+            assert "انتهت صلاحية الجلسة" in page.locator("#loginStatus").inner_text()
+            state["chat_unauthorized"] = False
 
             state["expires_in"] = 1
             page.locator("#accessPassword").fill(PASSWORD)
