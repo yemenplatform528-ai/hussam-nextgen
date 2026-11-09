@@ -1,12 +1,11 @@
 from sqlalchemy.orm import Session
 from app.core.contracts import JournalCommand
-from app.engines.finance.service import AccountingService, AccountingInvariantError
+from app.engines.finance.service import AccountingInvariantError
 from app.engines.finance.production import FinanceError, PostingLine, post_journal
 
 class FinancePersistenceService:
     def __init__(self, db: Session): self.db = db
     def post(self, tenant_id: int, command: JournalCommand) -> Journal:
-        AccountingService().validate_posting(command)
         if command.posting_date is None:
             raise AccountingInvariantError("posting date is required")
         try:
