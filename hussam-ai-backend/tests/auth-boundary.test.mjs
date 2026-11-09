@@ -192,19 +192,23 @@ test("chat fails closed without session; login enforces exact origin and passwor
     });
     assert.equal(otherClientLogin.status, 200, "one client's failed attempts must not lock out another client");
 
-    let globalLimitObserved = false;
+    // The application must not impose a shared global ceiling that lets an
+    // unauthenticated attacker lock every owner out by rotating caller IP headers.
+    // Per-client throttling is best-effort; a trusted edge must provide distributed limits.
     for (let i = 1; i <= 120; i += 1) {
       const rotatedIpAttempt = await fetch(`${base}/api/session/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Origin: "http://127.0.0.1", "CF-Connecting-IP": `192.0.2.${i}` },
         body: JSON.stringify({ password: "wrong password fixture only 2026" })
       });
-      if (rotatedIpAttempt.status === 429) {
-        globalLimitObserved = true;
-        break;
-      }
+      assert.equal(rotatedIpAttempt.status, 401, "a new client bucket must not be rejected by a shared global login ceiling");
     }
-    assert.equal(globalLimitObserved, true, "rotating caller-supplied client IPs must not bypass the global login ceiling");
+    const ownerAfterDistributedAttack = await fetch(`${base}/api/session/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Origin: "http://127.0.0.1", "CF-Connecting-IP": "198.51.100.21" },
+      body: JSON.stringify({ password: "test password fixture only 2026" })
+    });
+    assert.equal(ownerAfterDistributedAttack.status, 200, "failed attempts from many client keys must not globally lock out the owner");
 
     const forgedOrigin = await fetch(`${base}/api/session/login`, {
       method: "POST", headers: { "Content-Type": "application/json", Origin: "https://attacker.example" },
