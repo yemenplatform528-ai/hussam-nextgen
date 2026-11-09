@@ -3,12 +3,13 @@
 import json
 import os
 import sys
+import time
 import urllib.error
 import urllib.request
 
 FRONTEND = os.environ.get("FRONTEND_URL", "https://hussam-ai-standalone-portal.onrender.com").rstrip("/")
 BACKEND = os.environ.get("BACKEND_URL", "https://hussam-ai-inference-bridge.onrender.com").rstrip("/")
-TIMEOUT = 90
+TIMEOUT = 30
 
 
 def request(url, method="GET", headers=None, body=None):
@@ -28,10 +29,20 @@ def check(name, ok, detail):
 
 
 # Public landing page and the actual authenticated chat portal must both serve.
-status, _, body = request(FRONTEND + "/")
-landing = body.decode("utf-8", errors="replace")
+landing = ""
+status = 0
+# Wait briefly for Render's static-site deployment/CDN to publish the new release.
+for attempt in range(6):
+    status, _, body = request(FRONTEND + "/")
+    landing = body.decode("utf-8", errors="replace")
+    if status == 200 and "لا توجد موافقة على تفعيل فوترة مدفوعة" in landing:
+        break
+    if attempt < 5:
+        time.sleep(10)
 check("landing_page_http", status == 200 and "Hussam AI" in landing,
       f"HTTP {status}; Hussam AI identity present")
+check("landing_page_release", "لا توجد موافقة على تفعيل فوترة مدفوعة" in landing,
+      "latest corrected production landing page is deployed")
 check("landing_page_route", 'href="/hussam-ai/"' in landing,
       "landing page links to the standalone chat portal")
 
