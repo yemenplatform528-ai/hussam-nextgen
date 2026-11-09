@@ -31,7 +31,7 @@ class AccountPostingError(ValueError):
 
 
 def validate_posting_accounts(session: Session, *, tenant_id: int, currency: str,
-                              account_codes: list[str], allow_inactive: bool = False) -> None:
+                              account_codes: list[str], allow_legacy: bool = False) -> None:
     normalized_currency = str(currency or "").strip().upper()
     codes = [str(code or "").strip() for code in account_codes]
     if tenant_id <= 0 or not normalized_currency or not codes or any(not code for code in codes):
@@ -44,12 +44,12 @@ def validate_posting_accounts(session: Session, *, tenant_id: int, currency: str
     ).all()
     by_code = {row.code: row for row in rows}
     missing = set(codes) - set(by_code)
-    if missing:
+    if missing and not allow_legacy:
         raise AccountPostingError("posting account not found in tenant chart of accounts")
 
-    for code in set(codes):
+    for code in set(codes) & set(by_code):
         account = by_code[code]
-        if not account.active and not allow_inactive:
+        if not allow_legacy and not account.active:
             raise AccountPostingError("posting account is inactive")
-        if account.currency and account.currency.strip().upper() != normalized_currency:
+        if not allow_legacy and account.currency and account.currency.strip().upper() != normalized_currency:
             raise AccountPostingError("posting account currency does not match journal currency")
