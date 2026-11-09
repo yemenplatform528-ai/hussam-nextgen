@@ -46,9 +46,9 @@ function sameSecret(a, b) {
 }
 const rateLimiter = createRateLimiter({ maxBuckets: 512 });
 function clientAddress(req) {
-  // Best-effort client address only. A caller may be able to vary forwarded headers
-  // unless the hosting proxy boundary is verified; the global login ceiling is the
-  // fallback against simple IP rotation, not a complete DoS defense.
+  // Best-effort client address only. Forwarded headers are caller-controlled unless
+  // the hosting proxy boundary is explicitly verified. This key is not a security
+  // boundary; distributed edge throttling is required before public production use.
   const forwarded = String(req.headers["cf-connecting-ip"] || "").trim();
   if (isIP(forwarded)) return forwarded;
   return req.socket.remoteAddress || "unknown";
@@ -192,9 +192,10 @@ const server = http.createServer(async (req, res) => {
       return res.end(JSON.stringify({ error: "ORIGIN_NOT_ALLOWED" }));
     }
     const loginClientKey = "login:" + clientAddress(req);
-    // Reject a client's exhausted bucket before consuming the shared global budget.
-    if (!allowRate(loginClientKey, 8, 15 * 60_000) ||
-        !allowRate("login:global", 100, 15 * 60_000)) {
+    // Never consume a shared global login budget: an unauthenticated caller could
+    // exhaust it and lock the owner out. This per-client limit is best-effort only;
+    // the public edge must enforce distributed throttling using a trusted client IP.
+    if (!allowRate(loginClientKey, 8, 15 * 60_000)) {
       res.writeHead(429);
       return res.end(JSON.stringify({ error: "LOGIN_RATE_LIMITED", message: "تجاوزت محاولات الدخول المسموح بها مؤقتًا." }));
     }
