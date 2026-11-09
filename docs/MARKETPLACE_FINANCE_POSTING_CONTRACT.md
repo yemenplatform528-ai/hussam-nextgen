@@ -76,6 +76,8 @@ A later state must never be inferred from an earlier state. In particular, selle
 
 **Current implementation boundary (2026-11-09):** the persisted `ShipmentCollection` model currently supports only `evidence_source='seller_attestation'` with `independently_verified=false`. The carrier/agent-verified states above are target states, not currently writable states; enabling them requires a future evidence-verification workflow, proof/actor provenance, and an explicit schema change.
 
+**Evidence-storage dependency:** the current repository has no transaction-level receipt/file upload and secure evidence-storage adapter. The production `evidence/external` directory is for release-gate evidence and must not be repurposed as customer/courier receipt storage. A verified manual-agent workflow requires an approved private evidence store, immutable artifact references/hashes, access control, retention/deletion policy, and audited verifier identity before the source can be marked independently verified.
+
 ## 6. Reconciliation
 
 The existing provider-statement reconciliation contract must not be misused to represent a COD cash remittance as an electronic provider payment. Extend the shared reconciliation authority with an explicit source type if appropriate, or introduce a COD remittance reconciliation adapter that produces the same deterministic classifications and exception-closure guarantees.
