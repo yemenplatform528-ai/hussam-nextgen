@@ -113,13 +113,14 @@ def test_cod_collection_evidence_source_and_verification_are_consistent():
     )
     assert collection.evidence_source == 'seller_attestation'
     assert collection.independently_verified is False
+    collection_id = collection.id
 
     collection.independently_verified = True
     with pytest.raises(IntegrityError):
         db.commit()
     db.rollback()
 
-    collection = db.get(ShipmentCollection, collection.id)
+    collection = db.get(ShipmentCollection, collection_id)
     assert collection.evidence_source == 'seller_attestation'
     assert collection.independently_verified is False
 
