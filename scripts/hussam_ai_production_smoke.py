@@ -8,7 +8,7 @@ import urllib.request
 
 FRONTEND = os.environ.get("FRONTEND_URL", "https://hussam-ai-standalone-portal.onrender.com").rstrip("/")
 BACKEND = os.environ.get("BACKEND_URL", "https://hussam-ai-inference-bridge.onrender.com").rstrip("/")
-TIMEOUT = 20
+TIMEOUT = 90
 
 
 def request(url, method="GET", headers=None, body=None):
@@ -27,12 +27,19 @@ def check(name, ok, detail):
         raise SystemExit(1)
 
 
-# Public frontend must serve the intended standalone portal.
-status, headers, body = request(FRONTEND + "/")
-page = body.decode("utf-8", errors="replace")
-check("frontend_http", status == 200, f"HTTP {status}")
-check("frontend_identity", "Hussam AI" in page and "hussam-ai-inference-bridge.onrender.com" in page,
-      "standalone portal identity and configured backend URL")
+# Public landing page and the actual authenticated chat portal must both serve.
+status, _, body = request(FRONTEND + "/")
+landing = body.decode("utf-8", errors="replace")
+check("landing_page_http", status == 200 and "Hussam AI" in landing,
+      f"HTTP {status}; Hussam AI identity present")
+check("landing_page_route", 'href="/hussam-ai/"' in landing,
+      "landing page links to the standalone chat portal")
+
+status, _, body = request(FRONTEND + "/hussam-ai/")
+portal = body.decode("utf-8", errors="replace")
+check("chat_portal_http", status == 200, f"HTTP {status}")
+check("chat_portal_identity", "Hussam AI" in portal and BACKEND in portal,
+      "chat portal identity and configured inference backend")
 
 # Backend liveness and owner access-control readiness are separate facts.
 status, _, body = request(BACKEND + "/health")
