@@ -8,6 +8,7 @@ from app.core.models.core import Journal, JournalLineRecord
 from app.core.models.finance import FiscalPeriod, JournalLink
 from app.core.security.context import TenantAccessDenied
 from app.engines.finance.accounts import AccountPostingError, validate_posting_accounts
+from app.engines.finance.reconciliation import verify_journal_integrity
 
 class FinanceError(ValueError):
     pass
@@ -89,6 +90,8 @@ def reverse_journal(session, *, tenant_id: int, journal_id: int,
         raise FinanceError("journal not found in tenant")
     if original.status != "posted":
         raise FinanceError("only posted journals can be reversed")
+    if not verify_journal_integrity(session, tenant_id=tenant_id, journal_id=original.id):
+        raise FinanceError("journal integrity verification failed; reversal is blocked")
     if not reversal_reference:
         raise FinanceError("reversal reference is required")
     if session.scalar(select(JournalLink).where(
