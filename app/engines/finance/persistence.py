@@ -1,9 +1,6 @@
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 from app.core.contracts import JournalCommand
-from app.core.models import Journal, JournalLineRecord
 from app.engines.finance.service import AccountingService, AccountingInvariantError
-from datetime import date
 from app.engines.finance.production import FinanceError, PostingLine, post_journal
 
 class FinancePersistenceService:
