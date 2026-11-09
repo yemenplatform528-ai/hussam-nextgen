@@ -80,6 +80,24 @@ def test_reversal_can_reuse_inactive_accounts_from_original_journal():
         assert reversal.id != original.id
 
 
+def test_reversal_preserves_legacy_accounts_missing_from_chart():
+    F=setup()
+    with F() as s:
+        s.add(Tenant(name="Legacy",status="active")); s.flush(); seed_period(s)
+        original=Journal(tenant_id=1,reference="LEGACY-ORIGINAL",currency="YER",
+                         status="posted",posting_date=date(2026,3,1))
+        s.add(original); s.flush()
+        s.add_all([
+            JournalLineRecord(journal_id=original.id,account="legacy-cash",debit=Decimal("25"),credit=Decimal("0")),
+            JournalLineRecord(journal_id=original.id,account="legacy-sales",debit=Decimal("0"),credit=Decimal("25")),
+        ])
+        s.flush()
+        reversal=reverse_journal(s,tenant_id=1,journal_id=original.id,
+            reversal_reference="LEGACY-REVERSAL",reversal_date=date(2026,3,2))
+        assert reversal.id != original.id
+        assert {x.account for x in s.query(JournalLineRecord).filter_by(journal_id=reversal.id).all()} == {"legacy-cash","legacy-sales"}
+
+
 def test_invalid_lines_are_rejected():
     F=setup()
     with F() as s:
