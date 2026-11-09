@@ -1,0 +1,23 @@
+name: Hussam AI Production Smoke
+on:
+  push:
+    branches: [hussam-ai-standalone-portal]
+  workflow_dispatch:
+  schedule:
+    - cron: "17 */6 * * *"
+permissions:
+  contents: read
+concurrency:
+  group: hussam-ai-production-smoke
+  cancel-in-progress: true
+jobs:
+  live-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify live portal, backend, CORS, and auth boundary
+        env:
+          FRONTEND_URL: https://hussam-ai-standalone-portal.onrender.com
+          BACKEND_URL: https://hussam-ai-inference-bridge.onrender.com
+        run: python scripts/hussam_ai_production_smoke.py
