@@ -2,7 +2,9 @@ from tests.market_test_support import ensure_market
 from types import SimpleNamespace
 from app.api.routes.marketplace import seller_orders
 from decimal import Decimal
+import pytest
 from sqlalchemy import create_engine, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import sessionmaker
 from app.core.persistence import Base
 from app.core.contracts import StockMovement
@@ -93,3 +95,36 @@ def test_cod_selection_becomes_shipment_collection_amount():
     assert seller_order_view['cod_collection_evidence_source'] == 'seller_attestation'
     assert seller_order_view['cod_collection_independently_verified'] is False
     assert seller_order_view['cod_collection_status'] == 'collected'
+
+
+def test_cod_collection_evidence_source_and_verification_are_consistent():
+    db, fs, seller, f, shipment = setup()
+    for status, event_id in [
+        ('picked_up', 'prov-pick'),
+        ('in_transit', 'prov-transit'),
+        ('out_for_delivery', 'prov-out'),
+        ('delivered', 'prov-delivered'),
+    ]:
+        fs.transition(seller.id, f.id, status, event_id=event_id)
+    from app.engines.logistics import LogisticsProductionService
+    collection = LogisticsProductionService(db).create_cod_collection(
+        seller.id, shipment.id, reference='COD-PROVENANCE-1',
+        amount=Decimal('1000'), currency='YER'
+    )
+    assert collection.evidence_source == 'seller_attestation'
+    assert collection.independently_verified is False
+
+    collection.independently_verified = True
+    with pytest.raises(IntegrityError):
+        db.commit()
+    db.rollback()
+
+    collection = db.get(ShipmentCollection, collection.id)
+    assert collection.evidence_source == 'seller_attestation'
+    assert collection.independently_verified is False
+
+    collection.evidence_source = 'carrier_signed_event'
+    collection.independently_verified = True
+    db.commit()
+    assert collection.evidence_source == 'carrier_signed_event'
+    assert collection.independently_verified is True
