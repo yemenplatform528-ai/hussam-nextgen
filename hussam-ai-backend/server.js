@@ -329,7 +329,7 @@ const server = http.createServer(async (req, res) => {
     res.writeHead(400);
     return res.end(JSON.stringify({ error: "INVALID_JSON" }));
   }
-  if (!validMessages(body.messages)) {
+  if (!body || typeof body !== "object" || Array.isArray(body) || !validMessages(body.messages)) {
     res.writeHead(400);
     return res.end(JSON.stringify({ error: "INVALID_MESSAGES" }));
   }
