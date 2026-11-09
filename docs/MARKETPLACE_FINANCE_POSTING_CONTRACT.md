@@ -47,7 +47,7 @@ The posting boundary must validate, at minimum:
 - Journal reference and source event are idempotent and unique.
 - The account mapping version and approver are retained in the audit trail.
 
-The current `post_journal` path does not yet enforce all chart-of-accounts properties at posting time. Do not treat a successful balanced journal as proof that its account mapping is valid until this validation boundary is implemented and tested.
+The current `post_journal` path now enforces tenant ownership, active status and currency compatibility against the chart of accounts; inactive accounts are permitted only for reversal of an existing journal. Event-specific account-type mapping remains a separate owner-approved prerequisite. A balanced journal alone still does not prove that the selected account type is semantically correct for the business event.
 
 ## 4. Subledger-to-General-Ledger linkage
 
@@ -96,7 +96,7 @@ A reconciliation run may close only when its source identity/hash is stable, eve
 
 ## 8. Recommended implementation sequence
 
-1. Add chart-of-accounts validation and approved account-mapping configuration without seeding invented account codes.
+1. Configure and approve event-specific account-type mappings and commission/tax treatment; tenant, active-state and currency checks are already enforced by the posting boundary.
 2. Add Finance journal ↔ seller-subledger linkage for existing verified electronic settlement and payout paths.
 3. Add tenant/market/currency reconciliation between seller subledger and Finance control accounts.
 4. Add carrier/agent verification and separate COD cash-custody/remittance records.
