@@ -41,14 +41,12 @@ def upgrade():
         if SOURCE_CHECK not in checks:
             batch.create_check_constraint(
                 SOURCE_CHECK,
-                "evidence_source IN ('seller_attestation','carrier_signed_event','platform_verified_agent_receipt')",
+                "evidence_source = 'seller_attestation'",
             )
         if VERIFICATION_CHECK not in checks:
             batch.create_check_constraint(
                 VERIFICATION_CHECK,
-                "(evidence_source = 'seller_attestation' AND independently_verified = false) "
-                "OR (evidence_source IN ('carrier_signed_event','platform_verified_agent_receipt') "
-                "AND independently_verified = true)",
+                "independently_verified = false",
             )
 
 
