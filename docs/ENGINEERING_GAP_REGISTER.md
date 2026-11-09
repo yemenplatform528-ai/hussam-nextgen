@@ -73,3 +73,24 @@ The previous Phase 1 closure statement must be read as a closure of the Yemen ru
 ### Decision
 
 COD remains a valid buyer checkout method and shipment collection can be recorded, but **COD financial closure (remittance → ledger → reconciliation → seller payout) and COD cash refunds are not yet launch-complete**. These are explicit engineering work items, not provider certification claims. No synthetic settlement, journal, or refund was created to conceal the gap.
+
+
+## 2026-11-09 — COD collection evidence authenticity correction
+
+A source-level review of the current COD collection endpoint narrows the meaning of the collection record described above:
+
+- `POST /marketplace/seller/fulfillments/{fulfillment_id}/cod-collection` is authenticated with `seller_guard`; the seller supplies a free-form collection reference, amount, and currency.
+- The service verifies seller ownership of the fulfillment, existence of its shipment, delivered shipment state, exact COD amount/currency, and uniqueness/idempotency of the collection record.
+- This route does **not** verify a carrier-signed webhook, authenticated carrier/agent identity, independent cash handoff evidence, or remittance custody. Therefore the resulting `ShipmentCollection(status='collected')` is currently a **seller-submitted collection attestation**, not independently verified carrier evidence.
+
+### Additional verified engineering gap
+
+| Gap | Classification | Current behavior | Required closure |
+|---|---|---|---|
+| COD collection authenticity and custody | Verified engineering gap | Seller can submit a collection reference after shipment delivery; no carrier signature/agent identity or independent custody evidence is validated | Accept a carrier-signed event or platform-verified agent receipt with tenant/shipment binding, external event identity, exact amount/currency, event-time validation, idempotency, custody handoff and audit provenance; preserve a separately labeled seller attestation when no carrier integration exists |
+
+### Additional non-negotiable control
+
+7. A seller-submitted COD collection attestation must never be presented as carrier-verified cash collection or remittance. UI, API responses, and finance decisions must preserve the evidence source and verification level.
+
+The existing fail-closed settlement and refund controls remain correct and must not be weakened while this evidence gap is closed.
