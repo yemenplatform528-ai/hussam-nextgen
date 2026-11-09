@@ -189,8 +189,10 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(403);
       return res.end(JSON.stringify({ error: "ORIGIN_NOT_ALLOWED" }));
     }
-    if (!allowRate("login:global", 100, 15 * 60_000) ||
-        !allowRate("login:" + clientAddress(req), 8, 15 * 60_000)) {
+    const loginClientKey = "login:" + clientAddress(req);
+    // Reject a client's exhausted bucket before consuming the shared global budget.
+    if (!allowRate(loginClientKey, 8, 15 * 60_000) ||
+        !allowRate("login:global", 100, 15 * 60_000)) {
       res.writeHead(429);
       return res.end(JSON.stringify({ error: "LOGIN_RATE_LIMITED", message: "تجاوزت محاولات الدخول المسموح بها مؤقتًا." }));
     }
