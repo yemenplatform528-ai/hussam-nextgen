@@ -88,5 +88,6 @@ def test_cod_selection_becomes_shipment_collection_amount():
     seller_order_view = next(item for item in seller_view['items'] if item['id'] == order.id)
     assert seller_order_view['fulfillment_id'] == f.id
     assert seller_order_view['shipment_id'] == shipment.id
+    assert seller_order_view['cod_collection_reference'] == 'COD-COL-1'
     assert seller_order_view['cod_collection_evidence_source'] == 'seller_attestation'
     assert seller_order_view['cod_collection_independently_verified'] is False
