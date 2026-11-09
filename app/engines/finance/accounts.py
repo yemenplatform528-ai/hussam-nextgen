@@ -24,3 +24,32 @@ def deactivate_account(session: Session, *, tenant_id: int, code: str) -> Accoun
     account.active = False
     session.flush()
     return account
+
+
+class AccountPostingError(ValueError):
+    """Raised when a journal line does not resolve to a valid tenant account."""
+
+
+def validate_posting_accounts(session: Session, *, tenant_id: int, currency: str,
+                              account_codes: list[str], allow_inactive: bool = False) -> None:
+    normalized_currency = str(currency or "").strip().upper()
+    codes = [str(code or "").strip() for code in account_codes]
+    if tenant_id <= 0 or not normalized_currency or not codes or any(not code for code in codes):
+        raise AccountPostingError("valid tenant, currency and account codes are required")
+
+    rows = session.scalars(
+        select(Account)
+        .where(Account.tenant_id == tenant_id, Account.code.in_(set(codes)))
+        .with_for_update()
+    ).all()
+    by_code = {row.code: row for row in rows}
+    missing = set(codes) - set(by_code)
+    if missing:
+        raise AccountPostingError("posting account not found in tenant chart of accounts")
+
+    for code in set(codes):
+        account = by_code[code]
+        if not account.active and not allow_inactive:
+            raise AccountPostingError("posting account is inactive")
+        if account.currency and account.currency.strip().upper() != normalized_currency:
+            raise AccountPostingError("posting account currency does not match journal currency")
