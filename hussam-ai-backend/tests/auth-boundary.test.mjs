@@ -76,6 +76,21 @@ test("chat fails closed without session; login enforces exact origin and passwor
     const loginData = await validLogin.json();
     assert.equal(typeof loginData.token, "string");
     const validToken = loginData.token;
+
+    const nullChat = await fetch(`${base}/api/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Origin: "http://127.0.0.1", Authorization: `Bearer ${validToken}` },
+      body: "null"
+    });
+    assert.equal(nullChat.status, 400);
+    assert.equal((await nullChat.json()).error, "INVALID_MESSAGES");
+    const arrayChat = await fetch(`${base}/api/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Origin: "http://127.0.0.1", Authorization: `Bearer ${validToken}` },
+      body: "[]"
+    });
+    assert.equal(arrayChat.status, 400);
+    assert.equal((await arrayChat.json()).error, "INVALID_MESSAGES");
     const nullLogin = await fetch(`${base}/api/session/login`, {
       method: "POST", headers: { "Content-Type": "application/json", Origin: "http://127.0.0.1" },
       body: "null"
