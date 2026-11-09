@@ -25,7 +25,7 @@ def main():
     )
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
-    state = {"expires_in": 1800, "chat_authorized": False, "chat_unauthorized": False}
+    state = {"expires_in": 1800, "chat_authorized": False, "chat_unauthorized": False, "provider_auth_failure": False}
     origin_headers = {
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Headers": "Content-Type, Authorization",
@@ -71,6 +71,9 @@ def main():
             return
         if path == "/api/chat":
             state["chat_authorized"] = request.headers.get("authorization") == "Bearer e2e-session-token"
+            if state["provider_auth_failure"] and state["chat_authorized"]:
+                fulfill(route, 502, {"error": "PROVIDER_AUTHENTICATION_FAILED", "message": "تعذر التحقق من اعتماد مزود الاستدلال"})
+                return
             if state["chat_unauthorized"] or not state["chat_authorized"]:
                 state["chat_authorized"] = False
                 fulfill(route, 401, {"error": "INVALID_SESSION", "message": "انتهت صلاحية الجلسة"})
@@ -122,6 +125,15 @@ def main():
             page.locator("#form button[type='submit']").click()
             page.get_by_text("HUSSAM_AI_PORTAL_AUTH_E2E_OK").wait_for()
             assert state["chat_authorized"], "chat must send the bearer token"
+
+            state["provider_auth_failure"] = True
+            page.locator("#prompt").fill("provider credential failure must not log out the owner")
+            page.locator("#form button[type='submit']").click()
+            page.get_by_text("PROVIDER_AUTHENTICATION_FAILED").wait_for()
+            assert page.locator("#chatLayout").is_visible(), "provider auth failure must not clear the owner session"
+            assert page.locator("#loginPanel").is_hidden(), "provider auth failure must not expose the login panel"
+            assert page.locator("#logoutButton").is_visible(), "owner logout must remain available after provider failure"
+            state["provider_auth_failure"] = False
 
             assert "e2e-session-token" not in page.evaluate("JSON.stringify(localStorage)")
             page.locator("#logoutButton").click()
