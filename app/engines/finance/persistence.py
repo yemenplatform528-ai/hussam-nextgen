@@ -1,5 +1,6 @@
 from sqlalchemy.orm import Session
 from app.core.contracts import JournalCommand
+from app.core.models import Journal
 from app.engines.finance.service import AccountingInvariantError
 from app.engines.finance.production import FinanceError, PostingLine, post_journal
 
