@@ -15,6 +15,11 @@ def test_closed_period_blocks_posting_and_reversal_is_separate():
  s=session(); t=IdentityService(s).create_tenant('A'); create_account(s,tenant_id=t.id,code='cash',name='Cash',account_type='asset',currency='YER'); create_account(s,tenant_id=t.id,code='sales',name='Sales',account_type='revenue',currency='YER'); f=FinanceLifecycleService(s); f.open_period(t.id,'2026',date(2026,1,1),date(2026,12,31)); j=f.post(t.id,cmd(),date(2026,9,1)); r=f.reverse(t.id,j.id,'REV-J1',date(2026,9,2)); assert r.id!=j.id
  f.close_period(t.id,1)
  with pytest.raises(FinanceLifecycleError): f.post(t.id,cmd('J2'),date(2026,9,2))
+def test_finance_lifecycle_requires_posting_date():
+ s=session(); t=IdentityService(s).create_tenant('A'); create_account(s,tenant_id=t.id,code='cash',name='Cash',account_type='asset',currency='YER'); create_account(s,tenant_id=t.id,code='sales',name='Sales',account_type='revenue',currency='YER'); f=FinanceLifecycleService(s); f.open_period(t.id,'2026',date(2026,1,1),date(2026,12,31))
+ with pytest.raises(FinanceLifecycleError, match='posting date is required'): f.post(t.id,cmd())
+
+
 def test_reservation_cannot_exceed_available_stock():
  s=session(); t=IdentityService(s).create_tenant('A'); InventoryPersistenceService(s).record(t.id,StockMovement('i','w',Decimal('5'),'in','IN-1')); rs=InventoryReservationService(s); rs.reserve(t.id,'i','w',Decimal('3'),'R1')
  with pytest.raises(ReservationError): rs.reserve(t.id,'i','w',Decimal('3'),'R2')
