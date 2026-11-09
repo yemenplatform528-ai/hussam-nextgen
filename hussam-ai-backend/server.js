@@ -46,9 +46,10 @@ function sameSecret(a, b) {
 }
 const rateLimiter = createRateLimiter({ maxBuckets: 512 });
 function clientAddress(req) {
-  // Best-effort client address only. Forwarded headers are caller-controlled unless
-  // the hosting proxy boundary is explicitly verified. This key is not a security
-  // boundary; distributed edge throttling is required before public production use.
+  // Render routes every public web-service request through Cloudflare. Cloudflare
+  // supplies CF-Connecting-IP to the origin; unlike X-Forwarded-For, this is a
+  // single client address set by the edge. Keep this service on one instance while
+  // using this in-process limiter; use shared storage before scaling horizontally.
   const forwarded = String(req.headers["cf-connecting-ip"] || "").trim();
   if (isIP(forwarded)) return forwarded;
   return req.socket.remoteAddress || "unknown";
