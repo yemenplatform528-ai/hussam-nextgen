@@ -9,6 +9,7 @@ from app.core.models.core import Tenant, Journal, JournalLineRecord
 from app.core.models.finance import FiscalPeriod
 from app.engines.finance.production import FinanceError, PostingLine, post_journal, reverse_journal
 from app.engines.finance.reconciliation import account_balance
+from app.engines.finance.accounts import create_account, deactivate_account
 
 def setup():
     engine = create_engine("sqlite:///:memory:")
@@ -16,6 +17,9 @@ def setup():
     return sessionmaker(bind=engine)
 
 def seed_period(s, tenant_id=1, closed=False):
+    for code in ("1", "2", "10", "20"):
+        create_account(s, tenant_id=tenant_id, code=code, name=f"Test {code}",
+                       account_type="asset" if code in {"1", "10"} else "liability", currency="YER")
     s.add(FiscalPeriod(
         tenant_id=tenant_id,
         name=f"period-{tenant_id}-{closed}",
@@ -39,6 +43,42 @@ def test_posting_requires_open_period_and_balances():
             post_journal(s,tenant_id=1,reference="J-2",currency="YER",
                 posting_date=date(2027,1,1),
                 lines=[PostingLine("10",debit=1),PostingLine("20",credit=1)])
+
+def test_posting_rejects_missing_cross_tenant_inactive_and_currency_mismatch_accounts():
+    F=setup()
+    with F() as s:
+        s.add_all([Tenant(name="A",status="active"),Tenant(name="B",status="active")]); s.flush()
+        seed_period(s,1); seed_period(s,2)
+        create_account(s, tenant_id=1, code="cash", name="Cash", account_type="asset", currency="YER")
+        create_account(s, tenant_id=1, code="usd-bank", name="USD Bank", account_type="asset", currency="USD")
+        create_account(s, tenant_id=1, code="inactive", name="Inactive", account_type="asset", currency="YER")
+        create_account(s, tenant_id=2, code="other-tenant", name="Other", account_type="asset", currency="YER")
+        deactivate_account(s, tenant_id=1, code="inactive")
+        def post(code):
+            return post_journal(s, tenant_id=1, reference=f"CHECK-{code}", currency="YER",
+                posting_date=date(2026,6,1),
+                lines=[PostingLine("cash",debit=5),PostingLine(code,credit=5)])
+        with pytest.raises(FinanceError, match="not found in tenant"):
+            post("missing")
+        with pytest.raises(FinanceError, match="not found in tenant"):
+            post("other-tenant")
+        with pytest.raises(FinanceError, match="inactive"):
+            post("inactive")
+        with pytest.raises(FinanceError, match="currency"):
+            post("usd-bank")
+
+
+def test_reversal_can_reuse_inactive_accounts_from_original_journal():
+    F=setup()
+    with F() as s:
+        s.add(Tenant(name="A",status="active")); s.flush(); seed_period(s)
+        original=post_journal(s,tenant_id=1,reference="ORIGINAL",currency="YER",
+            posting_date=date(2026,3,1),lines=[PostingLine("1",debit=50),PostingLine("2",credit=50)])
+        deactivate_account(s,tenant_id=1,code="1")
+        reversal=reverse_journal(s,tenant_id=1,journal_id=original.id,
+            reversal_reference="REV-INACTIVE",reversal_date=date(2026,3,2))
+        assert reversal.id != original.id
+
 
 def test_invalid_lines_are_rejected():
     F=setup()
