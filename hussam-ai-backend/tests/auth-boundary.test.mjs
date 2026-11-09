@@ -174,6 +174,14 @@ test("chat fails closed without session; login enforces exact origin and passwor
       body: JSON.stringify({ password: "test password fixture only 2026" })
     });
     assert.equal(throttledLogin.status, 429);
+    for (let i = 0; i < 120; i += 1) {
+      const repeatedBlockedAttempt = await fetch(`${base}/api/session/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Origin: "http://127.0.0.1", "CF-Connecting-IP": loginIp },
+        body: JSON.stringify({ password: "incorrect password for test" })
+      });
+      assert.equal(repeatedBlockedAttempt.status, 429);
+    }
     const otherClientLogin = await fetch(`${base}/api/session/login`, {
       method: "POST", headers: { "Content-Type": "application/json", Origin: "http://127.0.0.1", "CF-Connecting-IP": "198.51.100.20" },
       body: JSON.stringify({ password: "test password fixture only 2026" })
