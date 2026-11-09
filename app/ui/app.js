@@ -86,8 +86,7 @@ const next={ready:['picked_up','تسليم الشحنة للناقل'],picked_up
 if(next)actions+='<button class="btn" data-fulfillment-transition="'+id+'" data-status="'+next[0]+'">'+next[1]+'</button>';
 }
 if(status==='delivered'&&o.payment_method_code==='cod'){
-if(o.cod_collection_status==='collected'&&o.cod_collection_independently_verified===true)actions+='<div class="notice">تم التحقق من تحصيل COD عبر مصدر موثوق: '+esc(o.cod_collection_evidence_source||'')+' · المرجع '+esc(o.cod_collection_id)+'</div>';
-else if(o.cod_collection_status==='collected')actions+='<div class="notice warn">إفادة البائع: سُجّل تحصيل '+esc(o.total)+' '+esc(o.currency)+' · المرجع '+esc(o.cod_collection_id)+' · لم يتم التحقق من الناقل أو توريد النقد</div>';
+if(o.cod_collection_status==='collected')actions+='<div class="notice warn">إفادة البائع: سُجّل تحصيل '+esc(o.total)+' '+esc(o.currency)+' · المرجع '+esc(o.cod_collection_id)+' · لم يتم التحقق من الناقل أو توريد النقد</div>';
 else actions+='<div class="field"><label>مرجع إفادة التحصيل بعد التسليم</label><input data-cod-ref="'+id+'" placeholder="مرجع الإفادة أو الإيصال"></div><button class="btn" data-collect-cod="'+id+'" data-total="'+esc(o.total)+'" data-currency="'+esc(o.currency)+'">تسجيل إفادة تحصيل الدفع عند الاستلام</button>';
 }
 return '<div class="panel" style="margin-bottom:14px"><div class="workspace-header"><div><h3>'+esc(o.reference)+'</h3><span class="muted">العميل: '+esc(o.buyer_user_id)+' · '+money(o.total,o.currency)+'</span></div><span class="badge">'+esc(status)+'</span></div><div class="notice">طريقة التنفيذ: '+esc(method)+' · الشحنة: '+esc(o.shipment_id||'لم تُنشأ')+' · الناقل: '+esc(o.carrier||'—')+'</div>'+actions+'</div>';
