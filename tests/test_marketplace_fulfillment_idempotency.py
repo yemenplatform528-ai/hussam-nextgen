@@ -1,4 +1,6 @@
 from tests.market_test_support import ensure_market
+from types import SimpleNamespace
+from app.api.routes.marketplace import seller_orders
 from decimal import Decimal
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
@@ -82,3 +84,7 @@ def test_cod_selection_becomes_shipment_collection_amount():
     payout = db.scalar(select(MarketplacePayout).where(MarketplacePayout.marketplace_order_id == order.id))
     assert order.status == 'completed'
     assert payout.status == 'held'
+    seller_view = seller_orders(ctx=SimpleNamespace(role='owner', tenant_id=seller.id), db=db)
+    seller_order_view = next(item for item in seller_view['items'] if item['id'] == order.id)
+    assert seller_order_view['cod_collection_evidence_source'] == 'seller_attestation'
+    assert seller_order_view['cod_collection_independently_verified'] is False
