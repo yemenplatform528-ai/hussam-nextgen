@@ -7,6 +7,7 @@ from sqlalchemy.orm import sessionmaker
 from app.core.persistence import Base
 from app.core.models.core import Tenant, Journal, JournalLineRecord
 from app.core.models.finance import FiscalPeriod
+from app.core.models.finance_accounts import Account
 from app.engines.finance.production import FinanceError, PostingLine, post_journal, reverse_journal
 from app.engines.finance.reconciliation import account_balance
 from app.engines.finance.accounts import create_account, deactivate_account
@@ -84,18 +85,29 @@ def test_reversal_preserves_legacy_accounts_missing_from_chart():
     F=setup()
     with F() as s:
         s.add(Tenant(name="Legacy",status="active")); s.flush(); seed_period(s)
-        original=Journal(tenant_id=1,reference="LEGACY-ORIGINAL",currency="YER",
-                         status="posted",posting_date=date(2026,3,1))
-        s.add(original); s.flush()
-        s.add_all([
-            JournalLineRecord(journal_id=original.id,account="legacy-cash",debit=Decimal("25"),credit=Decimal("0")),
-            JournalLineRecord(journal_id=original.id,account="legacy-sales",debit=Decimal("0"),credit=Decimal("25")),
-        ])
+        create_account(s, tenant_id=1, code="legacy-cash", name="Legacy Cash", account_type="asset", currency="YER")
+        create_account(s, tenant_id=1, code="legacy-sales", name="Legacy Sales", account_type="revenue", currency="YER")
+        original=post_journal(s,tenant_id=1,reference="LEGACY-ORIGINAL",currency="YER",
+            posting_date=date(2026,3,1),lines=[PostingLine("legacy-cash",debit=25),PostingLine("legacy-sales",credit=25)])
+        s.query(Account).filter(Account.tenant_id==1,Account.code.in_(["legacy-cash","legacy-sales"])).delete(synchronize_session=False)
         s.flush()
         reversal=reverse_journal(s,tenant_id=1,journal_id=original.id,
             reversal_reference="LEGACY-REVERSAL",reversal_date=date(2026,3,2))
         assert reversal.id != original.id
         assert {x.account for x in s.query(JournalLineRecord).filter_by(journal_id=reversal.id).all()} == {"legacy-cash","legacy-sales"}
+
+
+def test_reversal_rejects_tampered_original_journal():
+    F=setup()
+    with F() as s:
+        s.add(Tenant(name="Integrity",status="active")); s.flush(); seed_period(s)
+        original=post_journal(s,tenant_id=1,reference="TAMPERED-ORIGINAL",currency="YER",
+            posting_date=date(2026,3,1),lines=[PostingLine("1",debit=10),PostingLine("2",credit=10)])
+        line=s.query(JournalLineRecord).filter_by(journal_id=original.id).first()
+        line.debit=Decimal("11"); s.flush()
+        with pytest.raises(FinanceError,match="integrity verification failed"):
+            reverse_journal(s,tenant_id=1,journal_id=original.id,
+                reversal_reference="TAMPERED-REVERSAL",reversal_date=date(2026,3,2))
 
 
 def test_invalid_lines_are_rejected():
