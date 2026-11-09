@@ -46,7 +46,7 @@ def _open_period(session, tenant_id, posting_date):
 
 def post_journal(session, *, tenant_id: int, reference: str, currency: str,
                  posting_date: date, lines, actor_id: str | None = None,
-                 _allow_inactive_accounts: bool = False) -> Journal:
+                 _allow_legacy_accounts: bool = False) -> Journal:
     if tenant_id <= 0:
         raise TenantAccessDenied("valid tenant context is required")
     if not reference or not reference.strip() or not currency or not currency.strip():
@@ -58,7 +58,7 @@ def post_journal(session, *, tenant_id: int, reference: str, currency: str,
     try:
         validate_posting_accounts(
             session, tenant_id=tenant_id, currency=normalized_currency,
-            account_codes=account_codes, allow_inactive=_allow_inactive_accounts,
+            account_codes=account_codes, allow_legacy=_allow_legacy_accounts,
         )
     except AccountPostingError as exc:
         raise FinanceError(str(exc)) from exc
@@ -103,7 +103,7 @@ def reverse_journal(session, *, tenant_id: int, journal_id: int,
         for x in original_lines]
     reversal = post_journal(session, tenant_id=tenant_id,
         reference=reversal_reference, currency=original.currency,
-        posting_date=reversal_date, lines=reversed_lines, _allow_inactive_accounts=True)
+        posting_date=reversal_date, lines=reversed_lines, _allow_legacy_accounts=True)
     session.add(JournalLink(tenant_id=tenant_id, journal_id=reversal.id,
                             reversal_of_journal_id=original.id))
     session.flush()
