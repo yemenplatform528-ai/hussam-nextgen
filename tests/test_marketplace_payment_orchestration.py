@@ -11,11 +11,14 @@ from app.engines.identity import IdentityService
 from app.engines.inventory.production import InventoryProductionService
 from app.core.contracts import StockMovement
 from app.core.models.finance import FiscalPeriod
+from app.engines.finance.accounts import create_account
 
 
 def setup():
     e=create_engine('sqlite+pysqlite:///:memory:',future=True); Base.metadata.create_all(e); db=sessionmaker(e,expire_on_commit=False)(); ensure_market(db)
     ids=IdentityService(db); seller=ids.create_tenant('Seller'); buyer_t=ids.create_tenant('Buyer')
+    create_account(db, tenant_id=seller.id, code='payment_clearing', name='Payment Clearing', account_type='asset', currency='YER')
+    create_account(db, tenant_id=seller.id, code='accounts_receivable', name='Accounts Receivable', account_type='asset', currency='YER')
     admin=ids.create_user('seller','seller38@example.com'); buyer=ids.create_user('buyer','buyer38@example.com')
     ids.add_membership(admin.id,seller.id,'owner'); ids.add_membership(buyer.id,buyer_t.id,'owner')
     inv=InventoryProductionService(db); inv.create_item(seller.id,'rice38','Rice','bag'); inv.create_warehouse(seller.id,'wh38','Main'); inv.record(seller.id,StockMovement('rice38','wh38',Decimal('20'),'in','opening'))
