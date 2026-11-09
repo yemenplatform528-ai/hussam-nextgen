@@ -75,6 +75,8 @@ test("chat fails closed without session; login enforces exact origin and passwor
     assert.equal(validLogin.status, 200);
     const loginData = await validLogin.json();
     assert.equal(typeof loginData.token, "string");
+    assert.equal(validLogin.headers.get("cache-control"), "no-store");
+    assert.equal(validLogin.headers.get("pragma"), "no-cache");
     assert.equal(loginData.expiresIn, 30 * 60);
     const validToken = loginData.token;
 
@@ -84,6 +86,8 @@ test("chat fails closed without session; login enforces exact origin and passwor
       body: "null"
     });
     assert.equal(nullChat.status, 400);
+    assert.equal(nullChat.headers.get("cache-control"), "no-store");
+    assert.equal(nullChat.headers.get("pragma"), "no-cache");
     assert.equal((await nullChat.json()).error, "INVALID_MESSAGES");
     const arrayChat = await fetch(`${base}/api/chat`, {
       method: "POST",
