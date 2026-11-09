@@ -125,7 +125,7 @@ class LogisticsProductionService:
         if self.db.scalar(select(ShipmentCollection).where(ShipmentCollection.tenant_id == tenant_id, ShipmentCollection.reference == reference)):
             raise LogisticsError('duplicate collection reference')
         c = ShipmentCollection(tenant_id=tenant_id, shipment_id=shipment_id, reference=reference,
-                               amount=amount, currency=currency, status='collected', collected_at=datetime.now(timezone.utc))
+                               amount=amount, currency=currency, status='collected', evidence_source='seller_attestation', independently_verified=False, collected_at=datetime.now(timezone.utc))
         self.db.add(c); self.db.flush()
         self._event(tenant_id, 'logistics.cod.collected', s.id,
                     {'reference': reference, 'amount': str(amount), 'currency': currency})
