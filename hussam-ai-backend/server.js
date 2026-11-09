@@ -185,6 +185,8 @@ const server = http.createServer(async (req, res) => {
     }));
   }
   if (req.method === "POST" && url.pathname === "/api/session/login") {
+    res.setHeader("Cache-Control", "no-store");
+    res.setHeader("Pragma", "no-cache");
     if (origin !== ALLOWED_ORIGIN) {
       res.writeHead(403);
       return res.end(JSON.stringify({ error: "ORIGIN_NOT_ALLOWED" }));
@@ -241,6 +243,8 @@ const server = http.createServer(async (req, res) => {
     res.writeHead(404);
     return res.end(JSON.stringify({ error: "NOT_FOUND" }));
   }
+  res.setHeader("Cache-Control", "no-store");
+  res.setHeader("Pragma", "no-cache");
   if (origin !== ALLOWED_ORIGIN) {
     res.writeHead(403);
     return res.end(JSON.stringify({ error: "ORIGIN_NOT_ALLOWED" }));
