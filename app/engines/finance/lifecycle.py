@@ -1,4 +1,5 @@
 from datetime import date
+from decimal import Decimal
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from app.core.contracts import JournalCommand
