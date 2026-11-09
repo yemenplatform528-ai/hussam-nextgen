@@ -196,7 +196,7 @@ def run():
                     assert page.locator("text=تعذر تحميل قوائم المنتجات حالياً").is_visible()
                     page.evaluate("window.__e2eCatalogUnavailable=false; window.__e2eSellerVerification='approved'")
                     page.locator("button[data-ws='trust']").click()
-                    assert page.locator("text=حساب نشط").is_visible()
+                    page.locator("text=حساب نشط").wait_for(state="visible", timeout=5000)
                     assert page.locator("text=أرز بسمتي 10 كجم").is_visible()
                     assert page.locator("text=pending").is_visible()
                     page.locator("button[data-ws='orders']").click()
