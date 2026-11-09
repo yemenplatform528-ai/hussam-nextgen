@@ -10,7 +10,7 @@ const backend = resolve(here, "..");
 const serverFile = resolve(backend, "server.js");
 const preloadFile = resolve(here, "mock-provider-status.mjs");
 const ownerPassword = "test owner password fixture 2026";
-const sessionSecret = "0123456789abcdef0123456789abcdef";
+const sessionSecret = "test session secret fixture only for tests";
 const origin = "http://127.0.0.1";
 
 for (const [upstreamStatus, expectedCode] of [
