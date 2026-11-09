@@ -129,7 +129,7 @@ def main():
             state["provider_auth_failure"] = True
             page.locator("#prompt").fill("provider credential failure must not log out the owner")
             page.locator("#form button[type='submit']").click()
-            page.get_by_text("PROVIDER_AUTHENTICATION_FAILED").wait_for()
+            page.get_by_text("تعذر التحقق من اعتماد مزود الاستدلال").wait_for()
             assert page.locator("#chatLayout").is_visible(), "provider auth failure must not clear the owner session"
             assert page.locator("#loginPanel").is_hidden(), "provider auth failure must not expose the login panel"
             assert page.locator("#logoutButton").is_visible(), "owner logout must remain available after provider failure"
