@@ -125,7 +125,9 @@ def test_cod_collection_evidence_source_and_verification_are_consistent():
     assert collection.independently_verified is False
 
     collection.evidence_source = 'carrier_signed_event'
-    collection.independently_verified = True
-    db.commit()
-    assert collection.evidence_source == 'carrier_signed_event'
-    assert collection.independently_verified is True
+    with pytest.raises(IntegrityError):
+        db.commit()
+    db.rollback()
+    collection = db.get(ShipmentCollection, collection_id)
+    assert collection.evidence_source == 'seller_attestation'
+    assert collection.independently_verified is False
