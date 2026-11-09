@@ -9,6 +9,7 @@ from app.core.models.finance import FiscalPeriod
 from app.core.models.core import Journal, JournalLineRecord
 from app.core.models.governance import OutboxEvent
 from app.core.models.market import MarketContext, MarketCurrency, ProviderRegistryEntry, ProviderMarketCapability, PaymentRailRegistryEntry, PaymentAdapterRegistryEntry
+from app.engines.finance.accounts import create_account
 import json
 
 
@@ -17,6 +18,8 @@ def db():
 
 def setup():
     s = db(); t = IdentityService(s).create_tenant('Payments Tenant')
+    for code, name in [('payment_clearing', 'Payment Clearing'), ('accounts_receivable', 'Accounts Receivable'), ('cash', 'Cash')]:
+        create_account(s, tenant_id=t.id, code=code, name=name, account_type='asset', currency='YER')
     s.add(FiscalPeriod(tenant_id=t.id, name='2026', starts_on=date(2026,1,1), ends_on=date(2026,12,31), closed=False)); s.commit()
     return s, t, PaymentProductionService(s)
 

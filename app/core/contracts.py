@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from datetime import date
 from decimal import Decimal
 
 @dataclass(frozen=True)
@@ -12,6 +13,7 @@ class JournalCommand:
     reference: str
     currency: str
     lines: tuple[JournalLine, ...]
+    posting_date: date | None = None
 
 @dataclass(frozen=True)
 class StockMovement:

@@ -2,9 +2,9 @@ from datetime import date
 from decimal import Decimal
 from sqlalchemy import select
 from sqlalchemy.orm import Session
-from app.core.contracts import JournalCommand, JournalLine
-from app.core.models import FiscalPeriod, Journal, JournalLineRecord, JournalLink, ExchangeRate
-from app.engines.finance.service import AccountingService, AccountingInvariantError
+from app.core.contracts import JournalCommand
+from app.core.models import FiscalPeriod, ExchangeRate
+from app.engines.finance.production import FinanceError, PostingLine, post_journal, reverse_journal
 
 class FinanceLifecycleError(ValueError): pass
 
@@ -18,24 +18,29 @@ class FinanceLifecycleService:
         if not p: raise FinanceLifecycleError('period not found')
         p.closed=True; self.db.commit(); return p
     def post(self, tenant_id:int, command:JournalCommand, posting_date:date|None=None):
-        AccountingService().validate_posting(command)
-        if self.db.scalar(select(Journal).where(Journal.tenant_id==tenant_id,Journal.reference==command.reference)):
-            raise AccountingInvariantError('duplicate journal reference')
-        if posting_date:
-            period=self.db.scalar(select(FiscalPeriod).where(FiscalPeriod.tenant_id==tenant_id,FiscalPeriod.starts_on<=posting_date,FiscalPeriod.ends_on>=posting_date))
-            if not period: raise FinanceLifecycleError('no fiscal period for posting date')
-            if period.closed: raise FinanceLifecycleError('fiscal period is closed')
-        j=Journal(tenant_id=tenant_id,reference=command.reference.strip(),currency=command.currency.strip().upper(),status='posted')
-        self.db.add(j); self.db.flush(); self.db.add_all([JournalLineRecord(journal_id=j.id,account=x.account,debit=x.debit,credit=x.credit) for x in command.lines]); self.db.commit(); self.db.refresh(j); return j
-    def reverse(self, tenant_id:int, journal_id:int, reference:str):
-        original=self.db.scalar(select(Journal).where(Journal.id==journal_id,Journal.tenant_id==tenant_id,Journal.status=='posted'))
-        if not original: raise FinanceLifecycleError('posted journal not found')
-        if self.db.scalar(select(JournalLink).where(JournalLink.tenant_id==tenant_id,JournalLink.reversal_of_journal_id==journal_id)):
-            raise FinanceLifecycleError('journal already reversed')
-        lines=self.db.scalars(select(JournalLineRecord).where(JournalLineRecord.journal_id==journal_id)).all()
-        cmd=JournalCommand(reference,original.currency,tuple(JournalLine(x.account,Decimal(str(x.credit)),Decimal(str(x.debit))) for x in lines))
-        reversal=self.post(tenant_id,cmd)
-        self.db.add(JournalLink(tenant_id=tenant_id,journal_id=reversal.id,reversal_of_journal_id=journal_id)); self.db.commit(); return reversal
+        effective_date = posting_date or command.posting_date
+        if effective_date is None:
+            raise FinanceLifecycleError('posting date is required')
+        try:
+            journal = post_journal(
+                self.db, tenant_id=tenant_id, reference=command.reference,
+                currency=command.currency, posting_date=effective_date,
+                lines=[PostingLine(x.account, debit=x.debit, credit=x.credit) for x in command.lines],
+            )
+            self.db.commit(); self.db.refresh(journal); return journal
+        except FinanceError as exc:
+            self.db.rollback()
+            raise FinanceLifecycleError(str(exc)) from exc
+    def reverse(self, tenant_id:int, journal_id:int, reference:str, reversal_date:date):
+        try:
+            reversal = reverse_journal(
+                self.db, tenant_id=tenant_id, journal_id=journal_id,
+                reversal_reference=reference, reversal_date=reversal_date,
+            )
+            self.db.commit(); self.db.refresh(reversal); return reversal
+        except FinanceError as exc:
+            self.db.rollback()
+            raise FinanceLifecycleError(str(exc)) from exc
     def set_exchange_rate(self, tenant_id:int, base:str, quote:str, rate:Decimal):
         if rate <= 0 or base.strip().upper()==quote.strip().upper(): raise FinanceLifecycleError('invalid exchange rate')
         r=ExchangeRate(tenant_id=tenant_id,base_currency=base.strip().upper(),quote_currency=quote.strip().upper(),rate=rate); self.db.add(r); self.db.commit(); self.db.refresh(r); return r

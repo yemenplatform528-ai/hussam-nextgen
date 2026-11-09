@@ -10,10 +10,14 @@ from app.core.models.procurement import PurchaseOrder, PurchaseOrderLine, Purcha
 from app.core.models.inventory import InventoryMovementRecord
 from app.core.models.finance import FiscalPeriod
 from app.core.models.core import Journal, JournalLineRecord
+from app.engines.finance.accounts import create_account
 
 def db(): _, factory=make_session_factory(); return factory()
 def setup():
-    s=db(); t=IdentityService(s).create_tenant('Procurement Tenant'); inv=InventoryProductionService(s)
+    s=db(); t=IdentityService(s).create_tenant('Procurement Tenant')
+    create_account(s, tenant_id=t.id, code='inventory', name='Inventory', account_type='asset', currency='YER')
+    create_account(s, tenant_id=t.id, code='accounts_payable', name='Accounts Payable', account_type='liability', currency='YER')
+    inv=InventoryProductionService(s)
     inv.create_item(t.id,'item-1','Item 1'); inv.create_item(t.id,'item-2','Item 2'); inv.create_warehouse(t.id,'wh-a','A')
     p=ProcurementProductionService(s); p.create_supplier(t.id,'sup-1','Supplier 1'); return s,t,p
 

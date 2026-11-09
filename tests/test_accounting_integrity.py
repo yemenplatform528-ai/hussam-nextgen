@@ -35,6 +35,8 @@ def test_posting_records_date_and_integrity_hash_and_trial_balance():
     F = setup()
     with F() as s:
         seed(s)
+        create_account(s, tenant_id=1, code='1000', name='Cash', account_type='asset', currency='YER')
+        create_account(s, tenant_id=1, code='4000', name='Sales', account_type='revenue', currency='YER')
         j = post_journal(s, tenant_id=1, reference='SALE-1', currency='YER', posting_date=date(2026,9,13),
                          lines=[PostingLine('1000', debit=Decimal('125.50')), PostingLine('4000', credit=Decimal('125.50'))])
         assert j.posting_date == date(2026,9,13)
@@ -49,6 +51,8 @@ def test_integrity_detects_line_tampering_and_control_reconciliation():
     F = setup()
     with F() as s:
         seed(s)
+        create_account(s, tenant_id=1, code='1000', name='Cash', account_type='asset', currency='YER')
+        create_account(s, tenant_id=1, code='4000', name='Sales', account_type='revenue', currency='YER')
         j = post_journal(s, tenant_id=1, reference='TAMPER-1', currency='YER', posting_date=date(2026,9,13),
                          lines=[PostingLine('1000', debit=Decimal('50')), PostingLine('4000', credit=Decimal('50'))])
         assert verify_journal_integrity(s, tenant_id=1, journal_id=j.id)

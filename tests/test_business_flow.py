@@ -8,6 +8,7 @@ from sqlalchemy.pool import StaticPool
 from app.core.persistence import Base
 from app.core.models.core import Tenant, User, TenantMembership, Journal
 from app.core.models.finance import FiscalPeriod
+from app.engines.finance.accounts import create_account
 from app.core.models.inventory import InventoryMovementRecord, InventoryReservation
 from app.core.models.payments import PaymentIntent
 from app.core.models.logistics import Shipment
@@ -30,6 +31,12 @@ def test_complete_business_flow_from_purchase_to_settlement():
         period = FiscalPeriod(tenant_id=1, name="2026", starts_on=date(2026, 1, 1),
                               ends_on=date(2026, 12, 31), closed=False)
         db.add_all([tenant, user, membership, period])
+        for code, name, account_type in [
+            ('inventory', 'Inventory', 'asset'), ('accounts_payable', 'Accounts Payable', 'liability'),
+            ('payment_clearing', 'Payment Clearing', 'asset'), ('accounts_receivable', 'Accounts Receivable', 'asset'),
+            ('cash', 'Cash', 'asset'),
+        ]:
+            create_account(db, tenant_id=1, code=code, name=name, account_type=account_type, currency='YER')
         db.commit()
 
         procurement = ProcurementProductionService(db)

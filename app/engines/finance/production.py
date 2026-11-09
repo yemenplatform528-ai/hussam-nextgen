@@ -7,6 +7,8 @@ from sqlalchemy import select
 from app.core.models.core import Journal, JournalLineRecord
 from app.core.models.finance import FiscalPeriod, JournalLink
 from app.core.security.context import TenantAccessDenied
+from app.engines.finance.accounts import AccountPostingError, validate_posting_accounts
+from app.engines.finance.reconciliation import verify_journal_integrity
 
 class FinanceError(ValueError):
     pass
@@ -44,22 +46,33 @@ def _open_period(session, tenant_id, posting_date):
     return periods[0]
 
 def post_journal(session, *, tenant_id: int, reference: str, currency: str,
-                 posting_date: date, lines, actor_id: str | None = None) -> Journal:
+                 posting_date: date, lines, actor_id: str | None = None,
+                 _allow_legacy_accounts: bool = False) -> Journal:
     if tenant_id <= 0:
         raise TenantAccessDenied("valid tenant context is required")
-    if not reference or not currency:
+    if not reference or not reference.strip() or not currency or not currency.strip():
         raise FinanceError("reference and currency are required")
     _validate_lines(lines)
+    normalized_reference = reference.strip()
+    normalized_currency = currency.strip().upper()
+    account_codes = [str(line.account_id or "").strip() for line in lines]
+    try:
+        validate_posting_accounts(
+            session, tenant_id=tenant_id, currency=normalized_currency,
+            account_codes=account_codes, allow_legacy=_allow_legacy_accounts,
+        )
+    except AccountPostingError as exc:
+        raise FinanceError(str(exc)) from exc
     _open_period(session, tenant_id, posting_date)
     if session.scalar(select(Journal).where(
-        Journal.tenant_id == tenant_id, Journal.reference == reference)):
+        Journal.tenant_id == tenant_id, Journal.reference == normalized_reference)):
         raise FinanceError("duplicate journal reference")
-    journal = Journal(tenant_id=tenant_id, reference=reference.strip(), currency=currency.strip().upper(),
+    journal = Journal(tenant_id=tenant_id, reference=normalized_reference, currency=normalized_currency,
                       status="posted", posting_date=posting_date, created_at=datetime.now(timezone.utc))
     session.add(journal); session.flush()
-    for line in lines:
+    for line, account_code in zip(lines, account_codes):
         session.add(JournalLineRecord(
-            journal_id=journal.id, account=str(line.account_id),
+            journal_id=journal.id, account=account_code,
             debit=Decimal(str(line.debit)), credit=Decimal(str(line.credit))))
     session.flush()
     line_records = session.scalars(select(JournalLineRecord).where(JournalLineRecord.journal_id == journal.id).order_by(JournalLineRecord.id)).all()
@@ -77,6 +90,8 @@ def reverse_journal(session, *, tenant_id: int, journal_id: int,
         raise FinanceError("journal not found in tenant")
     if original.status != "posted":
         raise FinanceError("only posted journals can be reversed")
+    if not verify_journal_integrity(session, tenant_id=tenant_id, journal_id=original.id):
+        raise FinanceError("journal integrity verification failed; reversal is blocked")
     if not reversal_reference:
         raise FinanceError("reversal reference is required")
     if session.scalar(select(JournalLink).where(
@@ -91,7 +106,7 @@ def reverse_journal(session, *, tenant_id: int, journal_id: int,
         for x in original_lines]
     reversal = post_journal(session, tenant_id=tenant_id,
         reference=reversal_reference, currency=original.currency,
-        posting_date=reversal_date, lines=reversed_lines)
+        posting_date=reversal_date, lines=reversed_lines, _allow_legacy_accounts=True)
     session.add(JournalLink(tenant_id=tenant_id, journal_id=reversal.id,
                             reversal_of_journal_id=original.id))
     session.flush()
