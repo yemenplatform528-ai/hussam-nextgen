@@ -115,3 +115,14 @@ A source-level review of the current seller settlement and payout paths found an
 ### Control
 
 The marketplace seller balance remains an operational subledger, not a substitute for the authoritative Finance General Ledger. Do not claim accounting reconciliation or production payout certification from seller-balance conservation alone. Do not invent account codes or post journals until the account mapping and cash-custody policy are approved.
+
+
+## 2026-11-09 — Transaction evidence storage prerequisite
+
+A source-tree review found no transaction-level file upload or private evidence-storage adapter in the current application. No `UploadFile`, S3 client, presigned upload/download route, or transaction `EvidenceArtifact` model is present. The repository's `evidence/external` directory is reserved for release-gate evidence and must not be repurposed for customer, seller, or courier receipts.
+
+| Gap | Classification | Current behavior | Required closure |
+|---|---|---|---|
+| Secure transaction evidence storage | Verified engineering gap | No application-level private upload/storage contract exists for COD receipts, carrier events, or cash-refund proof | Select an approved storage provider; implement private tenant-scoped objects, short-lived access, upload type/size validation, malware scanning where supported, immutable SHA-256 evidence hashes, actor/access audit, retention/deletion policy, and evidence-to-business-record linkage |
+
+Until this is closed, a manually entered receipt reference remains an attestation and must not be upgraded to independently verified evidence. Storage provider, retention, privacy, and cost settings require owner/security approval before deployment.
