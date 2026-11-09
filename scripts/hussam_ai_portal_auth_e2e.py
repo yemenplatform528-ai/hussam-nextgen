@@ -95,6 +95,7 @@ def main():
             )
 
             assert not page.locator("#logoutButton").is_visible(), "logout must be hidden before login"
+            assert "غير مشفر" in page.locator("#loginPanel").inner_text(), "local history storage warning must be visible"
             page.locator("#navDashboard").click()
             assert page.locator("#loginPanel").is_visible(), "protected dashboard must require login"
 
