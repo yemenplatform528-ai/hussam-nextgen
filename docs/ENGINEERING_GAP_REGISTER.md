@@ -103,6 +103,7 @@ A source-level review of the current seller settlement and payout paths found an
 - `MarketplaceService.settle_order_payment` validates a real `PaymentSettlement` and credits the `MarketplaceSellerBalanceEntry` subledger for an eligible completed order.
 - `MarketplaceService.mark_payout_paid` validates the seller destination/provider gate and debits the same seller subledger when payout is marked paid.
 - These marketplace paths do not call the Finance `post_journal` authority or create a journal-to-subledger linkage. The payment settlement journal records cash/clearing movement, but it does not by itself establish the seller-payable and payout postings.
+- The current Finance `post_journal` function validates balanced lines, tenant context, an open fiscal period, and duplicate journal references, but writes account identifiers as strings without validating that each account exists, is active, belongs to the tenant, or supports the journal currency. The `accounts` table exists, but this posting path does not enforce it.
 - The seller subledger has its own conservation checks, but those checks do not prove General Ledger reconciliation.
 
 ### Additional verified engineering gap
