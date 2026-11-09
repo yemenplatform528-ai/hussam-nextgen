@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint, CheckConstraint
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint, CheckConstraint, false
 from sqlalchemy.orm import Mapped, mapped_column
 from app.core.persistence import Base
 
@@ -49,12 +49,16 @@ class ShipmentCollection(Base):
     currency: Mapped[str] = mapped_column(String(10), nullable=False)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default='pending')
     payment_reference: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    evidence_source: Mapped[str] = mapped_column(String(40), nullable=False, default='seller_attestation', server_default='seller_attestation')
+    independently_verified: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=false())
     collected_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     __table_args__ = (
         UniqueConstraint('tenant_id', 'reference', name='uq_shipment_collection_tenant_reference'),
         UniqueConstraint('tenant_id', 'shipment_id', name='uq_one_collection_per_shipment'),
         CheckConstraint('amount > 0', name='ck_shipment_collection_positive_amount'),
         CheckConstraint("status IN ('pending','collected','failed','cancelled')", name='ck_shipment_collection_status'),
+        CheckConstraint("evidence_source IN ('seller_attestation','carrier_signed_event','platform_verified_agent_receipt')", name='ck_shipment_collection_evidence_source'),
+        CheckConstraint("(evidence_source = 'seller_attestation' AND independently_verified = false) OR (evidence_source IN ('carrier_signed_event','platform_verified_agent_receipt') AND independently_verified = true)", name='ck_shipment_collection_evidence_verification'),
     )
 
 
