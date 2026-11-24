@@ -13,6 +13,7 @@ not connected to WorkflowEngine, and not deployed.
 - Expired final-attempt reaper and stale-attempt closure on reclaim.
 - Allowlisted handler registry, separate database connection for heartbeats, and cooperative shutdown that safely defers the active lease.
 - Bounded secret redaction for payload metadata and safe error summaries.
+- Bounded exponential retry backoff starting at 30 seconds, with ±20% jitter and a 60-minute cap.
 - Transactional schedule occurrence materializer with explicit misfire policies, invoked periodically by the process supervisor.
 - Optional `croniter` adapter using IANA `zoneinfo` and UTC occurrence timestamps.
 - Transactional allowlisted Outbox relay from the existing `outbox_events` model into durable tasks.
@@ -44,7 +45,9 @@ schedule materialization, outbox relay (when configured), and final-lease reapin
 
 Run the isolated PostgreSQL workflow in GitHub Actions. It applies `schema.sql` only
 to an ephemeral PostgreSQL 16 service and runs the queue/RLS/fencing/checkpoint/recovery
-tests. Passing CI is required before calling this prototype tested.
+tests. Current verified evidence: workflow #35 passed 37 tests and a `pg_dump`/`pg_restore`
+drill that reclaimed an in-flight task, verified its checkpoint, and completed it after
+restore. This is CI-isolated recovery evidence, not a hosted-provider or production restore.
 
 ## Explicitly not done
 
@@ -52,4 +55,4 @@ tests. Passing CI is required before calling this prototype tested.
 - No existing WorkflowEngine, WorkflowTask, Render service, Neon branch, YIB app,
   secret, SSO policy, or billing setting was changed.
 - No production deployment, live schedule, or external side-effect handler is enabled.
-- Backup/restore drill and provider-neutral packaging remain release gates.
+- Provider-backed backup/restore, provider-neutral packaging, independent code review, and live WorkflowEngine/Outbox integration remain release gates. The disposable PostgreSQL CI restore drill has passed.
