@@ -1,10 +1,12 @@
 # Hussam Portable Task Runner — Recovery-First Design
 
-**Status:** DESIGN / NOT IMPLEMENTED / NOT DEPLOYED  
-**Evidence date:** 2026-11-23  
+**Status:** DESIGN HISTORY + PARTIALLY IMPLEMENTED V1 PROTOTYPE / NOT INTEGRATED / NOT DEPLOYED  
+**Evidence date:** 2026-11-24  
 **Base:** `main` at `d83958a03d3b8194859cbef250c218cb09b4df2f`  
 **Working branch:** `design/portable-task-runner-2026-11-23`
 
+> **Implementation update (2026-11-24):** The design below remains the decision record and evidence snapshot that guided implementation. A separate, non-integrated Runner V1 prototype now exists under `app/runner/` on [PR #193](https://github.com/yemenplatform528-ai/hussam-nextgen/pull/193). Its current acceptance status and exact implemented boundary are maintained in [`app/runner/README.md`](../blob/prototype/portable-runner-v1-2026-11-24/app/runner/README.md). The prototype is not merged, connected to WorkflowEngine, migrated into an existing database, or deployed.
+>
 ## 1. Decision
 
 Keep the existing `WorkflowEngine` as the deterministic business-workflow state machine. Add a separate portable execution plane for durable tasks, leases, checkpoints, scheduling, retries, and worker recovery. The workflow layer emits commands/events; the runner owns execution lifecycle. Do not replace `WorkflowEngine` or overload `WorkflowTask` with queue semantics.
