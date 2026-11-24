@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import hashlib
+import hmac
 import json
 import uuid
 from typing import Any
@@ -29,7 +30,7 @@ class PostgresQueue:
         )
 
     def touch_worker(self, *, worker_id: str, process_instance_id: uuid.UUID,
-                     build_version: str) -> str:
+                     build_version: str) -> int:
         """Upsert a secret-free process heartbeat in the global worker registry."""
         if not worker_id or len(worker_id) > 160:
             raise ValueError("worker_id must contain 1..160 characters")
@@ -209,7 +210,7 @@ class PostgresQueue:
                 raise CheckpointIntegrityError("checkpoint payload must be an object")
             encoded = json.dumps(payload,sort_keys=True,separators=(",",":"))
             digest = hashlib.sha256(encoded.encode("utf-8")).hexdigest()
-            if not __import__("hmac").compare_digest(digest,str(stored_digest)):
+            if not hmac.compare_digest(digest,str(stored_digest)):
                 raise CheckpointIntegrityError("checkpoint SHA-256 verification failed")
             return {
                 "sequence_no": sequence_no,
