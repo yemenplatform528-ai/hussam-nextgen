@@ -105,3 +105,46 @@ def test_expired_final_attempt_is_dead_lettered(db):
             "SELECT state FROM hussam_runner_v1.tasks WHERE id=%s", (task_id,)
         ).fetchone()[0]
     assert state == "dead_letter"
+
+
+def test_heartbeat_renews_current_lease(db):
+    queue = PostgresQueue(db)
+    tenant = tenant_id()
+    task_id = queue.enqueue(tenant_id=tenant, task_type="demo", payload={},
+                            idempotency_key=str(uuid.uuid4()))
+    task = queue.claim(tenant_id=tenant, worker_id="worker-heartbeat", lease_seconds=10)
+    assert task and task["id"] == task_id
+    queue.heartbeat(task, lease_seconds=30)
+    queue.complete(task)
+
+
+def test_fail_uses_retry_then_dead_letter_state(db):
+    queue = PostgresQueue(db)
+    tenant = tenant_id()
+    task_id = queue.enqueue(tenant_id=tenant, task_type="demo", payload={},
+                            idempotency_key=str(uuid.uuid4()), max_attempts=2)
+    first = queue.claim(tenant_id=tenant, worker_id="worker-retry")
+    assert first and first["id"] == task_id
+    queue.fail(first, error_code="temporary_failure", safe_summary="retry safely",
+               retry_delay_seconds=0)
+    with db.transaction():
+        db.execute("SELECT set_config('app.tenant_id', %s, true)", (str(tenant),))
+        db.execute("UPDATE hussam_runner_v1.tasks SET run_after=now() WHERE id=%s", (task_id,))
+    second = queue.claim(tenant_id=tenant, worker_id="worker-retry")
+    assert second and second["attempts"] == 2
+    queue.fail(second, error_code="final_failure", safe_summary="final safe failure")
+    with db.transaction():
+        db.execute("SELECT set_config('app.tenant_id', %s, true)", (str(tenant),))
+        row = db.execute(
+            "SELECT state,safe_error_code FROM hussam_runner_v1.tasks WHERE id=%s",
+            (task_id,),
+        ).fetchone()
+    assert row == ("dead_letter", "FINAL_FAILURE")
+
+
+def test_enqueue_rejects_oversized_payload_before_database_access():
+    queue = PostgresQueue(None)
+    with pytest.raises(ValueError, match="64 KiB"):
+        queue.enqueue(tenant_id=1, task_type="demo",
+                      payload={"large": "x" * 70000},
+                      idempotency_key="oversized")
