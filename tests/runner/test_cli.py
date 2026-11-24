@@ -35,8 +35,11 @@ def test_factory_loader_rejects_objects_without_serve(monkeypatch):
 def test_main_passes_signal_shutdown_to_service(monkeypatch):
     observed = {}
 
+    handlers = {}
+
     class FakeService:
         def serve(self, *, stop_event):
+            handlers[signal.SIGTERM](signal.SIGTERM, None)
             observed["stop_event"] = stop_event
             assert stop_event.is_set()
 
@@ -45,7 +48,6 @@ def test_main_passes_signal_shutdown_to_service(monkeypatch):
     monkeypatch.setitem(sys.modules, "runner_factory_signal_test", module)
     monkeypatch.setenv("HUSSAM_RUNNER_FACTORY", "runner_factory_signal_test:build")
 
-    handlers = {}
     monkeypatch.setattr(
         cli.signal, "signal", lambda sig, handler: handlers.__setitem__(sig, handler)
     )
