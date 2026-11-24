@@ -24,7 +24,7 @@ jobs:
       - name: Install locked baseline tooling
         run: python -m pip install -r requirements.lock
       - name: Install project
-        run: python -m pip install -e '.[test]'
+        run: python -m pip install -e '.[test,runner]'
       - name: Install browser runtime for browser contract tests
         run: python -m playwright install --with-deps chromium
       - name: Repository baseline audit
@@ -92,7 +92,7 @@ jobs:
       - name: Install project
         run: |
           python -m pip install -r requirements.lock
-          python -m pip install -e '.[test]'
+          python -m pip install -e '.[test,runner]'
       - name: PostgreSQL migration
         env:
           DATABASE_URL: postgresql+psycopg://hussam:ci-pass@127.0.0.1:5432/hussam
@@ -136,7 +136,7 @@ jobs:
       - name: Install browser E2E dependencies
         run: |
           python -m pip install -r requirements.lock
-          python -m pip install -e '.[test]'
+          python -m pip install -e '.[test,runner]'
           python -m playwright install --with-deps chromium
       - name: Run desktop and mobile browser contract
         run: python scripts/browser_e2e.py

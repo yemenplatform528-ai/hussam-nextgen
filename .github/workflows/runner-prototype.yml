@@ -1,0 +1,161 @@
+name: Hussam Runner V1 isolated PostgreSQL prototype
+
+on:
+  pull_request:
+    paths:
+      - "app/runner/**"
+      - "tests/runner/**"
+      - ".github/workflows/runner-prototype.yml"
+      - "docs/ADR-0001-runner-v1-vs-v4.md"
+
+permissions:
+  contents: read
+
+jobs:
+  runner-postgres:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: runner_test
+          POSTGRES_USER: runner_test
+          POSTGRES_PASSWORD: runner_test_only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U runner_test -d runner_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install isolated test dependencies
+        run: python -m pip install "psycopg[binary]>=3.2,<4" "pytest>=8" "croniter>=2,<7"
+      - name: Install the portable CLI entry point without application dependencies
+        run: python -m pip install --no-deps -e .
+      - name: Verify both CLI entry points fail closed without an application factory
+        run: |
+          set -euo pipefail
+          run_expect_config_error() {
+            local output_file="/tmp/runner-cli-check-$RANDOM.log"
+            set +e
+            env -u HUSSAM_RUNNER_FACTORY "$@" >"$output_file" 2>&1
+            local result=$?
+            set -e
+            if [ "$result" -ne 2 ]; then
+              echo "CLI did not return its expected missing-factory exit code"
+              exit 1
+            fi
+            grep -q "runner startup failed error_type=ValueError" "$output_file"
+            if grep -Eiq '(postgres(ql)?://|password|api[_-]?key|token)' "$output_file"; then
+              echo "CLI emitted a secret-like value while rejecting missing configuration"
+              exit 1
+            fi
+          }
+          command -v hussam-runner
+          run_expect_config_error hussam-runner
+          run_expect_config_error python -m app.runner
+      - name: Create prototype schema in disposable PostgreSQL
+        env:
+          PGPASSWORD: runner_test_only
+        run: psql -h 127.0.0.1 -U runner_test -d runner_test -v ON_ERROR_STOP=1 -f app/runner/schema.sql
+      - name: Run queue, RLS, fencing, checkpoint and recovery tests
+        env:
+          RUNNER_TEST_DATABASE_URL: postgresql://runner_test:runner_test_only@127.0.0.1:5432/runner_test
+        run: python -m pytest -q tests/runner
+
+      - name: Backup, restore, and resume from a checkpoint on disposable PostgreSQL
+        env:
+          POSTGRES_CONTAINER_ID: ${{ job.services.postgres.id }}
+          RUNNER_TEST_DATABASE_URL: postgresql://runner_test:runner_test_only@127.0.0.1:5432/runner_test
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import os
+          import uuid
+          import psycopg
+          from app.runner.postgres import PostgresQueue
+
+          tenant_id = 190025
+          idempotency_key = "runner-v1-restore-drill"
+          connection = psycopg.connect(os.environ["RUNNER_TEST_DATABASE_URL"])
+          queue = PostgresQueue(connection)
+          task_id = queue.enqueue(
+              tenant_id=tenant_id,
+              task_type="restore_canary",
+              payload={"purpose": "isolated_restore_validation"},
+              idempotency_key=idempotency_key,
+              max_attempts=3,
+          )
+          task = queue.claim(
+              tenant_id=tenant_id,
+              worker_id="restore-drill-before-backup",
+              lease_seconds=30,
+          )
+          assert task is not None and task["id"] == task_id
+          queue.checkpoint(task, {"marker": "runner-v1-restore-checkpoint", "cursor": 37})
+          connection.close()
+          print("Created a running task and verified-checkpoint restore canary.")
+          PY
+
+          docker exec "$POSTGRES_CONTAINER_ID" pg_dump \
+            -U runner_test -d runner_test -Fc -f /tmp/hussam-runner-v1.dump
+          docker exec "$POSTGRES_CONTAINER_ID" pg_restore \
+            --list /tmp/hussam-runner-v1.dump >/tmp/hussam-runner-v1.dump.list
+          docker exec "$POSTGRES_CONTAINER_ID" createdb -U runner_test runner_restore
+          docker exec "$POSTGRES_CONTAINER_ID" pg_restore \
+            --no-owner --no-privileges -U runner_test -d runner_restore \
+            /tmp/hussam-runner-v1.dump
+
+          RUNNER_RESTORE_DATABASE_URL=postgresql://runner_test:runner_test_only@127.0.0.1:5432/runner_restore python - <<'PY'
+          import os
+          import psycopg
+          from app.runner.postgres import PostgresQueue
+
+          tenant_id = 190025
+          idempotency_key = "runner-v1-restore-drill"
+          connection = psycopg.connect(os.environ["RUNNER_RESTORE_DATABASE_URL"])
+          queue = PostgresQueue(connection)
+          with connection.transaction():
+              connection.execute(
+                  "SELECT set_config('app.tenant_id', %s, true)", (str(tenant_id),)
+              )
+              task_id = connection.execute(
+                  """SELECT id FROM hussam_runner_v1.tasks
+                     WHERE tenant_id=%s AND idempotency_key=%s""",
+                  (tenant_id, idempotency_key),
+              ).fetchone()[0]
+              connection.execute(
+                  """UPDATE hussam_runner_v1.tasks
+                     SET lease_expires_at=now()-interval '1 second'
+                     WHERE id=%s AND tenant_id=%s""",
+                  (task_id, tenant_id),
+              )
+          recovered = queue.claim(
+              tenant_id=tenant_id,
+              worker_id="restore-drill-after-restore",
+              lease_seconds=30,
+          )
+          assert recovered is not None and recovered["id"] == task_id
+          checkpoint = queue.latest_checkpoint(recovered)
+          assert checkpoint is not None
+          assert checkpoint["payload"] == {
+              "marker": "runner-v1-restore-checkpoint", "cursor": 37
+          }
+          queue.complete(recovered)
+          with connection.transaction():
+              connection.execute(
+                  "SELECT set_config('app.tenant_id', %s, true)", (str(tenant_id),)
+              )
+              state = connection.execute(
+                  "SELECT state FROM hussam_runner_v1.tasks WHERE id=%s",
+                  (task_id,),
+              ).fetchone()[0]
+          assert state == "succeeded"
+          connection.close()
+          print("Backup/restore passed: recovered task resumed from its verified checkpoint.")
+          PY
