@@ -70,7 +70,7 @@ class PostgresQueue:
                       AND (state IN ('pending','retry_wait')
                            OR (state='running' AND lease_expires_at < now()))
                     ORDER BY priority DESC, run_after, created_at
-                    FOR UPDATE SKIP LOCKED LIMIT 1
+                    LIMIT 1 FOR UPDATE SKIP LOCKED
                 )
                 UPDATE hussam_runner_v1.tasks AS t
                 SET state='running', attempts=t.attempts+1, lease_owner=%s,
@@ -195,7 +195,7 @@ class PostgresQueue:
                     FROM hussam_runner_v1.tasks
                     WHERE tenant_id=%s AND state='running'
                       AND lease_expires_at < now() AND attempts >= max_attempts
-                    ORDER BY lease_expires_at FOR UPDATE SKIP LOCKED LIMIT %s
+                    ORDER BY lease_expires_at LIMIT %s FOR UPDATE SKIP LOCKED
                 )
                 UPDATE hussam_runner_v1.tasks t
                 SET state='dead_letter',safe_error_code='LEASE_EXPIRED_FINAL_ATTEMPT',
