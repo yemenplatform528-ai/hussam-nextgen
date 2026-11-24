@@ -143,7 +143,11 @@ def test_fail_uses_retry_then_dead_letter_state(db):
 
 
 def test_enqueue_rejects_oversized_payload_before_database_access():
-    queue = PostgresQueue(None)
+    class NoDatabase:
+        def transaction(self):
+            raise AssertionError("database must not be accessed for oversized payload")
+
+    queue = PostgresQueue(NoDatabase())
     with pytest.raises(ValueError, match="64 KiB"):
         queue.enqueue(tenant_id=1, task_type="demo",
                       payload={"large": "x" * 70000},
