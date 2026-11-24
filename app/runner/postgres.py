@@ -4,6 +4,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+import random
 import uuid
 from typing import Any
 
@@ -20,6 +21,26 @@ class CheckpointIntegrityError(RuntimeError):
 
 class PostgresQueue:
     MAX_JSON_BYTES = 65536
+    RETRY_BASE_SECONDS = 30
+    RETRY_MAX_SECONDS = 3600
+    RETRY_JITTER_FRACTION = 0.20
+
+    @classmethod
+    def retry_delay_for_attempt(cls, attempt_no: int, *, jitter_sample: float) -> int:
+        """Return capped exponential retry delay with symmetric bounded jitter.
+
+        jitter_sample is supplied by random.random() in production and is
+        injectable here so the policy remains deterministic under test.
+        """
+        if attempt_no < 1:
+            raise ValueError("attempt_no must be positive")
+        if not 0.0 <= jitter_sample <= 1.0:
+            raise ValueError("jitter_sample must be between 0 and 1")
+        exponent = min(attempt_no - 1, 16)
+        base = min(cls.RETRY_MAX_SECONDS, cls.RETRY_BASE_SECONDS * (2 ** exponent))
+        spread = cls.RETRY_JITTER_FRACTION
+        multiplier = (1.0 - spread) + (2.0 * spread * jitter_sample)
+        return min(cls.RETRY_MAX_SECONDS, max(1, int(base * multiplier)))
 
     def __init__(self, connection: Any):
         self.connection = connection
@@ -257,7 +278,7 @@ class PostgresQueue:
             self._audit(task,"task.deferred",task["lease_owner"],{"reason_code":safe_code})
 
     def fail(self, task: dict[str, Any], *, error_code: str,
-             safe_summary: str, retry_delay_seconds: int = 30) -> None:
+             safe_summary: str, retry_delay_seconds: int | None = None) -> None:
         summary = redact_text(safe_summary)
         safe_code = error_code.upper()
         if not safe_code or len(safe_code) > 100 or not all(
@@ -277,7 +298,15 @@ class PostgresQueue:
                        completed_at=CASE WHEN %s THEN now() ELSE NULL END
                    WHERE id=%s AND tenant_id=%s AND lease_owner=%s AND fencing_token=%s""",
                 ("dead_letter" if terminal else "retry_wait",
-                 max(0,retry_delay_seconds),safe_code,summary,terminal,
+                 (
+                     0 if terminal else (
+                         self.retry_delay_for_attempt(
+                             task["attempts"], jitter_sample=random.random()
+                         )
+                         if retry_delay_seconds is None
+                         else max(0, retry_delay_seconds)
+                     )
+                 ),safe_code,summary,terminal,
                  task["id"],task["tenant_id"],task["lease_owner"],task["fencing_token"]),
             )
             self._finish_attempt(task,outcome,safe_code)
