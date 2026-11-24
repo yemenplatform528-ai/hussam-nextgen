@@ -8,7 +8,7 @@ from typing import Any
 
 _SECRET_KEY = re.compile(
     r"(password|passwd|secret|token|api[_-]?key|authorization|cookie|"
-    r"private[_-]?key|connection[_-]?string|credential)",
+    r"private[\\s_-]?key|connection[\\s_-]?string|credential)",
     re.IGNORECASE,
 )
 _PATTERNS = (
