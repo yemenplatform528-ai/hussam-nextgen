@@ -22,7 +22,7 @@ def test_outbox_relay_enqueues_once_and_marks_source_published(db):
         db.execute(
             """INSERT INTO outbox_events
                (event_id,tenant_id,event_type,aggregate_type,aggregate_id,payload)
-               VALUES (%s,%s,'order.created','order','ord-1','{\"amount\":5}'::jsonb)""",
+               VALUES (%s,%s,'order.created','order','ord-1','{"amount":5}'::jsonb)""",
             (event_id,tenant),
         )
     relay = PostgresOutboxRelay(db,event_handlers={"order.created":"handle_order_created"})
