@@ -14,6 +14,8 @@ class LeaseLost(RuntimeError):
 
 
 class PostgresQueue:
+    MAX_JSON_BYTES = 65536
+
     def __init__(self, connection: Any):
         self.connection = connection
 
@@ -30,6 +32,9 @@ class PostgresQueue:
         if not task_type or len(task_type) > 120 or max_attempts < 1:
             raise ValueError("invalid task type or max_attempts")
         safe_payload = safe_metadata(payload)
+        encoded_payload = json.dumps(safe_payload, ensure_ascii=False)
+        if len(encoded_payload.encode("utf-8")) > self.MAX_JSON_BYTES:
+            raise ValueError("task payload exceeds 64 KiB")
         with self.connection.transaction():
             self._set_tenant(tenant_id)
             row = self.connection.execute(
@@ -42,7 +47,7 @@ class PostgresQueue:
                 RETURNING id
                 """,
                 (uuid.uuid4(), tenant_id, task_type, handler_version,
-                 json.dumps(safe_payload), idempotency_key, priority, max_attempts),
+                 encoded_payload, idempotency_key, priority, max_attempts),
             ).fetchone()
             if row:
                 return row[0]
@@ -127,6 +132,8 @@ class PostgresQueue:
     def checkpoint(self, task: dict[str, Any], payload: dict[str, Any]) -> int:
         safe_payload = safe_metadata(payload)
         encoded = json.dumps(safe_payload, sort_keys=True, separators=(",",":"))
+        if len(encoded.encode("utf-8")) > self.MAX_JSON_BYTES:
+            raise ValueError("checkpoint payload exceeds 64 KiB")
         digest = hashlib.sha256(encoded.encode("utf-8")).hexdigest()
         with self.connection.transaction():
             self._set_tenant(task["tenant_id"])
@@ -164,6 +171,11 @@ class PostgresQueue:
     def fail(self, task: dict[str, Any], *, error_code: str,
              safe_summary: str, retry_delay_seconds: int = 30) -> None:
         summary = redact_text(safe_summary)
+        safe_code = error_code.upper()
+        if not safe_code or len(safe_code) > 100 or not all(
+            char.isalnum() or char == "_" for char in safe_code
+        ):
+            safe_code = "HANDLER_ERROR"
         terminal = task["attempts"] >= task["max_attempts"]
         outcome = "failed" if terminal else "retry"
         with self.connection.transaction():
@@ -177,12 +189,12 @@ class PostgresQueue:
                        completed_at=CASE WHEN %s THEN now() ELSE NULL END
                    WHERE id=%s AND tenant_id=%s AND lease_owner=%s AND fencing_token=%s""",
                 ("dead_letter" if terminal else "retry_wait",
-                 max(0,retry_delay_seconds),error_code[:100],summary,terminal,
+                 max(0,retry_delay_seconds),safe_code,summary,terminal,
                  task["id"],task["tenant_id"],task["lease_owner"],task["fencing_token"]),
             )
-            self._finish_attempt(task,outcome,error_code[:100])
+            self._finish_attempt(task,outcome,safe_code)
             self._audit(task,"task.failed",task["lease_owner"],
-                        {"error_code":error_code[:100],"summary":summary})
+                        {"error_code":safe_code,"summary":summary})
 
     def reap_exhausted(self, *, tenant_id: int, limit: int = 100) -> int:
         """Move expired final-attempt leases to dead_letter and close their attempts."""
