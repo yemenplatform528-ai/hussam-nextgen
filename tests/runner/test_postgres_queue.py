@@ -228,3 +228,21 @@ def test_graceful_defer_remains_claimable_without_marking_failure(db):
     assert resumed["attempts"] == 2
     assert queue.latest_checkpoint(resumed)["payload"] == {"cursor": 12}
     queue.complete(resumed)
+
+
+def test_worker_registry_heartbeat_tracks_process_instance(db):
+    queue = PostgresQueue(db)
+    process_id = uuid.uuid4()
+    worker_id = f"worker-{uuid.uuid4()}"
+    assert queue.touch_worker(
+        worker_id=worker_id, process_instance_id=process_id, build_version="test-v1"
+    ) == worker_id
+    with db.transaction():
+        row = db.execute(
+            """SELECT process_instance_id,build_version,last_seen_at
+               FROM hussam_runner_v1.workers WHERE worker_id=%s""",
+            (worker_id,),
+        ).fetchone()
+    assert row[0] == process_id
+    assert row[1] == "test-v1"
+    assert row[2] is not None
