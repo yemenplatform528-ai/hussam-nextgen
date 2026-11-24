@@ -246,3 +246,62 @@ def test_worker_registry_heartbeat_tracks_process_instance(db):
     assert row[0] == process_id
     assert row[1] == "test-v1"
     assert row[2] is not None
+
+
+def test_rls_is_enforced_for_non_owner_non_bypass_role(db):
+    from psycopg import sql
+    from psycopg.errors import InsufficientPrivilege
+
+    tenant_a = tenant_id()
+    tenant_b = tenant_a + 1
+    task_a = uuid.uuid4()
+    task_b = uuid.uuid4()
+    role = f"runner_rls_{uuid.uuid4().hex}"
+
+    with db.transaction():
+        db.execute(sql.SQL(
+            "CREATE ROLE {} NOLOGIN NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE"
+        ).format(sql.Identifier(role)))
+        db.execute(sql.SQL("GRANT USAGE ON SCHEMA hussam_runner_v1 TO {}").format(
+            sql.Identifier(role)
+        ))
+        db.execute(sql.SQL(
+            "GRANT SELECT,INSERT,UPDATE,DELETE ON ALL TABLES IN SCHEMA hussam_runner_v1 TO {}"
+        ).format(sql.Identifier(role)))
+        db.execute(sql.SQL(
+            "GRANT USAGE,SELECT,UPDATE ON ALL SEQUENCES IN SCHEMA hussam_runner_v1 TO {}"
+        ).format(sql.Identifier(role)))
+        db.execute(
+            """INSERT INTO hussam_runner_v1.tasks
+               (id,tenant_id,task_type,handler_version,payload,idempotency_key)
+               VALUES (%s,%s,'demo','1','{}'::jsonb,%s),
+                      (%s,%s,'demo','1','{}'::jsonb,%s)""",
+            (task_a,tenant_a,str(uuid.uuid4()),task_b,tenant_b,str(uuid.uuid4())),
+        )
+        role_flags = db.execute(
+            "SELECT rolsuper,rolbypassrls FROM pg_roles WHERE rolname=%s",
+            (role,),
+        ).fetchone()
+        assert role_flags == (False,False)
+
+    try:
+        with db.transaction():
+            db.execute(sql.SQL("SET LOCAL ROLE {}").format(sql.Identifier(role)))
+            db.execute("SELECT set_config('app.tenant_id', %s, true)", (str(tenant_a),))
+            visible = db.execute(
+                """SELECT id,tenant_id FROM hussam_runner_v1.tasks
+                   WHERE id=ANY(%s) ORDER BY tenant_id""",
+                ([task_a,task_b],),
+            ).fetchall()
+            assert visible == [(task_a,tenant_a)]
+            with pytest.raises(InsufficientPrivilege):
+                with db.transaction():
+                    db.execute(
+                        """INSERT INTO hussam_runner_v1.tasks
+                           (id,tenant_id,task_type,handler_version,payload,idempotency_key)
+                           VALUES (%s,%s,'demo','1','{}'::jsonb,%s)""",
+                        (uuid.uuid4(),tenant_b,str(uuid.uuid4())),
+                    )
+    finally:
+        with db.transaction():
+            db.execute(sql.SQL("DROP ROLE {}").format(sql.Identifier(role)))
