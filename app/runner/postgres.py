@@ -90,6 +90,17 @@ class PostgresQueue:
                     "attempts","max_attempts","lease_owner","lease_expires_at",
                     "fencing_token")
             task = dict(zip(keys, row))
+            if task["attempts"] > 1:
+                self.connection.execute(
+                    """UPDATE hussam_runner_v1.attempts
+                       SET finished_at=now(),outcome='lease_lost',
+                           safe_error_code='LEASE_EXPIRED_RECLAIMED'
+                       WHERE task_id=%s AND tenant_id=%s AND attempt_no=%s
+                         AND finished_at IS NULL""",
+                    (task["id"],tenant_id,task["attempts"] - 1),
+                )
+                self._audit(task,"task.lease_reclaimed",worker_id,
+                            {"previous_attempt":task["attempts"] - 1})
             self.connection.execute(
                 """INSERT INTO hussam_runner_v1.attempts
                    (task_id,tenant_id,attempt_no,worker_id,fencing_token)
