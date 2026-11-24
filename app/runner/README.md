@@ -15,6 +15,7 @@ not connected to WorkflowEngine, and not deployed.
 - Bounded secret redaction for payload metadata and safe error summaries.
 - Transactional schedule occurrence materializer with explicit misfire policies.
 - Optional `croniter` adapter using IANA `zoneinfo` and UTC occurrence timestamps.
+- Transactional allowlisted Outbox relay from the existing `outbox_events` model into durable tasks.
 
 ## Required integration contract
 
