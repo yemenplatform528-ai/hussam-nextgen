@@ -15,7 +15,11 @@ def test_factory_spec_must_be_a_trusted_module_callable():
 
 
 def test_factory_loader_returns_service_from_configured_module(monkeypatch):
-    expected = object()
+    class ExpectedService:
+        def serve(self, *, stop_event):
+            return None
+
+    expected = ExpectedService()
     module = types.ModuleType("runner_factory_test")
     module.build = lambda: expected
     monkeypatch.setitem(sys.modules, "runner_factory_test", module)
