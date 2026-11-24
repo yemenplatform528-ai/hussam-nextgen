@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 import threading
+import uuid
 from collections.abc import Callable
 from typing import Any
 
@@ -16,13 +17,16 @@ QueueFactory = Callable[[], PostgresQueue]
 class Worker:
     def __init__(self, queue: PostgresQueue, *, heartbeat_queue_factory: QueueFactory,
                  tenant_id: int, worker_id: str, handlers: dict[str, Handler],
-                 lease_seconds: int = 60, heartbeat_seconds: int = 15):
+                 lease_seconds: int = 60, heartbeat_seconds: int = 15,
+                 build_version: str = "prototype-v1"):
         if lease_seconds < 10 or heartbeat_seconds < 1 or heartbeat_seconds >= lease_seconds / 2:
             raise ValueError("heartbeat must be positive and less than half the lease")
         self.queue = queue
         self.heartbeat_queue_factory = heartbeat_queue_factory
         self.tenant_id = tenant_id
         self.worker_id = worker_id
+        self.process_instance_id = uuid.uuid4()
+        self.build_version = build_version
         self.handlers = dict(handlers)
         self.lease_seconds = lease_seconds
         self.heartbeat_seconds = heartbeat_seconds
