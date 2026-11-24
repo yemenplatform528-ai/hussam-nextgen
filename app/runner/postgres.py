@@ -28,6 +28,26 @@ class PostgresQueue:
             "SELECT set_config('app.tenant_id', %s, true)", (str(tenant_id),)
         )
 
+    def touch_worker(self, *, worker_id: str, process_instance_id: uuid.UUID,
+                     build_version: str) -> str:
+        """Upsert a secret-free process heartbeat in the global worker registry."""
+        if not worker_id or len(worker_id) > 160:
+            raise ValueError("worker_id must contain 1..160 characters")
+        if not build_version or len(build_version) > 80:
+            raise ValueError("build_version must contain 1..80 characters")
+        with self.connection.transaction():
+            row = self.connection.execute(
+                """INSERT INTO hussam_runner_v1.workers
+                       (worker_id,process_instance_id,build_version,last_seen_at)
+                   VALUES (%s,%s,%s,now())
+                   ON CONFLICT (worker_id) DO UPDATE
+                   SET process_instance_id=EXCLUDED.process_instance_id,
+                       build_version=EXCLUDED.build_version,last_seen_at=now()
+                   RETURNING worker_id""",
+                (worker_id,process_instance_id,build_version),
+            ).fetchone()
+            return row[0]
+
     def enqueue(self, *, tenant_id: int, task_type: str, payload: dict[str, Any],
                 idempotency_key: str, handler_version: str = "1",
                 priority: int = 0, max_attempts: int = 5) -> uuid.UUID:
