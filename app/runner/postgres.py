@@ -13,6 +13,10 @@ class LeaseLost(RuntimeError):
     """Raised when a worker no longer owns the current fenced lease."""
 
 
+class CheckpointIntegrityError(RuntimeError):
+    """Raised when a persisted checkpoint fails integrity or version checks."""
+
+
 class PostgresQueue:
     MAX_JSON_BYTES = 65536
 
@@ -70,10 +74,13 @@ class PostgresQueue:
                 """
                 WITH candidate AS (
                     SELECT id FROM hussam_runner_v1.tasks
-                    WHERE tenant_id=%s AND attempts < max_attempts
-                      AND run_after <= now()
-                      AND (state IN ('pending','retry_wait')
-                           OR (state='running' AND lease_expires_at < now()))
+                    WHERE tenant_id=%s AND run_after <= now()
+                      AND (
+                          (state='pending' AND attempts < max_attempts)
+                          OR state='retry_wait'
+                          OR (state='running' AND lease_expires_at < now()
+                              AND attempts < max_attempts)
+                      )
                     ORDER BY priority DESC, run_after, created_at
                     LIMIT 1 FOR UPDATE SKIP LOCKED
                 )
@@ -154,6 +161,43 @@ class PostgresQueue:
                         {"sequence":row[0],"sha256":digest})
             return row[0]
 
+    def latest_checkpoint(self, task: dict[str, Any]) -> dict[str, Any] | None:
+        """Load and verify the latest checkpoint while the caller still owns the lease."""
+        with self.connection.transaction():
+            self._set_tenant(task["tenant_id"])
+            self._assert_lease(task)
+            row = self.connection.execute(
+                """SELECT sequence_no,handler_version,payload,sha256,fencing_token
+                   FROM hussam_runner_v1.checkpoints
+                   WHERE task_id=%s AND tenant_id=%s
+                   ORDER BY sequence_no DESC LIMIT 1""",
+                (task["id"],task["tenant_id"]),
+            ).fetchone()
+            if row is None:
+                return None
+            sequence_no, handler_version, payload, stored_digest, checkpoint_token = row
+            if handler_version != task["handler_version"]:
+                raise CheckpointIntegrityError("checkpoint handler version mismatch")
+            if checkpoint_token > task["fencing_token"]:
+                raise CheckpointIntegrityError("checkpoint fencing token is from the future")
+            if isinstance(payload,str):
+                try:
+                    payload = json.loads(payload)
+                except (TypeError,ValueError) as exc:
+                    raise CheckpointIntegrityError("checkpoint payload is invalid JSON") from exc
+            if not isinstance(payload,dict):
+                raise CheckpointIntegrityError("checkpoint payload must be an object")
+            encoded = json.dumps(payload,sort_keys=True,separators=(",",":"))
+            digest = hashlib.sha256(encoded.encode("utf-8")).hexdigest()
+            if not __import__("hmac").compare_digest(digest,str(stored_digest)):
+                raise CheckpointIntegrityError("checkpoint SHA-256 verification failed")
+            return {
+                "sequence_no": sequence_no,
+                "handler_version": handler_version,
+                "payload": payload,
+                "sha256": digest,
+            }
+
     def complete(self, task: dict[str, Any]) -> None:
         with self.connection.transaction():
             self._set_tenant(task["tenant_id"])
@@ -167,6 +211,29 @@ class PostgresQueue:
             )
             self._finish_attempt(task,"succeeded")
             self._audit(task,"task.succeeded",task["lease_owner"])
+
+    def defer(self, task: dict[str, Any], *, reason_code: str = "WORKER_SHUTDOWN") -> None:
+        """Yield an active lease for graceful shutdown without recording a task failure."""
+        safe_code = reason_code.upper()
+        if not safe_code or len(safe_code) > 100 or not all(
+            char.isalnum() or char == "_" for char in safe_code
+        ):
+            safe_code = "WORKER_SHUTDOWN"
+        with self.connection.transaction():
+            self._set_tenant(task["tenant_id"])
+            self._assert_lease(task)
+            self.connection.execute(
+                """UPDATE hussam_runner_v1.tasks
+                   SET state='retry_wait',run_after=now(),safe_error_code=%s,
+                       safe_error_summary='Task yielded for graceful worker shutdown',
+                       updated_at=now(),lease_owner=NULL,lease_expires_at=NULL,
+                       completed_at=NULL
+                   WHERE id=%s AND tenant_id=%s AND lease_owner=%s AND fencing_token=%s""",
+                (safe_code,task["id"],task["tenant_id"],
+                 task["lease_owner"],task["fencing_token"]),
+            )
+            self._finish_attempt(task,"retry",safe_code)
+            self._audit(task,"task.deferred",task["lease_owner"],{"reason_code":safe_code})
 
     def fail(self, task: dict[str, Any], *, error_code: str,
              safe_summary: str, retry_delay_seconds: int = 30) -> None:
