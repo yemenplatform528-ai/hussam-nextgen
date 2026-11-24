@@ -46,7 +46,7 @@ class PostgresQueue:
                    RETURNING worker_id""",
                 (worker_id,process_instance_id,build_version),
             ).fetchone()
-            return row[0]
+            return 1 if row is not None else 0
 
     def enqueue(self, *, tenant_id: int, task_type: str, payload: dict[str, Any],
                 idempotency_key: str, handler_version: str = "1",
