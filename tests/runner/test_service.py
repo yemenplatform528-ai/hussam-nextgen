@@ -24,7 +24,12 @@ class FakeQueue:
 
 class FakeWorker:
     def __init__(self, *, tenant_id=41, fail_reaper=False):
+        import uuid
+
         self.tenant_id = tenant_id
+        self.worker_id = "worker-test"
+        self.process_instance_id = uuid.uuid4()
+        self.build_version = "test-build"
         self.queue = FakeQueue(fail_reaper=fail_reaper)
         self.calls = []
 
