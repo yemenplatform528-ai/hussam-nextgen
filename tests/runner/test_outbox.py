@@ -1,10 +1,24 @@
 from __future__ import annotations
 
+import os
 import uuid
 
+import psycopg
 import pytest
 
 from app.runner.outbox import PostgresOutboxRelay
+
+DB_URL = os.getenv("RUNNER_TEST_DATABASE_URL")
+pytestmark = pytest.mark.skipif(not DB_URL, reason="isolated runner PostgreSQL is not configured")
+
+
+@pytest.fixture
+def db():
+    connection = psycopg.connect(DB_URL)
+    try:
+        yield connection
+    finally:
+        connection.close()
 
 
 def test_outbox_relay_enqueues_once_and_marks_source_published(db):
