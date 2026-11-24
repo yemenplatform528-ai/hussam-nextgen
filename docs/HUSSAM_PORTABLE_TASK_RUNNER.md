@@ -1,6 +1,6 @@
 # Hussam Portable Task Runner — Recovery-First Design
 
-**Status:** DESIGN HISTORY + PARTIALLY IMPLEMENTED V1 PROTOTYPE / NOT INTEGRATED / NOT DEPLOYED  
+**Status:** DESIGN HISTORY + IMPLEMENTED V1 PROTOTYPE / DRAFT PR / NOT INTEGRATED / NOT DEPLOYED  
 **Evidence date:** 2026-11-24  
 **Base:** `main` at `d83958a03d3b8194859cbef250c218cb09b4df2f`  
 **Working branch:** `design/portable-task-runner-2026-11-23`
@@ -142,4 +142,4 @@ The historical V4 SQL is missing from current GitHub and the original Staging br
 - **No hosted queue/worker:** Render inventory currently has no Postgres, Key Value, or Workflow resource. Do not create paid or replacement resources under this design.
 - **YIB application export:** v76 remains draft and export requires the owner-held private connection key. It is only an application-level state/chat export, not a full PostgreSQL backup. Do not publish or execute it without the owner-controlled key and a reviewed test plan.
 
-**Current conclusion:** the existing workflow orchestration is implemented; a portable durable runner is not yet implemented. Historical Runner V4 tests are evidence of prior behavior, not a current deployable artifact. This document is a design and recovery plan only.
+**Current conclusion (2026-11-25):** the separate Runner V1 prototype is implemented on Draft PR #193. Its current head has passing repository-wide CI and a passing isolated PostgreSQL Runner suite; the PR records 27/27 targeted recovery/security tests. The prototype includes durable queueing, lease fencing, verified checkpoint restore, graceful deferral, worker heartbeat, scheduler/DST adapter, Outbox relay, and bounded redaction. It remains unreviewed, unmerged, unintegrated with WorkflowEngine, and undeployed. No hosted database migration or isolated backup/restore drill has been performed. Historical Runner V4 remains unrecovered and must not be reconstructed by guesswork. The next gates are independent code review, tenant-integrity hardening, exact Outbox contract validation, and a disposable backup/restore drill. The prototype is implemented and CI-tested, not production-ready.
