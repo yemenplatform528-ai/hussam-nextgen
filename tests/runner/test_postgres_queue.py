@@ -152,3 +152,79 @@ def test_enqueue_rejects_oversized_payload_before_database_access():
         queue.enqueue(tenant_id=1, task_type="demo",
                       payload={"large": ["x" * 1200 for _ in range(100)]},
                       idempotency_key="oversized")
+
+
+
+def test_checkpoint_is_restored_after_lease_reclaim(db):
+    queue = PostgresQueue(db)
+    tenant = tenant_id()
+    task_id = queue.enqueue(tenant_id=tenant, task_type="demo", payload={},
+                            idempotency_key=str(uuid.uuid4()), max_attempts=3)
+    first = queue.claim(tenant_id=tenant, worker_id="worker-before-crash", lease_seconds=5)
+    assert first and first["id"] == task_id
+    queue.checkpoint(first, {"cursor": 19, "page": 4})
+    expire_lease(db, task_id, tenant)
+    recovered = queue.claim(tenant_id=tenant, worker_id="worker-after-restart")
+    assert recovered and recovered["id"] == task_id
+    checkpoint = queue.latest_checkpoint(recovered)
+    assert checkpoint is not None
+    assert checkpoint["payload"] == {"cursor": 19, "page": 4}
+    assert checkpoint["sequence_no"] == 1
+
+
+def test_checkpoint_hash_tampering_fails_closed(db):
+    from app.runner.postgres import CheckpointIntegrityError
+
+    queue = PostgresQueue(db)
+    tenant = tenant_id()
+    task_id = queue.enqueue(tenant_id=tenant, task_type="demo", payload={},
+                            idempotency_key=str(uuid.uuid4()))
+    task = queue.claim(tenant_id=tenant, worker_id="worker-checkpoint-hash")
+    assert task and task["id"] == task_id
+    queue.checkpoint(task, {"cursor": 8})
+    with db.transaction():
+        db.execute("SELECT set_config('app.tenant_id', %s, true)", (str(tenant),))
+        db.execute(
+            """UPDATE hussam_runner_v1.checkpoints
+               SET sha256=%s WHERE task_id=%s AND tenant_id=%s""",
+            ("0" * 64, task_id, tenant),
+        )
+    with pytest.raises(CheckpointIntegrityError):
+        queue.latest_checkpoint(task)
+
+
+def test_checkpoint_version_mismatch_fails_closed(db):
+    from app.runner.postgres import CheckpointIntegrityError
+
+    queue = PostgresQueue(db)
+    tenant = tenant_id()
+    task_id = queue.enqueue(tenant_id=tenant, task_type="demo", payload={},
+                            idempotency_key=str(uuid.uuid4()))
+    task = queue.claim(tenant_id=tenant, worker_id="worker-checkpoint-version")
+    assert task and task["id"] == task_id
+    queue.checkpoint(task, {"cursor": 8})
+    with db.transaction():
+        db.execute("SELECT set_config('app.tenant_id', %s, true)", (str(tenant),))
+        db.execute(
+            """UPDATE hussam_runner_v1.checkpoints
+               SET handler_version='older-version' WHERE task_id=%s AND tenant_id=%s""",
+            (task_id, tenant),
+        )
+    with pytest.raises(CheckpointIntegrityError):
+        queue.latest_checkpoint(task)
+
+
+def test_graceful_defer_remains_claimable_without_marking_failure(db):
+    queue = PostgresQueue(db)
+    tenant = tenant_id()
+    task_id = queue.enqueue(tenant_id=tenant, task_type="demo", payload={},
+                            idempotency_key=str(uuid.uuid4()), max_attempts=1)
+    first = queue.claim(tenant_id=tenant, worker_id="worker-shutting-down")
+    assert first and first["id"] == task_id
+    queue.checkpoint(first, {"cursor": 12})
+    queue.defer(first)
+    resumed = queue.claim(tenant_id=tenant, worker_id="worker-restarted")
+    assert resumed and resumed["id"] == task_id
+    assert resumed["attempts"] == 2
+    assert queue.latest_checkpoint(resumed)["payload"] == {"cursor": 12}
+    queue.complete(resumed)
