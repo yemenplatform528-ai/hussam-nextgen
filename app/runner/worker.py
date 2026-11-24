@@ -9,7 +9,7 @@ from typing import Any
 from app.runner.postgres import LeaseLost, PostgresQueue
 from app.runner.redaction import redact_text
 
-Handler = Callable[[dict[str, Any], Callable[[dict[str, Any]], int]], None]
+Handler = Callable[[dict[str, Any], Callable[[dict[str, Any]], int], threading.Event], None]
 QueueFactory = Callable[[], PostgresQueue]
 
 
@@ -62,7 +62,7 @@ class Worker:
         thread = threading.Thread(target=renew, name="runner-lease-renewal", daemon=True)
         thread.start()
         try:
-            handler(task, lambda state: self.queue.checkpoint(task, state))
+            handler(task, lambda state: self.queue.checkpoint(task, state), stop)
             if lost.is_set():
                 raise LeaseLost("lease renewal failed")
             self.queue.complete(task)
