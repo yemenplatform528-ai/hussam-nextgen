@@ -32,7 +32,7 @@ def test_due_schedule_materializes_once_and_advances(db):
         db.execute(
             """INSERT INTO hussam_runner_v1.schedules
                (id,tenant_id,task_type,payload,cron_expression,timezone,next_run_at,misfire_policy)
-               VALUES (%s,%s,'demo','{}'::jsonb,'* * * * *','UTC',%s,'catch_up')""",
+               VALUES (%s,%s,'demo','{}'::jsonb,'* * * * *','UTC',%s,'run_once')""",
             (schedule_id,tenant,due),
         )
 
