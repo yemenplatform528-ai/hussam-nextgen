@@ -8,7 +8,12 @@ from app.runner.service import RunnerService
 class FakeQueue:
     def __init__(self, *, fail_reaper=False):
         self.reaped = []
+        self.worker_heartbeats = []
         self.fail_reaper = fail_reaper
+
+    def touch_worker(self, *, worker_id, process_instance_id, build_version):
+        self.worker_heartbeats.append((worker_id, process_instance_id, build_version))
+        return worker_id
 
     def reap_exhausted(self, *, tenant_id):
         self.reaped.append(tenant_id)
@@ -60,6 +65,7 @@ def test_service_runs_reaper_scheduler_and_outbox_on_cadence():
 
     assert service.run_once() is True
     assert worker.queue.reaped == [41]
+    assert len(worker.queue.worker_heartbeats) == 1
     assert scheduler.calls == [(41, 12)]
     assert relay.calls == [(41, 34)]
 
@@ -71,6 +77,7 @@ def test_service_runs_reaper_scheduler_and_outbox_on_cadence():
     clock[0] += 15
     service.run_once()
     assert worker.queue.reaped == [41, 41]
+    assert len(worker.queue.worker_heartbeats) == 2
     assert len(scheduler.calls) == 2
     assert len(relay.calls) == 2
     assert len(worker.calls) == 3
