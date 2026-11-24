@@ -71,10 +71,15 @@ BEGIN
  LOOP
   EXECUTE format('ALTER TABLE hussam_runner_v1.%I ENABLE ROW LEVEL SECURITY',tab);
   EXECUTE format('ALTER TABLE hussam_runner_v1.%I FORCE ROW LEVEL SECURITY',tab);
-  EXECUTE format(
-   'CREATE POLICY tenant_scope ON hussam_runner_v1.%I USING (tenant_id = NULLIF(current_setting(''app.tenant_id'',true),'''')::bigint) WITH CHECK (tenant_id = NULLIF(current_setting(''app.tenant_id'',true),'''')::bigint)',
-   tab
-  );
+  IF NOT EXISTS (
+   SELECT 1 FROM pg_policies
+   WHERE schemaname='hussam_runner_v1' AND tablename=tab AND policyname='tenant_scope'
+  ) THEN
+   EXECUTE format(
+    'CREATE POLICY tenant_scope ON hussam_runner_v1.%I USING (tenant_id = NULLIF(current_setting(''app.tenant_id'',true),'''')::bigint) WITH CHECK (tenant_id = NULLIF(current_setting(''app.tenant_id'',true),'''')::bigint)',
+    tab
+   );
+  END IF;
  END LOOP;
 END $$;
 
