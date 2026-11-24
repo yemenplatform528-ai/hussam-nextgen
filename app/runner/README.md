@@ -14,6 +14,7 @@ not connected to WorkflowEngine, and not deployed.
 - Allowlisted handler registry and separate database connection for heartbeats.
 - Bounded secret redaction for payload metadata and safe error summaries.
 - Transactional schedule occurrence materializer with explicit misfire policies.
+- Optional `croniter` adapter using IANA `zoneinfo` and UTC occurrence timestamps.
 
 ## Required integration contract
 
@@ -22,8 +23,9 @@ not connected to WorkflowEngine, and not deployed.
 - Set tenant ID only from authenticated server-side context.
 - Handler signature is `handler(task, checkpoint, stop_event)`; handlers must check
   `stop_event.is_set()` before each external side effect and use stable idempotency keys.
-- Supply a tested timezone-aware `next_occurrence(expression, IANA_timezone, after)`
-  function. Cron parsing and DST behavior are intentionally injected, not guessed.
+- Install `hussam-nextgen[runner]` for the included timezone-aware `croniter` adapter,
+  or inject a separately tested `next_occurrence(expression, IANA_timezone, after)`.
+  DST behavior must still be covered by the release acceptance matrix.
 - Keep Redis optional; PostgreSQL remains authoritative.
 - Do not put credentials, connection strings, raw exception messages, or secrets in
   task payloads or checkpoints. Redaction is defense in depth, not permission to store secrets.
