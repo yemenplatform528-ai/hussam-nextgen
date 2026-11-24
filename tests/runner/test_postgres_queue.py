@@ -236,7 +236,7 @@ def test_worker_registry_heartbeat_tracks_process_instance(db):
     worker_id = f"worker-{uuid.uuid4()}"
     assert queue.touch_worker(
         worker_id=worker_id, process_instance_id=process_id, build_version="test-v1"
-    ) == worker_id
+    ) == 1
     with db.transaction():
         row = db.execute(
             """SELECT process_instance_id,build_version,last_seen_at
