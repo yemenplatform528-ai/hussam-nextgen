@@ -13,9 +13,10 @@ not connected to WorkflowEngine, and not deployed.
 - Expired final-attempt reaper and stale-attempt closure on reclaim.
 - Allowlisted handler registry, separate database connection for heartbeats, and cooperative shutdown that safely defers the active lease.
 - Bounded secret redaction for payload metadata and safe error summaries.
-- Transactional schedule occurrence materializer with explicit misfire policies.
+- Transactional schedule occurrence materializer with explicit misfire policies, invoked periodically by the process supervisor.
 - Optional `croniter` adapter using IANA `zoneinfo` and UTC occurrence timestamps.
 - Transactional allowlisted Outbox relay from the existing `outbox_events` model into durable tasks.
+- `RunnerService` supervisor that periodically invokes schedule materialization, outbox relay, and expired final-lease reaping before polling the worker.
 
 ## Required integration contract
 
@@ -36,6 +37,10 @@ not connected to WorkflowEngine, and not deployed.
   task payloads or checkpoints. Redaction is defense in depth, not permission to store secrets.
 
 ## Validation
+
+Use `RunnerService.serve()` for a persistent tenant-scoped process. It runs periodic
+schedule materialization, outbox relay (when configured), and final-lease reaping;
+`Worker.serve()` remains available when only a queue consumer is required.
 
 Run the isolated PostgreSQL workflow in GitHub Actions. It applies `schema.sql` only
 to an ephemeral PostgreSQL 16 service and runs the queue/RLS/fencing/checkpoint/recovery
