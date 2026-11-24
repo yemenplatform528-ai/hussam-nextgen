@@ -40,7 +40,7 @@ class PostgresScheduler:
                 FROM hussam_runner_v1.schedules
                 WHERE tenant_id=%s AND enabled AND next_run_at <= %s
                 ORDER BY next_run_at
-                FOR UPDATE SKIP LOCKED LIMIT %s
+                LIMIT %s FOR UPDATE SKIP LOCKED
                 """,
                 (tenant_id,now,limit),
             ).fetchall()
