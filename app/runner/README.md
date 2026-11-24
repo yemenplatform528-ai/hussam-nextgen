@@ -18,8 +18,11 @@ not connected to WorkflowEngine, and not deployed.
 - Optional `croniter` adapter using IANA `zoneinfo` and UTC occurrence timestamps.
 - Transactional allowlisted Outbox relay from the existing `outbox_events` model into durable tasks.
 - `RunnerService` supervisor that periodically invokes schedule materialization, outbox relay, and expired final-lease reaping before polling the worker.
+- Portable `hussam-runner` / `python -m app.runner` entry point that loads a trusted application factory and handles SIGTERM/SIGINT without logging exception messages.
 
 ## Required integration contract
+
+- Set `HUSSAM_RUNNER_FACTORY` to a trusted `package.module:factory` callable. The factory must return a configured `RunnerService`; it owns the database connection factory, authenticated tenant context, handler allowlist, scheduler, and optional Outbox relay. The CLI does not read credentials from task payloads and never prints environment values.
 
 - Supply one PostgreSQL connection per worker operation and a separate connection
   factory for lease heartbeats.
@@ -45,14 +48,16 @@ schedule materialization, outbox relay (when configured), and final-lease reapin
 
 Run the isolated PostgreSQL workflow in GitHub Actions. It applies `schema.sql` only
 to an ephemeral PostgreSQL 16 service and runs the queue/RLS/fencing/checkpoint/recovery
-tests. Current verified evidence: workflow #35 passed 37 tests and a `pg_dump`/`pg_restore`
+tests. Current verified evidence: workflow #40 passed 42 tests and a `pg_dump`/`pg_restore`
 drill that reclaimed an in-flight task, verified its checkpoint, and completed it after
-restore. This is CI-isolated recovery evidence, not a hosted-provider or production restore.
+restore. The CLI factory, SIGTERM propagation, and secret-safe startup-error handling
+are included in those tests. This is CI-isolated recovery evidence, not a hosted-provider or production restore.
 
 ## Explicitly not done
 
 - No migration has been applied to any existing database.
 - No existing WorkflowEngine, WorkflowTask, Render service, Neon branch, YIB app,
   secret, SSO policy, or billing setting was changed.
+- No production factory or tenant/handler wiring is supplied yet; the CLI is an extension point, not a turnkey deployment.
 - No production deployment, live schedule, or external side-effect handler is enabled.
-- Provider-backed backup/restore, provider-neutral packaging, independent code review, and live WorkflowEngine/Outbox integration remain release gates. The disposable PostgreSQL CI restore drill has passed.
+- Provider-backed backup/restore, deployment-specific packaging, independent code review, and live WorkflowEngine/Outbox integration remain release gates. The disposable PostgreSQL CI restore drill has passed.
