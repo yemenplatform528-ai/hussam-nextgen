@@ -50,6 +50,11 @@ class RunnerService:
     def _maintain(self) -> None:
         tenant_id = self.worker.tenant_id
         operations = [
+            ("worker_heartbeat", lambda: self.worker.queue.touch_worker(
+                worker_id=self.worker.worker_id,
+                process_instance_id=self.worker.process_instance_id,
+                build_version=self.worker.build_version,
+            )),
             ("lease_reaper", lambda: self.worker.queue.reap_exhausted(tenant_id=tenant_id)),
         ]
         if self.scheduler is not None:
