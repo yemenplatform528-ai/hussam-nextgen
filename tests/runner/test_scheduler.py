@@ -13,6 +13,15 @@ DB_URL = os.getenv("RUNNER_TEST_DATABASE_URL")
 pytestmark = pytest.mark.skipif(not DB_URL, reason="isolated runner PostgreSQL is not configured")
 
 
+@pytest.fixture
+def db():
+    connection = psycopg.connect(DB_URL)
+    try:
+        yield connection
+    finally:
+        connection.close()
+
+
 def test_due_schedule_materializes_once_and_advances(db):
     # Reuse the shared db fixture from test_postgres_queue.
     tenant = uuid.uuid4().int % 2_000_000_000 + 1
