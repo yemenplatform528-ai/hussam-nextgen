@@ -150,5 +150,5 @@ def test_enqueue_rejects_oversized_payload_before_database_access():
     queue = PostgresQueue(NoDatabase())
     with pytest.raises(ValueError, match="64 KiB"):
         queue.enqueue(tenant_id=1, task_type="demo",
-                      payload={"large": "x" * 70000},
+                      payload={"large": ["x" * 1200 for _ in range(100)]},
                       idempotency_key="oversized")
