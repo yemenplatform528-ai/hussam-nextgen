@@ -8,7 +8,7 @@ from typing import Any
 
 _SECRET_KEY = re.compile(
     r"(password|passwd|secret|token|api[_-]?key|authorization|cookie|"
-    r"private[\\s_-]?key|connection[\\s_-]?string|credential)",
+    r"private[\s_-]?key|connection[\s_-]?string|credential)",
     re.IGNORECASE,
 )
 _PATTERNS = (
@@ -18,6 +18,8 @@ _PATTERNS = (
     re.compile(r"(?i)\b(postgres(?:ql)?://)[^\s'\"<>]+"),
     re.compile(r"\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\."
                r"[A-Za-z0-9_-]{8,}\b"),
+    re.compile(r"\b(?:sk-[A-Za-z0-9]{20,}|gh[pousr]_[A-Za-z0-9]{20,}|"
+               r"github_pat_[A-Za-z0-9_]{20,}|AIza[0-9A-Za-z_-]{30,})\b"),
     re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?"
                r"-----END [A-Z ]*PRIVATE KEY-----"),
 )
