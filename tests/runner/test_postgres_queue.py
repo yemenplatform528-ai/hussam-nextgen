@@ -304,4 +304,13 @@ def test_rls_is_enforced_for_non_owner_non_bypass_role(db):
                     )
     finally:
         with db.transaction():
+            db.execute(sql.SQL(
+                "REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA hussam_runner_v1 FROM {}"
+            ).format(sql.Identifier(role)))
+            db.execute(sql.SQL(
+                "REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA hussam_runner_v1 FROM {}"
+            ).format(sql.Identifier(role)))
+            db.execute(sql.SQL(
+                "REVOKE USAGE ON SCHEMA hussam_runner_v1 FROM {}"
+            ).format(sql.Identifier(role)))
             db.execute(sql.SQL("DROP ROLE {}").format(sql.Identifier(role)))
