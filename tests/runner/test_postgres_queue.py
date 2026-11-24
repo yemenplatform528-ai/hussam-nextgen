@@ -314,3 +314,84 @@ def test_rls_is_enforced_for_non_owner_non_bypass_role(db):
                 "REVOKE USAGE ON SCHEMA hussam_runner_v1 FROM {}"
             ).format(sql.Identifier(role)))
             db.execute(sql.SQL("DROP ROLE {}").format(sql.Identifier(role)))
+
+
+
+def test_child_records_cannot_reference_another_tenants_parent(db):
+    from psycopg.errors import ForeignKeyViolation
+
+    queue = PostgresQueue(db)
+    tenant_a = tenant_id()
+    tenant_b = tenant_a + 1
+    task_a = queue.enqueue(
+        tenant_id=tenant_a, task_type="demo", payload={},
+        idempotency_key=str(uuid.uuid4()),
+    )
+    schedule_a = uuid.uuid4()
+    schedule_b = uuid.uuid4()
+
+    with db.transaction():
+        db.execute("SELECT set_config('app.tenant_id', %s, true)", (str(tenant_a),))
+        db.execute(
+            """INSERT INTO hussam_runner_v1.schedules
+               (id,tenant_id,task_type,payload,cron_expression,timezone,next_run_at)
+               VALUES (%s,%s,'demo','{}'::jsonb,'0 * * * *','UTC',now())""",
+            (schedule_a, tenant_a),
+        )
+        db.execute("SELECT set_config('app.tenant_id', %s, true)", (str(tenant_b),))
+        db.execute(
+            """INSERT INTO hussam_runner_v1.schedules
+               (id,tenant_id,task_type,payload,cron_expression,timezone,next_run_at)
+               VALUES (%s,%s,'demo','{}'::jsonb,'0 * * * *','UTC',now())""",
+            (schedule_b, tenant_b),
+        )
+
+    with pytest.raises(ForeignKeyViolation):
+        with db.transaction():
+            db.execute("SELECT set_config('app.tenant_id', %s, true)", (str(tenant_b),))
+            db.execute(
+                """INSERT INTO hussam_runner_v1.attempts
+                   (task_id,tenant_id,attempt_no,worker_id,fencing_token)
+                   VALUES (%s,%s,1,'cross-tenant-test',1)""",
+                (task_a, tenant_b),
+            )
+
+    with pytest.raises(ForeignKeyViolation):
+        with db.transaction():
+            db.execute("SELECT set_config('app.tenant_id', %s, true)", (str(tenant_b),))
+            db.execute(
+                """INSERT INTO hussam_runner_v1.checkpoints
+                   (task_id,tenant_id,sequence_no,handler_version,payload,sha256,fencing_token)
+                   VALUES (%s,%s,1,'1','{}'::jsonb,%s,1)""",
+                (task_a, tenant_b, "0" * 64),
+            )
+
+    with pytest.raises(ForeignKeyViolation):
+        with db.transaction():
+            db.execute("SELECT set_config('app.tenant_id', %s, true)", (str(tenant_b),))
+            db.execute(
+                """INSERT INTO hussam_runner_v1.audit_events
+                   (task_id,tenant_id,event_type)
+                   VALUES (%s,%s,'cross_tenant_test')""",
+                (task_a, tenant_b),
+            )
+
+    with pytest.raises(ForeignKeyViolation):
+        with db.transaction():
+            db.execute("SELECT set_config('app.tenant_id', %s, true)", (str(tenant_b),))
+            db.execute(
+                """INSERT INTO hussam_runner_v1.schedule_occurrences
+                   (schedule_id,tenant_id,scheduled_for)
+                   VALUES (%s,%s,now())""",
+                (schedule_a, tenant_b),
+            )
+
+    with pytest.raises(ForeignKeyViolation):
+        with db.transaction():
+            db.execute("SELECT set_config('app.tenant_id', %s, true)", (str(tenant_b),))
+            db.execute(
+                """INSERT INTO hussam_runner_v1.schedule_occurrences
+                   (schedule_id,tenant_id,scheduled_for,task_id)
+                   VALUES (%s,%s,now(),%s)""",
+                (schedule_b, tenant_b, task_a),
+            )
