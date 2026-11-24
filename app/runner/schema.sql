@@ -16,30 +16,33 @@ CREATE TABLE IF NOT EXISTS hussam_runner_v1.tasks (
  safe_error_code varchar(100), safe_error_summary varchar(1200),
  created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(),
  started_at timestamptz, completed_at timestamptz,
- UNIQUE (tenant_id,idempotency_key)
+ UNIQUE (tenant_id,idempotency_key), UNIQUE (id,tenant_id)
 );
 CREATE INDEX IF NOT EXISTS ix_runner_v1_claim
  ON hussam_runner_v1.tasks (tenant_id,state,run_after,priority DESC,created_at);
 
 CREATE TABLE IF NOT EXISTS hussam_runner_v1.attempts (
- id bigserial PRIMARY KEY, task_id uuid NOT NULL REFERENCES hussam_runner_v1.tasks(id),
+ id bigserial PRIMARY KEY, task_id uuid NOT NULL,
  tenant_id bigint NOT NULL, attempt_no integer NOT NULL, worker_id varchar(160) NOT NULL,
  fencing_token bigint NOT NULL, started_at timestamptz NOT NULL DEFAULT now(),
  finished_at timestamptz, outcome varchar(20)
   CHECK (outcome IN ('succeeded','retry','failed','lease_lost')),
- safe_error_code varchar(100), UNIQUE (task_id,attempt_no)
+ safe_error_code varchar(100), UNIQUE (task_id,attempt_no),
+ FOREIGN KEY (task_id,tenant_id) REFERENCES hussam_runner_v1.tasks(id,tenant_id)
 );
 CREATE TABLE IF NOT EXISTS hussam_runner_v1.checkpoints (
- id bigserial PRIMARY KEY, task_id uuid NOT NULL REFERENCES hussam_runner_v1.tasks(id),
+ id bigserial PRIMARY KEY, task_id uuid NOT NULL,
  tenant_id bigint NOT NULL, sequence_no integer NOT NULL CHECK (sequence_no > 0),
  handler_version varchar(40) NOT NULL, payload jsonb NOT NULL, sha256 char(64) NOT NULL,
  fencing_token bigint NOT NULL, created_at timestamptz NOT NULL DEFAULT now(),
- UNIQUE (task_id,sequence_no)
+ UNIQUE (task_id,sequence_no),
+ FOREIGN KEY (task_id,tenant_id) REFERENCES hussam_runner_v1.tasks(id,tenant_id)
 );
 CREATE TABLE IF NOT EXISTS hussam_runner_v1.audit_events (
  id bigserial PRIMARY KEY, task_id uuid, tenant_id bigint NOT NULL,
  event_type varchar(100) NOT NULL, worker_id varchar(160), fencing_token bigint,
- safe_metadata jsonb NOT NULL DEFAULT '{}'::jsonb, created_at timestamptz NOT NULL DEFAULT now()
+ safe_metadata jsonb NOT NULL DEFAULT '{}'::jsonb, created_at timestamptz NOT NULL DEFAULT now(),
+ FOREIGN KEY (task_id,tenant_id) REFERENCES hussam_runner_v1.tasks(id,tenant_id)
 );
 CREATE INDEX IF NOT EXISTS ix_runner_v1_audit_tenant_task
  ON hussam_runner_v1.audit_events (tenant_id,task_id,id);
@@ -55,12 +58,15 @@ CREATE TABLE IF NOT EXISTS hussam_runner_v1.schedules (
  enabled boolean NOT NULL DEFAULT true, next_run_at timestamptz NOT NULL,
  misfire_policy varchar(20) NOT NULL DEFAULT 'skip'
   CHECK (misfire_policy IN ('skip','run_once','catch_up')),
- created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now()
+ created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(),
+ UNIQUE (id,tenant_id)
 );
 CREATE TABLE IF NOT EXISTS hussam_runner_v1.schedule_occurrences (
- id bigserial PRIMARY KEY, schedule_id uuid NOT NULL REFERENCES hussam_runner_v1.schedules(id),
+ id bigserial PRIMARY KEY, schedule_id uuid NOT NULL,
  tenant_id bigint NOT NULL, scheduled_for timestamptz NOT NULL, task_id uuid,
- created_at timestamptz NOT NULL DEFAULT now(), UNIQUE (schedule_id,scheduled_for)
+ created_at timestamptz NOT NULL DEFAULT now(), UNIQUE (schedule_id,scheduled_for),
+ FOREIGN KEY (schedule_id,tenant_id) REFERENCES hussam_runner_v1.schedules(id,tenant_id),
+ FOREIGN KEY (task_id,tenant_id) REFERENCES hussam_runner_v1.tasks(id,tenant_id)
 );
 
 -- Force tenant scope at the database boundary. Set app.tenant_id transaction-locally.
