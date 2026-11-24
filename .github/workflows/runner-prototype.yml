@@ -43,3 +43,95 @@ jobs:
         env:
           RUNNER_TEST_DATABASE_URL: postgresql://runner_test:runner_test_only@127.0.0.1:5432/runner_test
         run: python -m pytest -q tests/runner
+
+      - name: Backup, restore, and resume from a checkpoint on disposable PostgreSQL
+        env:
+          POSTGRES_CONTAINER_ID: ${{ job.services.postgres.id }}
+          RUNNER_TEST_DATABASE_URL: postgresql://runner_test:runner_test_only@127.0.0.1:5432/runner_test
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import os
+          import uuid
+          import psycopg
+          from app.runner.postgres import PostgresQueue
+
+          tenant_id = 190025
+          idempotency_key = "runner-v1-restore-drill"
+          connection = psycopg.connect(os.environ["RUNNER_TEST_DATABASE_URL"])
+          queue = PostgresQueue(connection)
+          task_id = queue.enqueue(
+              tenant_id=tenant_id,
+              task_type="restore_canary",
+              payload={"purpose": "isolated_restore_validation"},
+              idempotency_key=idempotency_key,
+              max_attempts=3,
+          )
+          task = queue.claim(
+              tenant_id=tenant_id,
+              worker_id="restore-drill-before-backup",
+              lease_seconds=30,
+          )
+          assert task is not None and task["id"] == task_id
+          queue.checkpoint(task, {"marker": "runner-v1-restore-checkpoint", "cursor": 37})
+          connection.close()
+          print("Created a running task and verified-checkpoint restore canary.")
+          PY
+
+          docker exec "$POSTGRES_CONTAINER_ID" pg_dump \
+            -U runner_test -d runner_test -Fc -f /tmp/hussam-runner-v1.dump
+          docker exec "$POSTGRES_CONTAINER_ID" pg_restore \
+            --list /tmp/hussam-runner-v1.dump >/tmp/hussam-runner-v1.dump.list
+          docker exec "$POSTGRES_CONTAINER_ID" createdb -U runner_test runner_restore
+          docker exec "$POSTGRES_CONTAINER_ID" pg_restore \
+            --no-owner --no-privileges -U runner_test -d runner_restore \
+            /tmp/hussam-runner-v1.dump
+
+          RUNNER_RESTORE_DATABASE_URL=postgresql://runner_test:runner_test_only@127.0.0.1:5432/runner_restore python - <<'PY'
+          import os
+          import psycopg
+          from app.runner.postgres import PostgresQueue
+
+          tenant_id = 190025
+          idempotency_key = "runner-v1-restore-drill"
+          connection = psycopg.connect(os.environ["RUNNER_RESTORE_DATABASE_URL"])
+          queue = PostgresQueue(connection)
+          with connection.transaction():
+              connection.execute(
+                  "SELECT set_config('app.tenant_id', %s, true)", (str(tenant_id),)
+              )
+              task_id = connection.execute(
+                  """SELECT id FROM hussam_runner_v1.tasks
+                     WHERE tenant_id=%s AND idempotency_key=%s""",
+                  (tenant_id, idempotency_key),
+              ).fetchone()[0]
+              connection.execute(
+                  """UPDATE hussam_runner_v1.tasks
+                     SET lease_expires_at=now()-interval '1 second'
+                     WHERE id=%s AND tenant_id=%s""",
+                  (task_id, tenant_id),
+              )
+          recovered = queue.claim(
+              tenant_id=tenant_id,
+              worker_id="restore-drill-after-restore",
+              lease_seconds=30,
+          )
+          assert recovered is not None and recovered["id"] == task_id
+          checkpoint = queue.latest_checkpoint(recovered)
+          assert checkpoint is not None
+          assert checkpoint["payload"] == {
+              "marker": "runner-v1-restore-checkpoint", "cursor": 37
+          }
+          queue.complete(recovered)
+          with connection.transaction():
+              connection.execute(
+                  "SELECT set_config('app.tenant_id', %s, true)", (str(tenant_id),)
+              )
+              state = connection.execute(
+                  "SELECT state FROM hussam_runner_v1.tasks WHERE id=%s",
+                  (task_id,),
+              ).fetchone()[0]
+          assert state == "succeeded"
+          connection.close()
+          print("Backup/restore passed: recovered task resumed from its verified checkpoint.")
+          PY
